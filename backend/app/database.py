@@ -3,16 +3,21 @@ import os
 import json
 from datetime import datetime
 
-DB_PATH = os.environ.get("FINAUDIT_DB_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "finauditpro.db"))
+def get_db_path() -> str:
+    return os.environ.get("FINAUDIT_DB_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "finauditpro.db"))
+
+DB_PATH = get_db_path()
 
 def _ensure_db_dir():
-    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+    path = get_db_path()
+    db_dir = os.path.dirname(os.path.abspath(path))
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
 
 def get_db_connection():
     _ensure_db_dir()
-    conn = sqlite3.connect(DB_PATH, timeout=30.0, isolation_level=None)
+    path = get_db_path()
+    conn = sqlite3.connect(path, timeout=30.0, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")

@@ -7,9 +7,10 @@ from backend.app.database import init_db
 class TestE2ECleanWorkflow(unittest.TestCase):
     def setUp(self):
         # Reset to clean database
-        if os.path.exists("backend/finauditpro.db"):
+        from backend.app.database import DB_PATH, init_db
+        if os.path.exists(DB_PATH):
             try:
-                os.remove("backend/finauditpro.db")
+                os.remove(DB_PATH)
             except Exception:
                 pass
         init_db()
