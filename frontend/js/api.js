@@ -946,10 +946,6 @@ class FinAuditAPI {
     return this.request("/api/audit-trail/backup/create", { method: "POST" });
   }
 
-  static seedSampleData() {
-    return this.request("/api/settings/seed-sample-data", { method: "POST" });
-  }
-
   // --- Offline Local AI Model Manager ---
   static getAIStatus() {
     return this.request("/api/ai-manager/status");

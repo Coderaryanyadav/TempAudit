@@ -88,6 +88,15 @@ class TestOfflineAIModelManager(unittest.TestCase):
         self.assertEqual(saved["context_size"], 4096)
         self.assertEqual(saved["temperature"], 0.15)
 
+        # Non-admin auditor cannot change AI settings (Admin-only)
+        auditor_only_token = create_access_token(data={"sub": "auditor", "role": "Auditor", "uid": 6})
+        res_auditor = self.client.post(
+            "/api/ai-manager/settings",
+            json=update_payload,
+            headers={"Authorization": f"Bearer {auditor_only_token}"}
+        )
+        self.assertEqual(res_auditor.status_code, 403)
+
         # Verify audit log entry
         conn = get_db_connection()
         log = conn.execute("""

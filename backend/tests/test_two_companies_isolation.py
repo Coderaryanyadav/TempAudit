@@ -156,5 +156,29 @@ class TestTwoCompaniesIsolation(unittest.TestCase):
         self.assertIn("Hitansh Fintech", res_ai_hitansh.get("response", ""))
         self.assertNotIn("Aryan", res_ai_hitansh.get("response", ""))
 
+    def test_staff_assignment_authorization_isolation(self):
+        """Staff assigned to Aryan cannot access Hitansh, and Staff assigned to Hitansh cannot access Aryan."""
+        staff_aryan_token = create_access_token({"sub": "staff_aryan", "role": "Audit Staff", "uid": 3, "token_version": 1})
+        staff_hitansh_token = create_access_token({"sub": "staff_hitansh", "role": "Audit Staff", "uid": 5, "token_version": 1})
+        
+        h_aryan = {"Authorization": f"Bearer {staff_aryan_token}"}
+        h_hitansh = {"Authorization": f"Bearer {staff_hitansh_token}"}
+
+        # 1. Staff A accesses Aryan -> 200 OK
+        res_a_aryan = self.client.get(f"/api/findings/{self.aryan_cy_id}", headers=h_aryan)
+        self.assertEqual(res_a_aryan.status_code, 200)
+
+        # 2. Staff A attempts to access Hitansh -> 403 Forbidden
+        res_a_hitansh = self.client.get(f"/api/findings/{self.hitansh_cy_id}", headers=h_aryan)
+        self.assertEqual(res_a_hitansh.status_code, 403)
+
+        # 3. Staff B accesses Hitansh -> 200 OK
+        res_b_hitansh = self.client.get(f"/api/findings/{self.hitansh_cy_id}", headers=h_hitansh)
+        self.assertEqual(res_b_hitansh.status_code, 200)
+
+        # 4. Staff B attempts to access Aryan -> 403 Forbidden
+        res_b_aryan = self.client.get(f"/api/findings/{self.aryan_cy_id}", headers=h_hitansh)
+        self.assertEqual(res_b_aryan.status_code, 403)
+
 if __name__ == "__main__":
     unittest.main()

@@ -15,6 +15,20 @@ def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> f
         return default
     return round(numerator / denominator, 4)
 
+def derive_prior_financial_year(fy_str: str) -> Optional[str]:
+    """Derives exact preceding financial year string (e.g. '2025-26' -> '2024-25', '2024-2025' -> '2023-2024')."""
+    if not fy_str:
+        return None
+    match = re.search(r'(\d{4})[-/](\d{2,4})', str(fy_str).strip())
+    if match:
+        start_year = int(match.group(1))
+        end_part = match.group(2)
+        if len(end_part) == 2:
+            return f"{start_year - 1}-{(start_year)%100:02d}"
+        else:
+            return f"{start_year - 1}-{int(end_part) - 1}"
+    return None
+
 def calculate_variance(cy: float, py: float, threshold_pct: float = 10.0, materiality: float = 50000.0, is_executive: bool = False) -> Dict[str, Any]:
     """
     Computes absolute difference, percentage change, direction, and significance
@@ -22,25 +36,35 @@ def calculate_variance(cy: float, py: float, threshold_pct: float = 10.0, materi
     """
     abs_diff = round(cy - py, 2)
     if abs(py) < 1e-4:
-        pct_diff = 100.0 if cy > 0 else (0.0 if cy == 0 else -100.0)
+        if abs(cy) < 1e-4:
+            pct_diff = 0.0
+            direction = "No Change"
+            change_type = "NO_CHANGE"
+        else:
+            pct_diff = None
+            direction = "New Balance" if cy > 0 else "New Debit Balance"
+            change_type = "NEW_BALANCE"
     else:
         pct_diff = round(((cy - py) / abs(py)) * 100.0, 2)
-
-    if abs_diff > 0:
-        direction = "Increase"
-    elif abs_diff < 0:
-        direction = "Decrease"
-    else:
-        direction = "No Change"
+        change_type = "MOVEMENT"
+        if abs_diff > 0:
+            direction = "Increase"
+        elif abs_diff < 0:
+            direction = "Decrease"
+        else:
+            direction = "No Change"
 
     # Configurable threshold evaluation
-    is_significant = (abs(pct_diff) >= threshold_pct) and (abs(abs_diff) >= materiality or is_executive)
+    if pct_diff is not None:
+        is_significant = (abs(pct_diff) >= threshold_pct) and (abs(abs_diff) >= materiality or is_executive)
+    else:
+        is_significant = (abs(abs_diff) >= materiality or is_executive)
 
     # Dynamic Risk Level
     if is_significant:
-        if (abs(pct_diff) >= max(30.0, threshold_pct * 3.0)) or (py > 0 and cy < 0 and "profit" in str(is_executive).lower()):
+        if pct_diff is not None and ((abs(pct_diff) >= max(30.0, threshold_pct * 3.0)) or (py > 0 and cy < 0 and "profit" in str(is_executive).lower())):
             risk = "CRITICAL"
-        elif abs(pct_diff) >= max(20.0, threshold_pct * 2.0):
+        elif pct_diff is not None and abs(pct_diff) >= max(20.0, threshold_pct * 2.0):
             risk = "HIGH"
         else:
             risk = "MEDIUM"
@@ -53,6 +77,7 @@ def calculate_variance(cy: float, py: float, threshold_pct: float = 10.0, materi
         "absolute_difference": abs_diff,
         "percentage_difference": pct_diff,
         "movement_direction": direction,
+        "change_type": change_type,
         "is_significant": is_significant,
         "risk": risk
     }
@@ -61,7 +86,7 @@ def run_yoy_comparison(
     engagement_id: int,
     py_engagement_id: Optional[int] = None,
     threshold_pct: float = 10.0,
-    materiality_threshold: float = 50000.0
+    materiality_threshold: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Executes comprehensive Year-on-Year Financial Comparison across:
@@ -81,6 +106,10 @@ def run_yoy_comparison(
     cy_eng = dict(cy_eng_row)
     client_id = cy_eng["client_id"]
     cy_fy = cy_eng.get("financial_year", "2024-25")
+    
+    # Read materiality threshold from engagement if not explicitly provided
+    if materiality_threshold is None:
+        materiality_threshold = float(cy_eng.get("materiality_threshold") or 50000.0)
 
     # 2. Identify or Validate Previous Year Engagement
     py_eng = None
@@ -90,7 +119,19 @@ def run_yoy_comparison(
             py_eng = dict(py_row)
     
     if not py_eng:
-        # Auto-detect other engagement for this client
+        # Step A: Look for exact prior financial year (e.g. FY 2025-26 -> FY 2024-25)
+        target_py_fy = derive_prior_financial_year(cy_fy)
+        if target_py_fy:
+            py_row = conn.execute("""
+                SELECT * FROM engagements
+                WHERE client_id = ? AND id != ? AND financial_year = ?
+                ORDER BY id DESC LIMIT 1
+            """, (client_id, engagement_id, target_py_fy)).fetchone()
+            if py_row:
+                py_eng = dict(py_row)
+
+    if not py_eng:
+        # Step B: Fallback to most recent earlier engagement
         py_row = conn.execute("""
             SELECT * FROM engagements
             WHERE client_id = ? AND id != ? AND financial_year != ?
@@ -825,13 +866,14 @@ def generate_yoy_csv_report(
         writer.writerow([])
         writer.writerow([f"--- {sec_title} ---"])
         for itm in items:
+            pct_s = f"{itm['percentage_difference']:.2f}%" if itm['percentage_difference'] is not None else "N/A (New Balance)"
             writer.writerow([
                 itm["category"],
                 itm["account_name"],
                 f"{itm['previous_year']:.2f}",
                 f"{itm['current_year']:.2f}",
                 f"{itm['absolute_difference']:.2f}",
-                f"{itm['percentage_difference']:.2f}%",
+                pct_s,
                 itm["movement_direction"],
                 "YES" if itm["is_significant"] else "NO",
                 itm["risk"],

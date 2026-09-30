@@ -3,6 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.database import init_db
+from test_data.seed import seed_test_database
 
 class TestE2ECleanWorkflow(unittest.TestCase):
     def setUp(self):
@@ -16,9 +17,19 @@ class TestE2ECleanWorkflow(unittest.TestCase):
         init_db()
         self.client = TestClient(app)
 
+    def tearDown(self):
+        # Restore standard test suite seeds
+        seed_test_database()
+
     def test_complete_clean_audit_workflow(self):
-        # 1. Login with initial admin credentials
-        res = self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+        # 1. Complete first-run administrator setup
+        setup_payload = {
+            "username": "admin",
+            "email": "admin@cleanfirm.local",
+            "full_name": "Senior Audit Partner (CA)",
+            "password": "SecurePassword2026!"
+        }
+        res = self.client.post("/api/auth/initial-setup", json=setup_payload)
         self.assertEqual(res.status_code, 200)
         token = res.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}

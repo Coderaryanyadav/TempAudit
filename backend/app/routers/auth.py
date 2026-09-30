@@ -19,6 +19,88 @@ router = APIRouter(prefix="/api/auth", tags=["User Management & Authentication"]
 USERNAME_REGEX = r"^[a-zA-Z0-9_.]{3,50}$"
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
 
+@router.get("/setup-status")
+def get_setup_status():
+    """Checks whether the first-time administrator setup has been completed."""
+    conn = get_db_connection()
+    try:
+        user_count = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
+        return {
+            "is_setup_completed": user_count > 0,
+            "user_count": user_count
+        }
+    finally:
+        conn.close()
+
+@router.post("/initial-setup")
+def initial_setup(user_data: UserCreate):
+    """
+    First-run setup endpoint: Allows creating the primary System Administrator
+    with a user-chosen password if and only if no users exist in the database.
+    """
+    conn = get_db_connection()
+    try:
+        user_count = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
+        if user_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Initial setup has already been completed. Please log in or contact an existing Administrator."
+            )
+
+        username = user_data.username.strip()
+        email = user_data.email.strip()
+
+        if not re.match(USERNAME_REGEX, username):
+            raise HTTPException(status_code=400, detail="Username must be 3-50 characters (letters, numbers, underscores, dots only).")
+        
+        if not re.match(EMAIL_REGEX, email):
+            raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+
+        if len(user_data.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters long.")
+
+        pwd_hash = hash_password(user_data.password)
+        now_str = datetime.now().isoformat()
+
+        cursor = conn.execute("""
+            INSERT INTO users (username, email, full_name, role, password_hash, is_active, phone, created_at)
+            VALUES (?, ?, ?, 'Admin', ?, 1, ?, ?)
+        """, (username, email, user_data.full_name.strip(), pwd_hash, user_data.phone or "", now_str))
+
+        new_id = cursor.lastrowid
+
+        log_audit_event(
+            conn,
+            action="INITIAL_SETUP",
+            module="AUTH",
+            record_id=new_id,
+            details=f"Primary Administrator account '{username}' created during first-run system setup",
+            user={"id": new_id, "username": username}
+        )
+
+        conn.commit()
+
+        # Generate access token for immediate onboarding
+        token = create_access_token({"sub": username, "role": "Admin", "uid": new_id, "token_version": 1})
+
+        return {
+            "status": "success",
+            "message": "System Administrator account created successfully.",
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": new_id,
+                "username": username,
+                "full_name": user_data.full_name.strip(),
+                "role": "Admin",
+                "email": email,
+                "phone": user_data.phone or "",
+                "created_at": now_str
+            }
+        }
+    finally:
+        conn.close()
+
 @router.post("/login")
 def login(creds: UserLogin):
     """Authenticate user with username and password, update last_login, return JWT token."""

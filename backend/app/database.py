@@ -143,6 +143,7 @@ def init_db():
         file_name TEXT NOT NULL,
         file_type TEXT NOT NULL,
         file_path TEXT NOT NULL,
+        source_type TEXT DEFAULT 'USER_UPLOAD', -- USER_UPLOAD, TEST_FIXTURE, SYSTEM_GENERATED
         data_category TEXT DEFAULT 'General Ledger',
         row_count INTEGER DEFAULT 0,
         successful_rows INTEGER DEFAULT 0,
@@ -159,6 +160,8 @@ def init_db():
     # Migrate uploaded_files table columns if missing
     cursor.execute("PRAGMA table_info(uploaded_files)")
     up_cols = [col[1] for col in cursor.fetchall()]
+    if "source_type" not in up_cols:
+        cursor.execute("ALTER TABLE uploaded_files ADD COLUMN source_type TEXT DEFAULT 'USER_UPLOAD'")
     if "data_category" not in up_cols:
         cursor.execute("ALTER TABLE uploaded_files ADD COLUMN data_category TEXT DEFAULT 'General Ledger'")
     if "successful_rows" not in up_cols:
@@ -720,28 +723,9 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_engagement ON uploaded_files(engagement_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_yoy_reviews_eng ON yoy_comparison_reviews(engagement_id)")
 
-    # Seed Initial Administrator Account if no users exist
-    user_count = cursor.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
-    if user_count == 0:
-        from backend.app.auth import hash_password
-        admin_hash = hash_password("admin123")
-        auditor_hash = hash_password("audit123")
-        staff_hash = hash_password("staff123")
-        now_str = datetime.now().isoformat()
-        cursor.execute("""
-        INSERT OR IGNORE INTO users (id, username, email, full_name, role, password_hash, is_active, created_at)
-        VALUES (1, 'admin', 'admin@finauditpro.local', 'System Administrator (FCA)', 'Admin', ?, 1, ?)
-        """, (admin_hash, now_str))
-        
-        cursor.execute("""
-        INSERT OR IGNORE INTO users (id, username, email, full_name, role, password_hash, is_active, created_at)
-        VALUES (2, 'auditor', 'senior@finauditpro.in', 'Rohan Mehta (Senior Audit Manager)', 'Auditor', ?, 1, ?)
-        """, (auditor_hash, now_str))
-
-        cursor.execute("""
-        INSERT OR IGNORE INTO users (id, username, email, full_name, role, password_hash, is_active, created_at)
-        VALUES (3, 'staff', 'assistant@finauditpro.in', 'Pooja Verma (Audit Assistant)', 'Audit Staff', ?, 1, ?)
-        """, (staff_hash, now_str))
+    # Note: Production initialization creates no default credentials.
+    # Initial Administrator is created via /api/auth/initial-setup during first-run setup.
+    # Test credentials are seeded explicitly in test_data/seed.py or scripts/seed_test_data.py.
 
     conn.commit()
     conn.close()

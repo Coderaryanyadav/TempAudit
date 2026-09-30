@@ -12,82 +12,92 @@ def safe_div(n: float, d: float, default: float = 0.0) -> float:
 def calculate_change(cy: float, py: float) -> Dict[str, Any]:
     abs_diff = round(cy - py, 2)
     if abs(py) < 1e-4:
-        pct_diff = 100.0 if cy > 0 else (0.0 if cy == 0 else -100.0)
+        pct_diff = None
+        change_type = "NO_CHANGE" if abs(cy) < 1e-4 else "NEW_BALANCE"
     else:
         pct_diff = round(((cy - py) / abs(py)) * 100.0, 2)
+        change_type = "MOVEMENT"
+
+    is_significant = (abs(pct_diff) >= 20.0 if pct_diff is not None else (change_type == "NEW_BALANCE" and abs(abs_diff) > 0)) or abs(abs_diff) >= 500000.0
     return {
         "current_value": round(cy, 2),
         "previous_value": round(py, 2),
         "absolute_difference": abs_diff,
         "percentage_difference": pct_diff,
-        "is_significant": abs(pct_diff) >= 20.0 or abs(abs_diff) >= 500000.0
+        "change_type": change_type,
+        "is_significant": is_significant
     }
 
-def get_possible_explanations(metric_key: str, cy: float, py: float, pct_diff: float) -> List[str]:
-    """Provides plausible statutory and business explanation categories for significant financial movements."""
-    is_increase = pct_diff > 0
+def get_possible_explanations(metric_key: str, cy: float, py: float, pct_diff: Optional[float] = None) -> List[str]:
+    """Provides plausible statutory and business hypothesis categories for significant financial movements (requires auditor corroboration)."""
+    if pct_diff is None:
+        is_increase = cy > py
+    else:
+        is_increase = pct_diff > 0
     k = metric_key.lower()
 
     if "revenue" in k or "sales" in k:
-        return [
+        raw = [
             "Expansion into new market territories / distributor addition" if is_increase else "Demand softening / key client contract non-renewal",
             "Price revision / inflation adjustments" if is_increase else "Competitive discounting / volume drop",
             "Introduction of new product lines" if is_increase else "Supply chain bottleneck impacting deliveries"
         ]
     elif "cogs" in k or "purchase" in k or "material" in k:
-        return [
+        raw = [
             "Raw material commodity price inflation" if is_increase else "Favorable procurement terms / bulk discounts",
             "Production volume escalation" if is_increase else "Shift toward higher margin traded goods",
             "Import tariff / freight rate fluctuations" if is_increase else "Inventory optimization / yield improvements"
         ]
     elif "gross_profit" in k or "gp_margin" in k:
-        return [
+        raw = [
             "Product mix shift toward higher margin value-added products" if is_increase else "Raw material input cost escalation not passed to customers",
             "Better manufacturing capacity utilization" if is_increase else "Pricing pressure from competitors",
             "Direct labor productivity gains" if is_increase else "Higher subcontracting / job work costs"
         ]
     elif "net_profit" in k or "np_margin" in k or "operating_margin" in k:
-        return [
+        raw = [
             "Operating leverage & fixed overhead cost containment" if is_increase else "Overhead cost escalation / administrative inflation",
             "Reduction in finance costs / debt retirement" if is_increase else "Higher interest rates on working capital facilities",
             "Lower depreciation or one-off exceptional gains" if is_increase else "Increased selling, marketing & logistics spend"
         ]
     elif "debtor" in k or "receivable" in k:
-        return [
+        raw = [
             "Relaxation of credit terms to major institutional clients" if is_increase else "Aggressive cash collections & tight credit policy",
             "High concentration of Q4 billing nearing year-end" if is_increase else "Factoring / bill discounting arrangements",
             "Delayed customer milestone sign-offs" if is_increase else "Write-off of long-overdue doubtful debts"
         ]
     elif "inventory" in k or "stock" in k:
-        return [
+        raw = [
             "Strategic bulk purchasing ahead of anticipated price rises" if is_increase else "Lean JIT inventory management implementation",
             "Slow-moving finished goods inventory build-up" if is_increase else "High order fulfillment during peak season",
             "Supply chain lead-time buffering" if is_increase else "Scrap / obsolete inventory write-downs"
         ]
     elif "creditor" in k or "payable" in k:
-        return [
+        raw = [
             "Negotiated extended payment terms with key suppliers" if is_increase else "Accelerated supplier payments to avail cash discounts",
             "Higher procurement volumes in year-end quarter" if is_increase else "Vendor advance settlement requirements",
             "Cash flow management pacing" if is_increase else "Stricter MSMEDA 45-day payment compliance (Sec 43B(h))"
         ]
     elif "debt" in k or "borrowing" in k:
-        return [
+        raw = [
             "Availment of new term loan for CAPEX expansion" if is_increase else "Scheduled term loan principal repayments",
             "Higher utilization of working capital cash credit limits" if is_increase else "De-leveraging funded by internal accruals",
             "Promoter unsecured loan infusion" if is_increase else "Refinancing with lower interest facilities"
         ]
     elif "current_ratio" in k or "quick_ratio" in k:
-        return [
+        raw = [
             "Enhanced liquidity buffer & retained cash reserves" if is_increase else "Working capital tightening / higher current maturities",
             "Inventory build-up or receivable growth" if is_increase else "Utilization of cash for fixed asset acquisitions",
             "Long-term funding of current assets" if is_increase else "Short-term borrowing for capital commitments"
         ]
     else:
-        return [
+        raw = [
             "Business scale change / operational expansion" if is_increase else "Operational curtailment / asset disposal",
             "Accounting reclassification or presentation change",
             "Market economic condition shift"
         ]
+
+    return [f"[Hypothesis - requires auditor corroboration] {item}" for item in raw]
 
 def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
     """
@@ -526,7 +536,8 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         is_sig = chg["is_significant"]
         if is_sig:
             significant_movements_count += 1
-            finding_status = "Significant movement" if abs(chg["percentage_difference"]) >= 35.0 else "Unusual change"
+            pct_d = chg["percentage_difference"]
+            finding_status = "Significant movement" if (pct_d is None or abs(pct_d) >= 35.0) else "Unusual change"
         else:
             finding_status = "Stable trend"
 

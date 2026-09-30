@@ -2,12 +2,12 @@ import unittest
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.auth import hash_password, verify_password
-from backend.app.utils.sample_data import seed_sample_database
+from test_data.seed import seed_test_database
 
 class TestUserManagementAndAuth(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        seed_sample_database()
+        seed_test_database()
         cls.client = TestClient(app)
 
     def test_password_hashing_and_verification(self):

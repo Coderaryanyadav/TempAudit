@@ -11,44 +11,77 @@ import os
 import csv
 from datetime import datetime
 from backend.app.database import get_db_connection, init_db
+from backend.app.auth import hash_password
 from test_data.companies import ARYAN_COMPANY, HITANSH_COMPANY
 from test_data.transactions import get_transactions_for_company, get_prior_year_transactions_for_company
 from test_data.findings import get_test_findings_for_company
 from test_data.working_papers import get_test_working_papers_for_company
 from test_data.checklists import get_test_checklist_items
 
+def seed_test_users(conn):
+    """Explicitly seeds test users and staff assignments for testing/development."""
+    cursor = conn.cursor()
+    now_str = datetime.now().isoformat()
+    
+    admin_hash = hash_password("admin123")
+    audit_hash = hash_password("audit123")
+    staff_hash = hash_password("staff123")
+
+    test_users = [
+        (1, "admin", "admin@finauditpro.local", "System Administrator (FCA)", "Admin", admin_hash),
+        (2, "auditor_aryan", "lead.aryan@finauditpro.in", "Auditor A (Aryan Lead Manager)", "Auditor", audit_hash),
+        (3, "staff_aryan", "staff.aryan@finauditpro.in", "Staff A (Aryan Engagement Staff)", "Audit Staff", staff_hash),
+        (4, "auditor_hitansh", "lead.hitansh@finauditpro.in", "Auditor B (Hitansh Lead Manager)", "Auditor", audit_hash),
+        (5, "staff_hitansh", "staff.hitansh@finauditpro.in", "Staff B (Hitansh Engagement Staff)", "Audit Staff", staff_hash),
+        (6, "auditor", "senior@finauditpro.in", "Rohan Mehta (General Auditor)", "Auditor", audit_hash),
+        (7, "staff", "assistant@finauditpro.in", "Pooja Verma (General Staff)", "Audit Staff", staff_hash),
+    ]
+
+    for uid, uname, uemail, ufullname, urole, uhash in test_users:
+        cursor.execute("""
+            INSERT OR REPLACE INTO users (id, username, email, full_name, role, password_hash, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        """, (uid, uname, uemail, ufullname, urole, uhash, now_str))
+
 def seed_company_engagement(conn, company: dict) -> dict:
     now_str = datetime.now().isoformat()
     cursor = conn.cursor()
 
-    # 1. Insert Client
+    is_aryan = company.get("short_code") == "ARYAN"
+    lead_auditor_id = 2 if is_aryan else 4
+    assigned_staff_id = 3 if is_aryan else 5
+
+    # 1. Insert Client with synthetic flag notes
+    client_notes = f"[SYNTHETIC TEST DATASET - NOT REAL CLIENT DATA] {company.get('nature_of_business', '')}"
     cursor.execute("""
-        INSERT INTO clients (name, pan, gstin, entity_type, contact_person, email, phone, address, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients (name, pan, gstin, entity_type, contact_person, email, phone, address, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         company["name"], company["pan"], company["gstin"], company["company_type"],
         company["primary_contact"], company["email"], company["phone"], company["address"],
-        now_str, now_str
+        client_notes, now_str, now_str
     ))
     client_id = cursor.lastrowid
 
     # 2. Insert Prior Year Engagement (FY 2024-25)
     cursor.execute("""
-        INSERT INTO engagements (client_id, title, audit_type, financial_year, period_start, period_end, status, lead_auditor_id, assigned_staff_id, notes, created_at, updated_at)
-        VALUES (?, ?, 'Statutory Audit', ?, ?, ?, 'Completed', 1, 2, ?, ?, ?)
+        INSERT INTO engagements (client_id, title, audit_type, financial_year, period_start, period_end, status, lead_auditor_id, assigned_staff_id, materiality_threshold, notes, created_at, updated_at)
+        VALUES (?, ?, 'Statutory Audit', ?, ?, ?, 'Completed', ?, ?, 50000.0, ?, ?, ?)
     """, (
         client_id, f"Statutory Audit {company['prior_financial_year']}", company["prior_financial_year"],
-        f"2024-04-01", f"2025-03-31", f"Prior year audit records for {company['name']}", now_str, now_str
+        f"2024-04-01", f"2025-03-31", lead_auditor_id, assigned_staff_id,
+        f"[TEST FIXTURE] Prior year audit records for {company['name']}", now_str, now_str
     ))
     py_eng_id = cursor.lastrowid
 
     # 3. Insert Current Year Engagement (FY 2025-26)
     cursor.execute("""
-        INSERT INTO engagements (client_id, title, audit_type, financial_year, period_start, period_end, status, lead_auditor_id, assigned_staff_id, notes, created_at, updated_at)
-        VALUES (?, ?, 'Statutory Audit', ?, ?, ?, 'In Progress', 1, 2, ?, ?, ?)
+        INSERT INTO engagements (client_id, title, audit_type, financial_year, period_start, period_end, status, lead_auditor_id, assigned_staff_id, materiality_threshold, notes, created_at, updated_at)
+        VALUES (?, ?, 'Statutory Audit', ?, ?, ?, 'In Progress', ?, ?, 50000.0, ?, ?, ?)
     """, (
         client_id, f"Statutory & Tax Audit {company['financial_year']}", company["financial_year"],
-        f"2025-04-01", f"2026-03-31", f"Current year active audit for {company['name']}", now_str, now_str
+        f"2025-04-01", f"2026-03-31", lead_auditor_id, assigned_staff_id,
+        f"[TEST FIXTURE] Current year active audit for {company['name']}", now_str, now_str
     ))
     cy_eng_id = cursor.lastrowid
 
@@ -122,7 +155,7 @@ def seed_company_engagement(conn, company: dict) -> dict:
             wp["objective"], wp["status"], wp["prepared_by"], now_str[:10], wp["notes"], now_str, now_str
         ))
 
-    # 9. Register Uploaded Files references
+    # 9. Register Uploaded Files references with explicit source_type = 'TEST_FIXTURE' and uploaded_by = 'SYSTEM_TEST_SEED'
     for cat, fname in [
         ("General Ledger", "transactions.csv"),
         ("Sales Register", "sales_register.csv"),
@@ -131,8 +164,8 @@ def seed_company_engagement(conn, company: dict) -> dict:
         ("GST Data", "gst_portal.csv")
     ]:
         cursor.execute("""
-            INSERT INTO uploaded_files (engagement_id, file_name, file_type, file_path, data_category, row_count, uploaded_by, uploaded_at)
-            VALUES (?, ?, 'CSV', ?, ?, 200, 'admin', ?)
+            INSERT INTO uploaded_files (engagement_id, file_name, file_type, file_path, source_type, data_category, row_count, uploaded_by, uploaded_at)
+            VALUES (?, ?, 'CSV', ?, 'TEST_FIXTURE', ?, 200, 'SYSTEM_TEST_SEED', ?)
         """, (
             cy_eng_id, f"{company['short_code'].lower()}_{fname}", f"test_data/{company['short_code'].lower()}_fintech/{fname}", cat, now_str
         ))
@@ -141,13 +174,16 @@ def seed_company_engagement(conn, company: dict) -> dict:
         "client_id": client_id,
         "cy_engagement_id": cy_eng_id,
         "py_engagement_id": py_eng_id,
-        "company": company["name"]
+        "company": company["name"],
+        "lead_auditor_id": lead_auditor_id,
+        "assigned_staff_id": assigned_staff_id
     }
 
 def seed_test_database():
-    """Seeds the SQLite database with both Aryan Fintech and Hitansh Fintech datasets."""
+    """Seeds the SQLite database with both Aryan Fintech and Hitansh Fintech datasets and test users."""
     init_db()
     conn = get_db_connection()
+    seed_test_users(conn)
     res_aryan = seed_company_engagement(conn, ARYAN_COMPANY)
     res_hitansh = seed_company_engagement(conn, HITANSH_COMPANY)
     conn.commit()

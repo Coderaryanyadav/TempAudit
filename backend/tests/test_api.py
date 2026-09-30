@@ -1,12 +1,12 @@
 import unittest
 from fastapi.testclient import TestClient
 from backend.app.main import app
-from backend.app.utils.sample_data import seed_sample_database
+from test_data.seed import seed_test_database
 
 class TestFinAuditAPI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        seed_sample_database()
+        seed_test_database()
         cls.client = TestClient(app)
         login_res = cls.client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
         token = login_res.json()["access_token"]

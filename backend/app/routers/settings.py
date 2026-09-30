@@ -13,7 +13,6 @@ from pydantic import BaseModel
 from backend.app.auth import get_current_user, require_role
 from backend.app.database import DB_PATH, get_db_connection
 from backend.app.utils.audit_logger import log_audit_event
-from backend.app.utils.sample_data import seed_sample_database
 
 router = APIRouter(prefix="/api/settings", tags=["Settings & Application Config"])
 
@@ -257,26 +256,3 @@ def download_backup(filename: str, current_user: dict = Depends(require_role(["A
         conn.close()
 
     return FileResponse(path=file_path, filename=safe_filename, media_type="application/octet-stream")
-
-
-@router.post("/seed-sample-data")
-def seed_sample_data(current_user: dict = Depends(require_role(["Admin"]))):
-    """Admin: Seeds test clients, engagements, vouchers, and working papers for demonstration."""
-    try:
-        seed_sample_database()
-        conn = get_db_connection()
-        try:
-            log_audit_event(
-                conn,
-                action="DATA_MODIFICATION",
-                module="SETTINGS",
-                record_id="seed_sample_data",
-                details="Seeded sample audit database and engagements",
-                user=current_user
-            )
-            conn.commit()
-        finally:
-            conn.close()
-        return {"status": "success", "message": "Sample client, engagements, realistic test vouchers, and checklists seeded successfully."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to seed sample data: {str(e)}")

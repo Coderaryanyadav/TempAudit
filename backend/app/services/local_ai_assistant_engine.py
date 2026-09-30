@@ -433,7 +433,8 @@ The Hybrid AI Anomaly Engine analyzed **{len(self.transactions):,}** transaction
             is_sig = l.get("is_significant")
 
             sig_badge = "🚨 **SIGNIFICANT**" if is_sig else "Normal"
-            narrative += f"- **{acc}:** {py_fy}: ₹{py_val:,.2f} → {cy_fy}: ₹{cy_val:,.2f} | **Variance:** {abs_diff:+,.2f} ({pct_diff:+.1f}%) [{dir_m}] — {sig_badge}\n"
+            pct_s = f"{pct_diff:+.1f}%" if pct_diff is not None else "New Balance"
+            narrative += f"- **{acc}:** {py_fy}: ₹{py_val:,.2f} → {cy_fy}: ₹{cy_val:,.2f} | **Variance:** {abs_diff:+,.2f} ({pct_s}) [{dir_m}] — {sig_badge}\n"
             
             evidence.append({
                 "item_key": l.get("item_key"),
@@ -687,7 +688,9 @@ The automated audit engine evaluated **{len(self.transactions):,}** transactions
                 name = ml.get("account_name")
                 if name not in ledger_risk_map:
                     ledger_risk_map[name] = {"findings": 0, "critical": 0, "reasons": []}
-                ledger_risk_map[name]["reasons"].append(f"Significant YoY variance of ₹{ml.get('absolute_difference'):+,.2f} ({ml.get('percentage_difference'):+.1f}%)")
+                ml_pct = ml.get('percentage_difference')
+                ml_pct_s = f"{ml_pct:+.1f}%" if ml_pct is not None else "New Balance"
+                ledger_risk_map[name]["reasons"].append(f"Significant YoY variance of ₹{ml.get('absolute_difference'):+,.2f} ({ml_pct_s})")
 
         narrative = f"""### 📋 Accounts & Ledgers Requiring In-Depth Review
 **Engagement:** {self.engagement.get('title')} ({self.engagement.get('financial_year')})

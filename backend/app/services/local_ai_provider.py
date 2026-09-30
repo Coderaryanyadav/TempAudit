@@ -221,10 +221,10 @@ class BuiltinDeterministicAIProvider(BaseLocalAIProvider):
         super().__init__(endpoint="local://builtin", model_name="FinAudit-Builtin-Rule-Reasoner-v1")
 
     def get_engine_name(self) -> str:
-        return "FinAudit Built-in Reasoning Engine (Deterministic)"
+        return "DETERMINISTIC_RULE_ENGINE"
 
     def check_health(self) -> Tuple[bool, str, float]:
-        return True, "Built-in Offline Reasoning Engine always ready (100% offline)", 0.5
+        return True, "Deterministic Rule Engine Fallback always ready (100% offline, zero daemon)", 0.5
 
     def get_available_models(self) -> List[str]:
         return ["FinAudit-Builtin-Rule-Reasoner-v1"]
@@ -233,6 +233,7 @@ class BuiltinDeterministicAIProvider(BaseLocalAIProvider):
         start = time.time()
         
         response_text = (
+            f"**[ENGINE: DETERMINISTIC_RULE_ENGINE — Offline Fallback (Rule-Based Synthesis, Not Generative LLM)]**\n\n"
             f"### Professional Audit Analysis & Evidence Evaluation (Offline Mode)\n\n"
             f"**1. Audit Subject Matter Evaluation**:\n"
             f"Analysis performed under ICAI Standards on Auditing (SA 200 / SA 315 / SA 500). "
@@ -249,7 +250,7 @@ class BuiltinDeterministicAIProvider(BaseLocalAIProvider):
         lat = round((time.time() - start) * 1000, 1)
         return {
             "text": response_text,
-            "engine": "Built-in Offline Reasoner",
+            "engine": "DETERMINISTIC_RULE_ENGINE",
             "model": self.model_name,
             "latency_ms": lat,
             "success": True,

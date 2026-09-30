@@ -887,6 +887,27 @@ def generate_datasets_for_company(company: dict):
         writer.writeheader()
         writer.writerows(py_transactions)
 
+    # Validation: Assert Accounting Equations & Invariants
+    tot_dr = sum(float(t.get("debit") or 0.0) for t in transactions)
+    tot_cr = sum(float(t.get("credit") or 0.0) for t in transactions)
+    assert abs(tot_dr - tot_cr) < 1.0, f"Accounting equation failed for {short_code} GL: Total Dr ({tot_dr}) != Total Cr ({tot_cr})"
+
+    for s_inv in sales_invoices_data:
+        t_amt = float(s_inv.get("taxable_amount") or 0.0)
+        c_gst = float(s_inv.get("cgst") or 0.0)
+        s_gst = float(s_inv.get("sgst") or 0.0)
+        i_gst = float(s_inv.get("igst") or 0.0)
+        inv_tot = float(s_inv.get("invoice_total") or 0.0)
+        assert abs(inv_tot - (t_amt + c_gst + s_gst + i_gst)) < 0.05, f"Sales invoice {s_inv.get('invoice_no')} total mismatch: {inv_tot} vs {t_amt + c_gst + s_gst + i_gst}"
+
+    for p_inv in purchase_invoices_data:
+        t_amt = float(p_inv.get("taxable_amount") or 0.0)
+        c_gst = float(p_inv.get("cgst") or 0.0)
+        s_gst = float(p_inv.get("sgst") or 0.0)
+        i_gst = float(p_inv.get("igst") or 0.0)
+        inv_tot = float(p_inv.get("invoice_total") or 0.0)
+        assert abs(inv_tot - (t_amt + c_gst + s_gst + i_gst)) < 0.05, f"Purchase invoice {p_inv.get('invoice_no')} total mismatch: {inv_tot} vs {t_amt + c_gst + s_gst + i_gst}"
+
     # 9. Expected Results JSON
     expected_results = {
         "company_code": short_code,
@@ -915,7 +936,7 @@ def generate_datasets_for_company(company: dict):
     with open(os.path.join(c_dir, "expected_results.json"), "w", encoding="utf-8") as f:
         json.dump(expected_results, f, indent=2)
 
-    print(f"Generated complete test dataset for {company['name']} in {c_dir}")
+    print(f"Generated and validated complete test dataset for {company['name']} in {c_dir}")
 
 def run():
     create_directories()

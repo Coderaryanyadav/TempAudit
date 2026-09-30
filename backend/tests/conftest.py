@@ -21,6 +21,7 @@ def setup_test_environment():
     """Initializes isolated database for test execution."""
     os.environ["FINAUDIT_DB_PATH"] = TEST_DB_PATH
     init_db()
+    seed_test_database()
     yield
     # Cleanup test db after session
     if os.path.exists(TEST_DB_PATH):

@@ -10846,9 +10846,6 @@ async function renderSettings() {
             <button class="btn btn-primary" onclick="triggerBackup()">
               💾 Create Full SQLite Backup
             </button>
-            <button class="btn btn-secondary" onclick="triggerSeedData()">
-              🔄 Reset & Seed Sample CA Data
-            </button>
           </div>
         ` : ''}
       </div>
@@ -10889,18 +10886,6 @@ async function triggerBackup() {
     alert(`Backup created successfully: ${res.backup_file}`);
   } catch (e) {
     alert("Backup failed: " + e.message);
-  }
-}
-
-async function triggerSeedData() {
-  if (!confirm("This will re-seed sample Indian CA audit scenarios. Continue?")) return;
-  try {
-    const res = await FinAuditAPI.seedSampleData();
-    alert(res.message);
-    await loadEngagements();
-    navigateTo("dashboard");
-  } catch (e) {
-    alert("Error seeding data: " + e.message);
   }
 }
 

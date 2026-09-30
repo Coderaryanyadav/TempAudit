@@ -5,14 +5,14 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.database import init_db, get_db_connection
-from backend.app.utils.sample_data import seed_sample_database
+from test_data.seed import seed_test_database
 
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_database():
     init_db()
-    seed_sample_database()
+    seed_test_database()
 
 def get_auth_token():
     # Login as default admin

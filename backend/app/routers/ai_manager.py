@@ -55,8 +55,8 @@ def get_available_models(current_user: dict = Depends(get_current_user)):
         }
 
 @router.post("/settings")
-def update_ai_settings(payload: AISettingsUpdate, current_user: dict = Depends(require_role(["Admin", "Auditor"]))):
-    """Updates Local AI Model Manager settings (Admin/Auditor only)."""
+def update_ai_settings(payload: AISettingsUpdate, current_user: dict = Depends(require_role(["Admin"]))):
+    """Updates Local AI Model Manager settings (Admin only)."""
     try:
         old_config = LocalAIModelManager.get_config()
         update_data = {k: v for k, v in payload.model_dump().items() if v is not None}
