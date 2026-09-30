@@ -1,0 +1,24 @@
+{
+  "company_code": "HITANSH",
+  "company_name": "Hitansh Fintech Pvt. Ltd.",
+  "financial_year": "2025-26",
+  "prior_financial_year": "2024-25",
+  "total_current_year_transactions": 1097,
+  "total_prior_year_transactions": 400,
+  "total_sales_invoices": 250,
+  "total_purchase_invoices": 250,
+  "total_gst_portal_invoices": 200,
+  "total_bank_statement_records": 200,
+  "expected_anomalies": {
+    "sec_40a_cash_violations_count": 1,
+    "sec_269st_cash_receipts_count": 1,
+    "duplicate_invoices_count": 2,
+    "round_number_transactions_count": 1,
+    "weekend_transactions_count": 1
+  },
+  "expected_reconciliation": {
+    "gst_matched_minimum": 140,
+    "gst_discrepancies_minimum": 20,
+    "brs_matched_minimum": 100
+  }
+}

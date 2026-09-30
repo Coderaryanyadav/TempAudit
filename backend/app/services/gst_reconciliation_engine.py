@@ -528,5 +528,12 @@ def run_gst_reconciliation(
             "missing_in_source_b_count": missing_b_count,
             "total_discrepancies": discrepancy_count
         },
+        "provenance": {
+            "source_type": "GST_PORTAL_AND_BOOKS",
+            "calculation_method": "DETERMINISTIC_MULTI_PARAM_RECONCILIATION",
+            "calculation_timestamp": now_str,
+            "calculation_version": "2.0",
+            "data_status": "ACTUAL" if (total_a_invoices > 0 and total_b_invoices > 0) else ("MISSING" if (total_a_invoices == 0 and total_b_invoices == 0) else "INCOMPLETE_DATA")
+        },
         "items": recon_items
     }

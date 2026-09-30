@@ -1,0 +1,201 @@
+date,voucher_no,reference_no,description,party_name,debit,credit,amount,balance
+2025-04-03,BNK-CAP-001,EQUITY-TR-1,NEFT / RTGS settlement - Share capital equity subscription tranche 1,Aryan Sharma & Co-Founders,0.0,2500000.0,2500000.0,25000000.0
+2025-04-03,JV-CAP-001,EQUITY-TR-1,NEFT / RTGS settlement - Allotment of equity shares tranche 1,Aryan Sharma & Co-Founders,2500000.0,0.0,2500000.0,25010000.0
+2025-04-05,BNK-CAP-002,EQUITY-TR-2,NEFT / RTGS settlement - Share capital equity subscription tranche 2,Aryan Sharma & Co-Founders,0.0,2500000.0,2500000.0,25020000.0
+2025-04-05,JV-CAP-002,EQUITY-TR-2,NEFT / RTGS settlement - Allotment of equity shares tranche 2,Aryan Sharma & Co-Founders,2500000.0,0.0,2500000.0,25030000.0
+2025-04-07,BNK-CAP-003,EQUITY-TR-3,NEFT / RTGS settlement - Share capital equity subscription tranche 3,Aryan Sharma & Co-Founders,0.0,500000.0,500000.0,25040000.0
+2025-04-07,JV-CAP-003,EQUITY-TR-3,NEFT / RTGS settlement - Allotment of equity shares tranche 3,Aryan Sharma & Co-Founders,500000.0,0.0,500000.0,25050000.0
+2025-04-09,BNK-CAP-004,EQUITY-TR-4,NEFT / RTGS settlement - Share capital equity subscription tranche 4,Aryan Sharma & Co-Founders,0.0,500000.0,500000.0,25060000.0
+2025-04-09,JV-CAP-004,EQUITY-TR-4,NEFT / RTGS settlement - Allotment of equity shares tranche 4,Aryan Sharma & Co-Founders,500000.0,0.0,500000.0,25070000.0
+2025-04-11,BNK-CAP-005,EQUITY-TR-5,NEFT / RTGS settlement - Share capital equity subscription tranche 5,Aryan Sharma & Co-Founders,0.0,500000.0,500000.0,25080000.0
+2025-04-11,JV-CAP-005,EQUITY-TR-5,NEFT / RTGS settlement - Allotment of equity shares tranche 5,Aryan Sharma & Co-Founders,500000.0,0.0,500000.0,25090000.0
+2025-04-13,BNK-CAP-006,EQUITY-TR-6,NEFT / RTGS settlement - Share capital equity subscription tranche 6,Aryan Sharma & Co-Founders,0.0,500000.0,500000.0,25100000.0
+2025-04-13,JV-CAP-006,EQUITY-TR-6,NEFT / RTGS settlement - Allotment of equity shares tranche 6,Aryan Sharma & Co-Founders,500000.0,0.0,500000.0,25110000.0
+2025-04-15,BNK-CAP-007,EQUITY-TR-7,NEFT / RTGS settlement - Share capital equity subscription tranche 7,Aryan Sharma & Co-Founders,0.0,500000.0,500000.0,25120000.0
+2025-04-15,JV-CAP-007,EQUITY-TR-7,NEFT / RTGS settlement - Allotment of equity shares tranche 7,Aryan Sharma & Co-Founders,500000.0,0.0,500000.0,25130000.0
+2025-04-17,BNK-CAP-008,EQUITY-TR-8,NEFT / RTGS settlement - Share capital equity subscription tranche 8,Aryan Sharma & Co-Founders,0.0,500000.0,500000.0,25140000.0
+2025-04-17,JV-CAP-008,EQUITY-TR-8,NEFT / RTGS settlement - Allotment of equity shares tranche 8,Aryan Sharma & Co-Founders,500000.0,0.0,500000.0,25150000.0
+2025-04-19,BNK-CAP-009,EQUITY-TR-9,NEFT / RTGS settlement - Share capital equity subscription tranche 9,Aryan Sharma & Co-Founders,0.0,500000.0,500000.0,25160000.0
+2025-04-19,JV-CAP-009,EQUITY-TR-9,NEFT / RTGS settlement - Allotment of equity shares tranche 9,Aryan Sharma & Co-Founders,500000.0,0.0,500000.0,25170000.0
+2025-04-21,BNK-CAP-010,EQUITY-TR-10,NEFT / RTGS settlement - Share capital equity subscription tranche 10,Aryan Sharma & Co-Founders,0.0,500000.0,500000.0,25180000.0
+2025-04-21,JV-CAP-010,EQUITY-TR-10,NEFT / RTGS settlement - Allotment of equity shares tranche 10,Aryan Sharma & Co-Founders,500000.0,0.0,500000.0,25190000.0
+2025-04-26,BNK-LN-001,LOAN-FAC-1,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 1,HDFC Bank Ltd,0.0,1000000.0,1000000.0,25200000.0
+2025-04-26,JV-LN-001,LOAN-FAC-1,NEFT / RTGS settlement - Secured term loan liability acknowledgment 1,HDFC Bank Ltd,1000000.0,0.0,1000000.0,25210000.0
+2025-05-11,BNK-LN-002,LOAN-FAC-2,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 2,HDFC Bank Ltd,0.0,200000.0,200000.0,25220000.0
+2025-05-11,JV-LN-002,LOAN-FAC-2,NEFT / RTGS settlement - Secured term loan liability acknowledgment 2,HDFC Bank Ltd,200000.0,0.0,200000.0,25230000.0
+2025-05-26,BNK-LN-003,LOAN-FAC-3,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 3,HDFC Bank Ltd,0.0,200000.0,200000.0,25240000.0
+2025-05-26,JV-LN-003,LOAN-FAC-3,NEFT / RTGS settlement - Secured term loan liability acknowledgment 3,HDFC Bank Ltd,200000.0,0.0,200000.0,25250000.0
+2025-06-10,BNK-LN-004,LOAN-FAC-4,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 4,HDFC Bank Ltd,0.0,200000.0,200000.0,25260000.0
+2025-06-10,JV-LN-004,LOAN-FAC-4,NEFT / RTGS settlement - Secured term loan liability acknowledgment 4,HDFC Bank Ltd,200000.0,0.0,200000.0,25270000.0
+2025-06-25,BNK-LN-005,LOAN-FAC-5,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 5,HDFC Bank Ltd,0.0,200000.0,200000.0,25280000.0
+2025-06-25,JV-LN-005,LOAN-FAC-5,NEFT / RTGS settlement - Secured term loan liability acknowledgment 5,HDFC Bank Ltd,200000.0,0.0,200000.0,25290000.0
+2025-07-10,BNK-LN-006,LOAN-FAC-6,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 6,HDFC Bank Ltd,0.0,200000.0,200000.0,25300000.0
+2025-07-10,JV-LN-006,LOAN-FAC-6,NEFT / RTGS settlement - Secured term loan liability acknowledgment 6,HDFC Bank Ltd,200000.0,0.0,200000.0,25310000.0
+2025-07-25,BNK-LN-007,LOAN-FAC-7,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 7,HDFC Bank Ltd,0.0,200000.0,200000.0,25320000.0
+2025-07-25,JV-LN-007,LOAN-FAC-7,NEFT / RTGS settlement - Secured term loan liability acknowledgment 7,HDFC Bank Ltd,200000.0,0.0,200000.0,25330000.0
+2025-08-09,BNK-LN-008,LOAN-FAC-8,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 8,HDFC Bank Ltd,0.0,200000.0,200000.0,25340000.0
+2025-08-09,JV-LN-008,LOAN-FAC-8,NEFT / RTGS settlement - Secured term loan liability acknowledgment 8,HDFC Bank Ltd,200000.0,0.0,200000.0,25350000.0
+2025-08-24,BNK-LN-009,LOAN-FAC-9,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 9,HDFC Bank Ltd,0.0,200000.0,200000.0,25360000.0
+2025-08-24,JV-LN-009,LOAN-FAC-9,NEFT / RTGS settlement - Secured term loan liability acknowledgment 9,HDFC Bank Ltd,200000.0,0.0,200000.0,25370000.0
+2025-09-08,BNK-LN-010,LOAN-FAC-10,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 10,HDFC Bank Ltd,0.0,200000.0,200000.0,25380000.0
+2025-09-08,JV-LN-010,LOAN-FAC-10,NEFT / RTGS settlement - Secured term loan liability acknowledgment 10,HDFC Bank Ltd,200000.0,0.0,200000.0,25390000.0
+2025-09-23,BNK-LN-011,LOAN-FAC-11,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 11,HDFC Bank Ltd,0.0,200000.0,200000.0,25400000.0
+2025-09-23,JV-LN-011,LOAN-FAC-11,NEFT / RTGS settlement - Secured term loan liability acknowledgment 11,HDFC Bank Ltd,200000.0,0.0,200000.0,25410000.0
+2025-10-08,BNK-LN-012,LOAN-FAC-12,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 12,HDFC Bank Ltd,0.0,200000.0,200000.0,25420000.0
+2025-10-08,JV-LN-012,LOAN-FAC-12,NEFT / RTGS settlement - Secured term loan liability acknowledgment 12,HDFC Bank Ltd,200000.0,0.0,200000.0,25430000.0
+2025-10-23,BNK-LN-013,LOAN-FAC-13,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 13,HDFC Bank Ltd,0.0,200000.0,200000.0,25440000.0
+2025-10-23,JV-LN-013,LOAN-FAC-13,NEFT / RTGS settlement - Secured term loan liability acknowledgment 13,HDFC Bank Ltd,200000.0,0.0,200000.0,25450000.0
+2025-11-07,BNK-LN-014,LOAN-FAC-14,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 14,HDFC Bank Ltd,0.0,200000.0,200000.0,25460000.0
+2025-11-07,JV-LN-014,LOAN-FAC-14,NEFT / RTGS settlement - Secured term loan liability acknowledgment 14,HDFC Bank Ltd,200000.0,0.0,200000.0,25470000.0
+2025-11-22,BNK-LN-015,LOAN-FAC-15,NEFT / RTGS settlement - Bank term loan drawdown / facility utilization 15,HDFC Bank Ltd,0.0,200000.0,200000.0,25480000.0
+2025-11-22,JV-LN-015,LOAN-FAC-15,NEFT / RTGS settlement - Secured term loan liability acknowledgment 15,HDFC Bank Ltd,200000.0,0.0,200000.0,25490000.0
+2025-04-18,FA-VCH-001,FA-PO-1,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 1,AF Hardware Systems Ltd,0.0,87500.0,87500.0,25500000.0
+2025-04-30,FA-VCH-002,FA-PO-2,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 2,AF Hardware Systems Ltd,0.0,100000.0,100000.0,25510000.0
+2025-05-12,FA-VCH-003,FA-PO-3,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 3,AF Hardware Systems Ltd,0.0,112500.0,112500.0,25520000.0
+2025-05-24,FA-VCH-004,FA-PO-4,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 4,AF Hardware Systems Ltd,0.0,125000.0,125000.0,25530000.0
+2025-06-05,FA-VCH-005,FA-PO-5,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 5,AF Hardware Systems Ltd,0.0,137500.0,137500.0,25540000.0
+2025-06-17,FA-VCH-006,FA-PO-6,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 6,AF Hardware Systems Ltd,0.0,150000.0,150000.0,25550000.0
+2025-06-29,FA-VCH-007,FA-PO-7,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 7,AF Hardware Systems Ltd,0.0,162500.0,162500.0,25560000.0
+2025-07-11,FA-VCH-008,FA-PO-8,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 8,AF Hardware Systems Ltd,0.0,175000.0,175000.0,25570000.0
+2025-07-23,FA-VCH-009,FA-PO-9,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 9,AF Hardware Systems Ltd,0.0,187500.0,187500.0,25580000.0
+2025-08-04,FA-VCH-010,FA-PO-10,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 10,AF Hardware Systems Ltd,0.0,200000.0,200000.0,25590000.0
+2025-08-16,FA-VCH-011,FA-PO-11,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 11,AF Hardware Systems Ltd,0.0,212500.0,212500.0,25600000.0
+2025-08-28,FA-VCH-012,FA-PO-12,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 12,AF Hardware Systems Ltd,0.0,225000.0,225000.0,25610000.0
+2025-09-09,FA-VCH-013,FA-PO-13,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 13,AF Hardware Systems Ltd,0.0,237500.0,237500.0,25620000.0
+2025-09-21,FA-VCH-014,FA-PO-14,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 14,AF Hardware Systems Ltd,0.0,250000.0,250000.0,25630000.0
+2025-10-03,FA-VCH-015,FA-PO-15,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 15,AF Hardware Systems Ltd,0.0,262500.0,262500.0,25640000.0
+2025-10-15,FA-VCH-016,FA-PO-16,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 16,AF Hardware Systems Ltd,0.0,275000.0,275000.0,25650000.0
+2025-10-27,FA-VCH-017,FA-PO-17,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 17,AF Hardware Systems Ltd,0.0,287500.0,287500.0,25660000.0
+2025-11-08,FA-VCH-018,FA-PO-18,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 18,AF Hardware Systems Ltd,0.0,300000.0,300000.0,25670000.0
+2025-11-20,FA-VCH-019,FA-PO-19,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 19,AF Hardware Systems Ltd,0.0,312500.0,312500.0,25680000.0
+2025-12-02,FA-VCH-020,FA-PO-20,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 20,AF Hardware Systems Ltd,0.0,325000.0,325000.0,25690000.0
+2025-12-14,FA-VCH-021,FA-PO-21,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 21,AF Hardware Systems Ltd,0.0,337500.0,337500.0,25700000.0
+2025-12-26,FA-VCH-022,FA-PO-22,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 22,AF Hardware Systems Ltd,0.0,350000.0,350000.0,25710000.0
+2026-01-07,FA-VCH-023,FA-PO-23,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 23,AF Hardware Systems Ltd,0.0,362500.0,362500.0,25720000.0
+2026-01-19,FA-VCH-024,FA-PO-24,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 24,AF Hardware Systems Ltd,0.0,375000.0,375000.0,25730000.0
+2026-01-31,FA-VCH-025,FA-PO-25,NEFT / RTGS settlement - Procurement of high-performance developer workstations & servers 25,AF Hardware Systems Ltd,0.0,387500.0,387500.0,25740000.0
+2025-04-02,SAL-0001,ORD-ARYAN-1,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 1,AF Enterprise Client 1,48816.6,0.0,48816.6,25750000.0
+2025-04-03,SAL-0002,ORD-ARYAN-2,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 2,AF Enterprise Client 2,50433.2,0.0,50433.2,25760000.0
+2025-04-05,SAL-0003,ORD-ARYAN-3,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 3,AF Enterprise Client 3,52049.8,0.0,52049.8,25770000.0
+2025-04-06,SAL-0004,ORD-ARYAN-4,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 4,AF Enterprise Client 4,53666.4,0.0,53666.4,25780000.0
+2025-04-08,SAL-0005,ORD-ARYAN-5,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 5,AF Enterprise Client 5,55283.0,0.0,55283.0,25790000.0
+2025-04-09,SAL-0006,ORD-ARYAN-6,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 6,AF Enterprise Client 6,56899.6,0.0,56899.6,25800000.0
+2025-04-11,SAL-0007,ORD-ARYAN-7,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 7,AF Enterprise Client 7,58516.2,0.0,58516.2,25810000.0
+2025-04-12,SAL-0008,ORD-ARYAN-8,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 8,AF Enterprise Client 8,60132.8,0.0,60132.8,25820000.0
+2025-04-13,SAL-0009,ORD-ARYAN-9,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 9,AF Enterprise Client 9,61749.4,0.0,61749.4,25830000.0
+2025-04-15,SAL-0010,ORD-ARYAN-10,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 10,AF Enterprise Client 10,63366.0,0.0,63366.0,25840000.0
+2025-04-16,SAL-0011,ORD-ARYAN-11,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 11,AF Enterprise Client 11,64982.6,0.0,64982.6,25850000.0
+2025-04-18,SAL-0012,ORD-ARYAN-12,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 12,AF Enterprise Client 12,66599.2,0.0,66599.2,25860000.0
+2025-04-19,SAL-0013,ORD-ARYAN-13,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 13,AF Enterprise Client 13,68215.8,0.0,68215.8,25870000.0
+2025-04-21,SAL-0014,ORD-ARYAN-14,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 14,AF Enterprise Client 14,69832.4,0.0,69832.4,25880000.0
+2025-04-22,SAL-0015,ORD-ARYAN-15,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 15,AF Inter-State Client 1,71449.0,0.0,71449.0,25890000.0
+2025-04-24,SAL-0016,ORD-ARYAN-16,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 16,AF Inter-State Client 2,73065.6,0.0,73065.6,25900000.0
+2025-04-25,SAL-0017,ORD-ARYAN-17,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 17,AF Inter-State Client 3,74682.2,0.0,74682.2,25910000.0
+2025-04-26,SAL-0018,ORD-ARYAN-18,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 18,AF Inter-State Client 4,76298.8,0.0,76298.8,25920000.0
+2025-04-28,SAL-0019,ORD-ARYAN-19,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 19,AF Inter-State Client 5,77915.4,0.0,77915.4,25930000.0
+2025-04-29,SAL-0020,ORD-ARYAN-20,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 20,AF Inter-State Client 6,79532.0,0.0,79532.0,25940000.0
+2025-05-01,SAL-0021,ORD-ARYAN-21,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 21,AF Inter-State Client 7,81148.6,0.0,81148.6,25950000.0
+2025-05-02,SAL-0022,ORD-ARYAN-22,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 22,AF Inter-State Client 8,82765.2,0.0,82765.2,25960000.0
+2025-05-04,SAL-0023,ORD-ARYAN-23,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 23,AF Inter-State Client 9,84381.8,0.0,84381.8,25970000.0
+2025-05-05,SAL-0024,ORD-ARYAN-24,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 24,AF Enterprise Client 1,85998.4,0.0,85998.4,25980000.0
+2025-05-07,SAL-0025,ORD-ARYAN-25,NEFT / RTGS settlement - Fintech platform SaaS licensing & API processing service fees 25,AF Enterprise Client 2,87615.0,0.0,87615.0,25990000.0
+2025-05-08,REF-MATCH-0,ORD-ARYAN-26,Online payment ref ORD-ARYAN-26,AF Enterprise Client 3,89231.6,0.0,89231.6,26000000.0
+2025-05-09,REF-MATCH-1,ORD-ARYAN-27,Online payment ref ORD-ARYAN-27,AF Enterprise Client 4,90848.2,0.0,90848.2,26000000.0
+2025-05-11,REF-MATCH-2,ORD-ARYAN-28,Online payment ref ORD-ARYAN-28,AF Enterprise Client 5,92464.8,0.0,92464.8,26000000.0
+2025-05-12,REF-MATCH-3,ORD-ARYAN-29,Online payment ref ORD-ARYAN-29,AF Enterprise Client 6,94081.4,0.0,94081.4,26000000.0
+2025-05-14,REF-MATCH-4,ORD-ARYAN-30,Online payment ref ORD-ARYAN-30,AF Enterprise Client 7,95698.0,0.0,95698.0,26000000.0
+2025-05-15,REF-MATCH-5,ORD-ARYAN-31,Online payment ref ORD-ARYAN-31,AF Enterprise Client 8,97314.6,0.0,97314.6,26000000.0
+2025-05-17,REF-MATCH-6,ORD-ARYAN-32,Online payment ref ORD-ARYAN-32,AF Enterprise Client 9,98931.2,0.0,98931.2,26000000.0
+2025-05-18,REF-MATCH-7,ORD-ARYAN-33,Online payment ref ORD-ARYAN-33,AF Enterprise Client 10,100547.8,0.0,100547.8,26000000.0
+2025-05-19,REF-MATCH-8,ORD-ARYAN-34,Online payment ref ORD-ARYAN-34,AF Enterprise Client 11,102164.4,0.0,102164.4,26000000.0
+2025-05-21,REF-MATCH-9,ORD-ARYAN-35,Online payment ref ORD-ARYAN-35,AF Enterprise Client 12,103781.0,0.0,103781.0,26000000.0
+2025-05-22,REF-MATCH-10,ORD-ARYAN-36,Online payment ref ORD-ARYAN-36,AF Enterprise Client 13,105397.6,0.0,105397.6,26000000.0
+2025-05-24,REF-MATCH-11,ORD-ARYAN-37,Online payment ref ORD-ARYAN-37,AF Enterprise Client 14,107014.2,0.0,107014.2,26000000.0
+2025-05-25,REF-MATCH-12,ORD-ARYAN-38,Online payment ref ORD-ARYAN-38,AF Inter-State Client 1,108630.8,0.0,108630.8,26000000.0
+2025-05-27,REF-MATCH-13,ORD-ARYAN-39,Online payment ref ORD-ARYAN-39,AF Inter-State Client 2,110247.4,0.0,110247.4,26000000.0
+2025-05-28,REF-MATCH-14,ORD-ARYAN-40,Online payment ref ORD-ARYAN-40,AF Inter-State Client 3,111864.0,0.0,111864.0,26000000.0
+2025-05-30,REF-MATCH-15,ORD-ARYAN-41,Online payment ref ORD-ARYAN-41,AF Inter-State Client 4,113480.6,0.0,113480.6,26000000.0
+2025-05-31,REF-MATCH-16,ORD-ARYAN-42,Online payment ref ORD-ARYAN-42,AF Inter-State Client 5,115097.2,0.0,115097.2,26000000.0
+2025-06-01,REF-MATCH-17,ORD-ARYAN-43,Online payment ref ORD-ARYAN-43,AF Inter-State Client 6,116713.8,0.0,116713.8,26000000.0
+2025-06-03,REF-MATCH-18,ORD-ARYAN-44,Online payment ref ORD-ARYAN-44,AF Inter-State Client 7,118330.4,0.0,118330.4,26000000.0
+2025-06-04,REF-MATCH-19,ORD-ARYAN-45,Online payment ref ORD-ARYAN-45,AF Inter-State Client 8,119947.0,0.0,119947.0,26000000.0
+2025-06-06,REF-MATCH-20,ORD-ARYAN-46,Online payment ref ORD-ARYAN-46,AF Inter-State Client 9,121563.6,0.0,121563.6,26000000.0
+2025-06-07,REF-MATCH-21,ORD-ARYAN-47,Online payment ref ORD-ARYAN-47,AF Enterprise Client 1,123180.2,0.0,123180.2,26000000.0
+2025-06-09,REF-MATCH-22,ORD-ARYAN-48,Online payment ref ORD-ARYAN-48,AF Enterprise Client 2,124796.8,0.0,124796.8,26000000.0
+2025-06-10,REF-MATCH-23,ORD-ARYAN-49,Online payment ref ORD-ARYAN-49,AF Enterprise Client 3,126413.4,0.0,126413.4,26000000.0
+2025-06-12,REF-MATCH-24,ORD-ARYAN-50,Online payment ref ORD-ARYAN-50,AF Enterprise Client 4,128030.0,0.0,128030.0,26000000.0
+2025-06-13,BNK-TXN-500,BNK-REF-500,Direct clearing transaction AF Enterprise Client 5,AF Enterprise Client 5,129646.6,0.0,129646.6,26500000.0
+2025-06-14,BNK-TXN-501,BNK-REF-501,Direct clearing transaction AF Enterprise Client 6,AF Enterprise Client 6,131263.2,0.0,131263.2,26500000.0
+2025-06-16,BNK-TXN-502,BNK-REF-502,Direct clearing transaction AF Enterprise Client 7,AF Enterprise Client 7,132879.8,0.0,132879.8,26500000.0
+2025-06-17,BNK-TXN-503,BNK-REF-503,Direct clearing transaction AF Enterprise Client 8,AF Enterprise Client 8,134496.4,0.0,134496.4,26500000.0
+2025-06-19,BNK-TXN-504,BNK-REF-504,Direct clearing transaction AF Enterprise Client 9,AF Enterprise Client 9,136113.0,0.0,136113.0,26500000.0
+2025-06-20,BNK-TXN-505,BNK-REF-505,Direct clearing transaction AF Enterprise Client 10,AF Enterprise Client 10,137729.6,0.0,137729.6,26500000.0
+2025-06-22,BNK-TXN-506,BNK-REF-506,Direct clearing transaction AF Enterprise Client 11,AF Enterprise Client 11,139346.2,0.0,139346.2,26500000.0
+2025-06-23,BNK-TXN-507,BNK-REF-507,Direct clearing transaction AF Enterprise Client 12,AF Enterprise Client 12,140962.8,0.0,140962.8,26500000.0
+2025-06-24,BNK-TXN-508,BNK-REF-508,Direct clearing transaction AF Enterprise Client 13,AF Enterprise Client 13,142579.4,0.0,142579.4,26500000.0
+2025-06-26,BNK-TXN-509,BNK-REF-509,Direct clearing transaction AF Enterprise Client 14,AF Enterprise Client 14,144196.0,0.0,144196.0,26500000.0
+2025-06-27,BNK-TXN-510,BNK-REF-510,Direct clearing transaction AF Inter-State Client 1,AF Inter-State Client 1,145812.6,0.0,145812.6,26500000.0
+2025-06-29,BNK-TXN-511,BNK-REF-511,Direct clearing transaction AF Inter-State Client 2,AF Inter-State Client 2,147429.2,0.0,147429.2,26500000.0
+2025-06-30,BNK-TXN-512,BNK-REF-512,Direct clearing transaction AF Inter-State Client 3,AF Inter-State Client 3,149045.8,0.0,149045.8,26500000.0
+2025-07-02,BNK-TXN-513,BNK-REF-513,Direct clearing transaction AF Inter-State Client 4,AF Inter-State Client 4,150662.4,0.0,150662.4,26500000.0
+2025-07-03,BNK-TXN-514,BNK-REF-514,Direct clearing transaction AF Inter-State Client 5,AF Inter-State Client 5,152279.0,0.0,152279.0,26500000.0
+2025-07-05,BNK-TXN-515,BNK-REF-515,Direct clearing transaction AF Inter-State Client 6,AF Inter-State Client 6,153895.6,0.0,153895.6,26500000.0
+2025-07-06,BNK-TXN-516,BNK-REF-516,Direct clearing transaction AF Inter-State Client 7,AF Inter-State Client 7,155512.2,0.0,155512.2,26500000.0
+2025-07-07,BNK-TXN-517,BNK-REF-517,Direct clearing transaction AF Inter-State Client 8,AF Inter-State Client 8,157128.8,0.0,157128.8,26500000.0
+2025-07-09,BNK-TXN-518,BNK-REF-518,Direct clearing transaction AF Inter-State Client 9,AF Inter-State Client 9,158745.4,0.0,158745.4,26500000.0
+2025-07-10,BNK-TXN-519,BNK-REF-519,Direct clearing transaction AF Enterprise Client 1,AF Enterprise Client 1,160362.0,0.0,160362.0,26500000.0
+2025-04-28,CHG-BNK-1,SYS-CHG-1,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-05-28,CHG-BNK-2,SYS-CHG-2,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-06-28,CHG-BNK-3,SYS-CHG-3,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-07-28,CHG-BNK-4,SYS-CHG-4,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-08-28,CHG-BNK-5,SYS-CHG-5,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-09-28,CHG-BNK-6,SYS-CHG-6,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-10-28,CHG-BNK-7,SYS-CHG-7,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-11-28,CHG-BNK-8,SYS-CHG-8,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-12-28,CHG-BNK-9,SYS-CHG-9,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-13-28,CHG-BNK-10,SYS-CHG-10,Monthly consolidated current account ledger maintenance fee,HDFC Bank Ltd,1500.0,0.0,1500.0,26400000.0
+2025-04-30,INT-BNK-1,AUTO-INT-1,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-05-30,INT-BNK-2,AUTO-INT-2,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-06-30,INT-BNK-3,AUTO-INT-3,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-07-30,INT-BNK-4,AUTO-INT-4,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-08-30,INT-BNK-5,AUTO-INT-5,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-09-30,INT-BNK-6,AUTO-INT-6,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-10-30,INT-BNK-7,AUTO-INT-7,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-11-30,INT-BNK-8,AUTO-INT-8,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-12-30,INT-BNK-9,AUTO-INT-9,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-13-30,INT-BNK-10,AUTO-INT-10,Quarterly flexi-deposit auto sweep interest credit,HDFC Bank Ltd,0.0,12500.0,12500.0,26450000.0
+2025-11-02,EXTRA-BNK-1,EXT-REF-1,Direct bank credit entry 1,AF Bank Partner 2,0.0,25000.0,25000.0,27000000.0
+2025-11-03,EXTRA-BNK-2,EXT-REF-2,Direct bank credit entry 2,AF Bank Partner 3,0.0,25000.0,25000.0,27000000.0
+2025-11-04,EXTRA-BNK-3,EXT-REF-3,Direct bank credit entry 3,AF Bank Partner 4,0.0,25000.0,25000.0,27000000.0
+2025-11-05,EXTRA-BNK-4,EXT-REF-4,Direct bank credit entry 4,AF Bank Partner 5,0.0,25000.0,25000.0,27000000.0
+2025-11-06,EXTRA-BNK-5,EXT-REF-5,Direct bank credit entry 5,AF Bank Partner 1,0.0,25000.0,25000.0,27000000.0
+2025-11-07,EXTRA-BNK-6,EXT-REF-6,Direct bank credit entry 6,AF Bank Partner 2,0.0,25000.0,25000.0,27000000.0
+2025-11-08,EXTRA-BNK-7,EXT-REF-7,Direct bank credit entry 7,AF Bank Partner 3,0.0,25000.0,25000.0,27000000.0
+2025-11-09,EXTRA-BNK-8,EXT-REF-8,Direct bank credit entry 8,AF Bank Partner 4,0.0,25000.0,25000.0,27000000.0
+2025-11-10,EXTRA-BNK-9,EXT-REF-9,Direct bank credit entry 9,AF Bank Partner 5,0.0,25000.0,25000.0,27000000.0
+2025-11-11,EXTRA-BNK-10,EXT-REF-10,Direct bank credit entry 10,AF Bank Partner 1,0.0,25000.0,25000.0,27000000.0
+2025-11-12,EXTRA-BNK-11,EXT-REF-11,Direct bank credit entry 11,AF Bank Partner 2,0.0,25000.0,25000.0,27000000.0
+2025-11-13,EXTRA-BNK-12,EXT-REF-12,Direct bank credit entry 12,AF Bank Partner 3,0.0,25000.0,25000.0,27000000.0
+2025-11-14,EXTRA-BNK-13,EXT-REF-13,Direct bank credit entry 13,AF Bank Partner 4,0.0,25000.0,25000.0,27000000.0
+2025-11-15,EXTRA-BNK-14,EXT-REF-14,Direct bank credit entry 14,AF Bank Partner 5,0.0,25000.0,25000.0,27000000.0
+2025-11-16,EXTRA-BNK-15,EXT-REF-15,Direct bank credit entry 15,AF Bank Partner 1,0.0,25000.0,25000.0,27000000.0
+2025-11-17,EXTRA-BNK-16,EXT-REF-16,Direct bank credit entry 16,AF Bank Partner 2,0.0,25000.0,25000.0,27000000.0
+2025-11-18,EXTRA-BNK-17,EXT-REF-17,Direct bank credit entry 17,AF Bank Partner 3,0.0,25000.0,25000.0,27000000.0
+2025-11-19,EXTRA-BNK-18,EXT-REF-18,Direct bank credit entry 18,AF Bank Partner 4,0.0,25000.0,25000.0,27000000.0
+2025-11-20,EXTRA-BNK-19,EXT-REF-19,Direct bank credit entry 19,AF Bank Partner 5,0.0,25000.0,25000.0,27000000.0
+2025-11-21,EXTRA-BNK-20,EXT-REF-20,Direct bank credit entry 20,AF Bank Partner 1,0.0,25000.0,25000.0,27000000.0
+2025-11-22,EXTRA-BNK-21,EXT-REF-21,Direct bank credit entry 21,AF Bank Partner 2,0.0,25000.0,25000.0,27000000.0
+2025-11-23,EXTRA-BNK-22,EXT-REF-22,Direct bank credit entry 22,AF Bank Partner 3,0.0,25000.0,25000.0,27000000.0
+2025-11-24,EXTRA-BNK-23,EXT-REF-23,Direct bank credit entry 23,AF Bank Partner 4,0.0,25000.0,25000.0,27000000.0
+2025-11-25,EXTRA-BNK-24,EXT-REF-24,Direct bank credit entry 24,AF Bank Partner 5,0.0,25000.0,25000.0,27000000.0
+2025-11-26,EXTRA-BNK-25,EXT-REF-25,Direct bank credit entry 25,AF Bank Partner 1,0.0,25000.0,25000.0,27000000.0
+2025-11-27,EXTRA-BNK-26,EXT-REF-26,Direct bank credit entry 26,AF Bank Partner 2,0.0,25000.0,25000.0,27000000.0
+2025-11-28,EXTRA-BNK-27,EXT-REF-27,Direct bank credit entry 27,AF Bank Partner 3,0.0,25000.0,25000.0,27000000.0
+2025-11-01,EXTRA-BNK-28,EXT-REF-28,Direct bank credit entry 28,AF Bank Partner 4,0.0,25000.0,25000.0,27000000.0
+2025-11-02,EXTRA-BNK-29,EXT-REF-29,Direct bank credit entry 29,AF Bank Partner 5,0.0,25000.0,25000.0,27000000.0
+2025-11-03,EXTRA-BNK-30,EXT-REF-30,Direct bank credit entry 30,AF Bank Partner 1,0.0,25000.0,25000.0,27000000.0
+2025-11-04,EXTRA-BNK-31,EXT-REF-31,Direct bank credit entry 31,AF Bank Partner 2,0.0,25000.0,25000.0,27000000.0
+2025-11-05,EXTRA-BNK-32,EXT-REF-32,Direct bank credit entry 32,AF Bank Partner 3,0.0,25000.0,25000.0,27000000.0
+2025-11-06,EXTRA-BNK-33,EXT-REF-33,Direct bank credit entry 33,AF Bank Partner 4,0.0,25000.0,25000.0,27000000.0
+2025-11-07,EXTRA-BNK-34,EXT-REF-34,Direct bank credit entry 34,AF Bank Partner 5,0.0,25000.0,25000.0,27000000.0
+2025-11-08,EXTRA-BNK-35,EXT-REF-35,Direct bank credit entry 35,AF Bank Partner 1,0.0,25000.0,25000.0,27000000.0

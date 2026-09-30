@@ -546,5 +546,12 @@ def run_bank_reconciliation(
             "adjusted_bank_balance": adjusted_bank_balance,
             "net_unreconciled_difference": net_diff
         },
+        "provenance": {
+            "source_type": "BANK_LEDGER_AND_STATEMENTS",
+            "calculation_method": "DETERMINISTIC_4_TIER_BRS_RECONCILIATION",
+            "calculation_timestamp": now_str,
+            "calculation_version": "2.0",
+            "data_status": "ACTUAL" if (len(book_txs) > 0 and len(bank_txs) > 0) else ("MISSING" if (len(book_txs) == 0 and len(bank_txs) == 0) else "INCOMPLETE_DATA")
+        },
         "items": all_recon_items
     }

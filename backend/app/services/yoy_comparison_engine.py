@@ -550,6 +550,13 @@ def run_yoy_comparison(
             "revenue_growth_pct": next((i["percentage_difference"] for i in executive_comparison if i["item_key"] == "revenue_from_operations"), 0.0),
             "net_profit_growth_pct": next((i["percentage_difference"] for i in executive_comparison if i["item_key"] == "net_profit"), 0.0)
         },
+        "provenance": {
+            "source_type": "GENERAL_LEDGER_TRANSACTIONS",
+            "calculation_method": "DETERMINISTIC_YOY_VARIANCE_ANALYSIS",
+            "calculation_timestamp": datetime.now().isoformat(),
+            "calculation_version": "2.0",
+            "data_status": "ACTUAL" if (bool(cy_txs) and bool(py_txs)) else ("MISSING_PY" if bool(cy_txs) else "MISSING")
+        },
         "executive_comparison": executive_comparison,
         "major_ledgers_comparison": major_ledgers_comparison,
         "party_comparison": party_comparison,

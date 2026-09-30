@@ -546,5 +546,12 @@ def run_sales_purchase_reconciliation(
             "matched_count": matched_count,
             "discrepancy_count": discrepancy_count
         },
+        "provenance": {
+            "source_type": "REGISTERS_AND_LEDGERS",
+            "calculation_method": "DETERMINISTIC_11_POINT_REGISTER_RECONCILIATION",
+            "calculation_timestamp": now_str,
+            "calculation_version": "2.0",
+            "data_status": "ACTUAL" if (total_reg_invoices > 0 or total_led_invoices > 0) else "MISSING"
+        },
         "exceptions": exceptions_list
     }

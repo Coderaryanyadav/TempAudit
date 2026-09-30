@@ -533,6 +533,13 @@ def analyze_trial_balance(engagement_id: int) -> Dict[str, Any]:
         },
         "exceptions": exceptions,
         "group_summaries": group_summaries,
+        "provenance": {
+            "source_type": "GENERAL_LEDGER_TRANSACTIONS",
+            "calculation_method": "DETERMINISTIC_12_POINT_TB_ANALYSIS",
+            "calculation_timestamp": datetime.now().isoformat(),
+            "calculation_version": "2.0",
+            "data_status": "ACTUAL" if len(txn_rows) > 0 else "MISSING"
+        },
         "accounts": accounts
     }
 

@@ -584,5 +584,13 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
             "significant_movements_count": significant_movements_count,
             "total_metrics_analyzed": len(comparisons),
             "management_commentary": summary_text
+        },
+        "provenance": {
+            "source_type": "GENERAL_LEDGER_TRANSACTIONS",
+            "calculation_method": "SCHEDULE_III_BALANCE_SHEET_PNL_CASHFLOW_AGGREGATION",
+            "calculation_timestamp": datetime.now().isoformat(),
+            "calculation_version": "2.0",
+            "data_status": "ACTUAL" if bool(cy_rows) else "MISSING",
+            "previous_year_data_status": "ACTUAL" if py_available else "NOT_AVAILABLE"
         }
     }

@@ -261,7 +261,7 @@ def create_engagement(eng_data: EngagementCreate, current_user: dict = Depends(r
     new_id = cursor.lastrowid
 
     # Auto seed standard checklist items
-    from backend.app.utils.sample_data import STANDARD_CHECKLIST_ITEMS
+    from backend.app.services.checklist_templates import STANDARD_CHECKLIST_ITEMS
     for item in STANDARD_CHECKLIST_ITEMS:
         conn.execute("""
         INSERT INTO audit_checklists (engagement_id, category, item_code, question, guidance, status, created_at)
