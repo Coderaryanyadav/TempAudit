@@ -65,6 +65,9 @@ def test_local_ai_endpoint_validation_prevents_ssrf():
         "http://127.0.0.1@attacker.net",
         "http://evil-localhost.com",
         "http://192.168.1.50:1234",
+        "http://localhost:22",
+        "http://127.0.0.1:5432",
+        "http://localhost:6379",
         "https://google.com",
         "ftp://localhost:1234"
     ]

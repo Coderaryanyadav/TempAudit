@@ -1,4 +1,5 @@
 import re
+import time
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime
 from typing import List, Optional
@@ -32,32 +33,67 @@ def get_setup_status():
     finally:
         conn.close()
 
+COMMON_WEAK_PASSWORDS = {
+    "password123456", "admin12345678", "administrator1", "123456789012",
+    "passwordpassword", "welcome123456", "qwertyuiop12"
+}
+
+_SETUP_ATTEMPTS: List[float] = []
+
+def _check_setup_rate_limit():
+    global _SETUP_ATTEMPTS
+    now = time.time()
+    _SETUP_ATTEMPTS = [t for t in _SETUP_ATTEMPTS if now - t < 60]
+    if len(_SETUP_ATTEMPTS) >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many initial setup attempts. Please wait 60 seconds before retrying."
+        )
+    _SETUP_ATTEMPTS.append(now)
+
 @router.post("/initial-setup")
 def initial_setup(user_data: UserCreate):
     """
     First-run setup endpoint: Allows creating the primary System Administrator
     with a user-chosen password if and only if no users exist in the database.
+    Atomic, rate-limited, and requires a 12+ character high-entropy password.
     """
+    _check_setup_rate_limit()
+
+    username = user_data.username.strip()
+    email = user_data.email.strip()
+
+    if not re.match(USERNAME_REGEX, username):
+        raise HTTPException(status_code=400, detail="Username must be 3-50 characters (letters, numbers, underscores, dots only).")
+    
+    if not re.match(EMAIL_REGEX, email):
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+
+    if len(user_data.password) < 12:
+        raise HTTPException(
+            status_code=400,
+            detail="Primary Administrator password must be at least 12 characters long for security compliance."
+        )
+
+    if user_data.password.lower() in COMMON_WEAK_PASSWORDS or user_data.password.lower() == username.lower() * (12 // len(username) + 1):
+        raise HTTPException(
+            status_code=400,
+            detail="Password is too common or easily guessable. Please choose a stronger passphrase."
+        )
+
     conn = get_db_connection()
     try:
+        # Atomic lock using SQLite immediate transaction to prevent setup race conditions
+        conn.execute("BEGIN IMMEDIATE")
         user_count = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
-        if user_count > 0:
+        setup_done = conn.execute("SELECT value FROM app_settings WHERE key = 'is_initial_setup_completed'").fetchone()
+
+        if user_count > 0 or (setup_done and setup_done["value"] == "1"):
+            conn.rollback()
             raise HTTPException(
                 status_code=400,
                 detail="Initial setup has already been completed. Please log in or contact an existing Administrator."
             )
-
-        username = user_data.username.strip()
-        email = user_data.email.strip()
-
-        if not re.match(USERNAME_REGEX, username):
-            raise HTTPException(status_code=400, detail="Username must be 3-50 characters (letters, numbers, underscores, dots only).")
-        
-        if not re.match(EMAIL_REGEX, email):
-            raise HTTPException(status_code=400, detail="Please enter a valid email address.")
-
-        if len(user_data.password) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters long.")
 
         pwd_hash = hash_password(user_data.password)
         now_str = datetime.now().isoformat()
@@ -68,6 +104,11 @@ def initial_setup(user_data: UserCreate):
         """, (username, email, user_data.full_name.strip(), pwd_hash, user_data.phone or "", now_str))
 
         new_id = cursor.lastrowid
+
+        conn.execute("""
+            INSERT OR REPLACE INTO app_settings (key, value, updated_at)
+            VALUES ('is_initial_setup_completed', '1', ?)
+        """, (now_str,))
 
         log_audit_event(
             conn,
@@ -98,6 +139,12 @@ def initial_setup(user_data: UserCreate):
                 "created_at": now_str
             }
         }
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 

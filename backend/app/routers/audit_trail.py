@@ -419,14 +419,21 @@ def list_backups(current_user: dict = Depends(require_role(["Admin"]))):
     return backups
 
 
+import uuid
+import zipfile
+
+EVIDENCE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploaded_files")
+
+
 @router.post("/backup/create")
 def create_local_backup(current_user: dict = Depends(require_role(["Admin"]))):
     """Admin: Create a point-in-time local SQLite database snapshot with SQLite Online Backup API and SHA-256 integrity verification."""
     if not os.path.exists(DB_PATH):
         raise HTTPException(status_code=404, detail="Primary database file not found")
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_filename = f"finauditpro_backup_{timestamp}.db"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
+    short_uid = uuid.uuid4().hex[:6]
+    backup_filename = f"finauditpro_backup_{timestamp}_{short_uid}.db"
     backup_filepath = os.path.join(BACKUP_DIR, backup_filename)
 
     # Use SQLite Online Backup API for point-in-time consistency
@@ -463,6 +470,71 @@ def create_local_backup(current_user: dict = Depends(require_role(["Admin"]))):
         "size_kb": size_kb,
         "checksum_sha256": checksum,
         "download_url": f"/api/audit-trail/backup/download/{backup_filename}"
+    }
+
+
+@router.post("/backup/create-full-bundle")
+def create_full_backup_bundle(current_user: dict = Depends(require_role(["Admin"]))):
+    """Admin: Create a complete point-in-time backup bundle containing SQLite DB AND uploaded evidence files."""
+    if not os.path.exists(DB_PATH):
+        raise HTTPException(status_code=404, detail="Primary database file not found")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
+    short_uid = uuid.uuid4().hex[:6]
+    temp_db_name = f"finauditpro_db_{timestamp}_{short_uid}.db"
+    temp_db_path = os.path.join(BACKUP_DIR, temp_db_name)
+
+    # 1. Snapshot DB
+    src_conn = sqlite3.connect(DB_PATH)
+    dest_conn = sqlite3.connect(temp_db_path)
+    try:
+        src_conn.backup(dest_conn)
+    finally:
+        dest_conn.close()
+        src_conn.close()
+
+    # 2. Package into zip with evidence directory
+    bundle_filename = f"finauditpro_full_bundle_{timestamp}_{short_uid}.zip"
+    bundle_filepath = os.path.join(BACKUP_DIR, bundle_filename)
+
+    with zipfile.ZipFile(bundle_filepath, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.write(temp_db_path, arcname="database.db")
+        if os.path.exists(EVIDENCE_DIR):
+            for root, dirs, files in os.walk(EVIDENCE_DIR):
+                for f in files:
+                    full_p = os.path.join(root, f)
+                    rel_p = os.path.relpath(full_p, os.path.dirname(EVIDENCE_DIR))
+                    zf.write(full_p, arcname=rel_p)
+
+    # Clean up temp db file if bundled
+    if os.path.exists(temp_db_path):
+        os.remove(temp_db_path)
+
+    checksum = calculate_file_hash(bundle_filepath)
+    size_kb = round(os.path.getsize(bundle_filepath) / 1024, 2)
+
+    # Record in audit trail
+    conn = get_db_connection()
+    try:
+        log_audit_event(
+            conn,
+            action="DATABASE_BACKUP",
+            module="BACKUP",
+            record_id=bundle_filename,
+            new_value={"filename": bundle_filename, "size_kb": size_kb, "sha256": checksum, "type": "FULL_BUNDLE"},
+            details=f"Created complete audit backup bundle (DB + evidence files): {bundle_filename} ({size_kb} KB)",
+            user=current_user
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "message": "Full audit backup bundle (Database + Evidence) created successfully",
+        "filename": bundle_filename,
+        "size_kb": size_kb,
+        "checksum_sha256": checksum,
+        "download_url": f"/api/audit-trail/backup/download/{bundle_filename}"
     }
 
 
@@ -516,8 +588,8 @@ def restore_database_backup(filename: str, current_user: dict = Depends(require_
         raise HTTPException(status_code=400, detail=f"Invalid or corrupted SQLite backup file: {str(e)}")
 
     # 1. Take automatic pre-restore safety snapshot of current active DB
-    safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safety_filename = f"pre_restore_safety_{safety_ts}.db"
+    safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
+    safety_filename = f"pre_restore_safety_{safety_ts}_{uuid.uuid4().hex[:6]}.db"
     safety_filepath = os.path.join(BACKUP_DIR, safety_filename)
     if os.path.exists(DB_PATH):
         src_conn = sqlite3.connect(DB_PATH)

@@ -118,11 +118,10 @@ def run_bank_reconciliation(
         bank_by_amt.setdefault(amt_key, []).append(b)
 
     # -------------------------------------------------------------
-    # PASS 1: EXACT MATCH (100% Score)
+    # PASS 1: EXACT MATCH (100% Score - Strong Identifier Required)
     # -------------------------------------------------------------
+    exact_candidates = []
     for bk in book_txs:
-        if bk["id"] in matched_book_ids:
-            continue
         bk_dr = float(bk.get("debit") or 0.0)
         bk_cr = float(bk.get("credit") or 0.0)
         bk_amt = round(float(bk.get("amount") or max(bk_dr, bk_cr)), 2)
@@ -133,8 +132,6 @@ def run_bank_reconciliation(
 
         candidates = bank_by_amt.get(bk_amt, [])
         for bn in candidates:
-            if bn["id"] in matched_bank_ids:
-                continue
             bn_dr = float(bn.get("debit") or 0.0)
             bn_cr = float(bn.get("credit") or 0.0)
             bn_dt = parse_date(bn.get("date"))
@@ -144,58 +141,65 @@ def run_bank_reconciliation(
 
             # Direction check: Book Dr (Deposit) == Bank Cr (Deposit) OR Book Cr (Payment) == Bank Dr (Withdrawal)
             is_direction_match = (bk_dr > 0 and bn_cr > 0) or (bk_cr > 0 and bn_dr > 0) or (bk_dr == 0 and bk_cr == 0)
-
             if not is_direction_match:
                 continue
 
             date_diff = abs((bn_dt - bk_dt).days) if (bk_dt and bn_dt) else 0
 
-            # Exact condition: Same amount AND (same chq/ref OR (date_diff <= 1 and (bk_party in bn_party or bn_party in bk_party or not bk_party))))
-            is_exact_chq = (bk_chq and bn_chq and bk_chq == bn_chq)
-            is_exact_ref = (bk_ref and bn_ref and bk_ref == bn_ref)
-            is_exact_date_party = (date_diff <= 1 and bk_party and bn_party and (bk_party in bn_party or bn_party in bk_party))
+            # Strict Exact condition: Requires strong identifier (cheque, voucher ref, or strong party match + 1 day window)
+            is_exact_chq = bool(bk_chq and bn_chq and bk_chq == bn_chq)
+            is_exact_ref = bool(bk_ref and bn_ref and bk_ref == bn_ref)
+            is_exact_date_party = bool(date_diff <= 1 and bk_party and bn_party and (bk_party in bn_party or bn_party in bk_party))
 
-            if is_exact_chq or is_exact_ref or is_exact_date_party or (date_diff == 0 and not is_exact_chq):
-                matched_book_ids.add(bk["id"])
-                matched_bank_ids.add(bn["id"])
-                
-                reason_parts = [f"Exact Amount ₹{bk_amt:,.2f}"]
-                if is_exact_chq:
-                    reason_parts.append(f"Matching Cheque #{bk_chq}")
-                elif is_exact_ref:
-                    reason_parts.append(f"Matching Ref #{bk_ref}")
-                if date_diff == 0:
-                    reason_parts.append("Same Day Clearance")
-                else:
-                    reason_parts.append(f"{date_diff}d timing clearance")
+            if is_exact_chq or is_exact_ref or is_exact_date_party:
+                priority = 100 if is_exact_chq else (98 if is_exact_ref else 95)
+                exact_candidates.append((priority, -date_diff, bk, bn, is_exact_chq, is_exact_ref, bk_chq, bk_ref, bk_amt, date_diff))
 
-                matched_items.append({
-                    "book_tx_id": bk["id"],
-                    "bank_tx_id": bn["id"],
-                    "date_a": bk.get("date"),
-                    "date_b": bn.get("date"),
-                    "ref_a": bk.get("voucher_no") or bk.get("reference_no") or "",
-                    "ref_b": bn.get("voucher_no") or bn.get("reference_no") or "",
-                    "party_a": bk.get("party_name") or "",
-                    "party_b": bn.get("party_name") or "",
-                    "description_a": bk.get("description") or "",
-                    "description_b": bn.get("description") or "",
-                    "amount_a": bk_amt,
-                    "amount_b": bk_amt,
-                    "difference": 0.0,
-                    "date_diff_days": date_diff,
-                    "match_level": "EXACT MATCH",
-                    "match_score": 100.0,
-                    "match_reason": " • ".join(reason_parts),
-                    "item_type": "MATCHED",
-                    "status": "Confirmed",
-                    "notes": "System verified exact voucher and statement match."
-                })
-                break
+    # Sort exact candidates by priority descending, date proximity ascending
+    exact_candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    for _, _, bk, bn, is_exact_chq, is_exact_ref, bk_chq, bk_ref, bk_amt, date_diff in exact_candidates:
+        if bk["id"] in matched_book_ids or bn["id"] in matched_bank_ids:
+            continue
+        matched_book_ids.add(bk["id"])
+        matched_bank_ids.add(bn["id"])
+
+        reason_parts = [f"Exact Amount ₹{bk_amt:,.2f}"]
+        if is_exact_chq:
+            reason_parts.append(f"Matching Cheque #{bk_chq}")
+        elif is_exact_ref:
+            reason_parts.append(f"Matching Ref #{bk_ref}")
+        if date_diff == 0:
+            reason_parts.append("Same Day Clearance")
+        else:
+            reason_parts.append(f"{date_diff}d timing clearance")
+
+        matched_items.append({
+            "book_tx_id": bk["id"],
+            "bank_tx_id": bn["id"],
+            "date_a": bk.get("date"),
+            "date_b": bn.get("date"),
+            "ref_a": bk.get("voucher_no") or bk.get("reference_no") or "",
+            "ref_b": bn.get("voucher_no") or bn.get("reference_no") or "",
+            "party_a": bk.get("party_name") or "",
+            "party_b": bn.get("party_name") or "",
+            "description_a": bk.get("description") or "",
+            "description_b": bn.get("description") or "",
+            "amount_a": bk_amt,
+            "amount_b": bk_amt,
+            "difference": 0.0,
+            "date_diff_days": date_diff,
+            "match_level": "EXACT MATCH",
+            "match_score": 100.0,
+            "match_reason": " • ".join(reason_parts),
+            "item_type": "MATCHED",
+            "status": "Confirmed",
+            "notes": "System verified exact voucher and statement match with strong identifier."
+        })
 
     # -------------------------------------------------------------
-    # PASS 2: HIGH CONFIDENCE MATCH (80% - 95% Score)
+    # PASS 2: HIGH CONFIDENCE MATCH (80% - 95% Score - Global 1-to-1 Assignment)
     # -------------------------------------------------------------
+    high_conf_candidates = []
     for bk in book_txs:
         if bk["id"] in matched_book_ids:
             continue
@@ -223,37 +227,43 @@ def run_bank_reconciliation(
             date_diff = abs((bn_dt - bk_dt).days) if (bk_dt and bn_dt) else 0
             sim = compute_string_similarity(f"{bk_party} {bk_desc}", f"{bn_party} {bn_desc}")
 
-            # High confidence: Exact amount within 7 days clearance delay and (some party/desc similarity or small date diff)
+            # High confidence: Exact amount within 7 days clearance delay
             if date_diff <= 7:
                 score = 90.0 if date_diff <= 3 else 80.0
                 if sim >= 0.3:
                     score += 5.0
-                matched_book_ids.add(bk["id"])
-                matched_bank_ids.add(bn["id"])
+                high_conf_candidates.append((score, -date_diff, bk, bn, bk_amt, bk_party, bn_party, bk_desc, bn_desc, date_diff, sim))
 
-                matched_items.append({
-                    "book_tx_id": bk["id"],
-                    "bank_tx_id": bn["id"],
-                    "date_a": bk.get("date"),
-                    "date_b": bn.get("date"),
-                    "ref_a": bk.get("voucher_no") or bk.get("reference_no") or "",
-                    "ref_b": bn.get("voucher_no") or bn.get("reference_no") or "",
-                    "party_a": bk_party,
-                    "party_b": bn_party,
-                    "description_a": bk_desc,
-                    "description_b": bn_desc,
-                    "amount_a": bk_amt,
-                    "amount_b": bk_amt,
-                    "difference": 0.0,
-                    "date_diff_days": date_diff,
-                    "match_level": "HIGH CONFIDENCE",
-                    "match_score": score,
-                    "match_reason": f"Exact Amount ₹{bk_amt:,.2f} with {date_diff} days clearance lag" + (f" (Party similarity {int(sim*100)}%)" if sim > 0 else ""),
-                    "item_type": "MATCHED",
-                    "status": "Suggested",
-                    "notes": "High probability match suggested based on amount and timing proximity."
-                })
-                break
+    # Sort high confidence candidates globally
+    high_conf_candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    for score, _, bk, bn, bk_amt, bk_party, bn_party, bk_desc, bn_desc, date_diff, sim in high_conf_candidates:
+        if bk["id"] in matched_book_ids or bn["id"] in matched_bank_ids:
+            continue
+        matched_book_ids.add(bk["id"])
+        matched_bank_ids.add(bn["id"])
+
+        matched_items.append({
+            "book_tx_id": bk["id"],
+            "bank_tx_id": bn["id"],
+            "date_a": bk.get("date"),
+            "date_b": bn.get("date"),
+            "ref_a": bk.get("voucher_no") or bk.get("reference_no") or "",
+            "ref_b": bn.get("voucher_no") or bn.get("reference_no") or "",
+            "party_a": bk_party,
+            "party_b": bn_party,
+            "description_a": bk_desc,
+            "description_b": bn_desc,
+            "amount_a": bk_amt,
+            "amount_b": bk_amt,
+            "difference": 0.0,
+            "date_diff_days": date_diff,
+            "match_level": "HIGH CONFIDENCE",
+            "match_score": score,
+            "match_reason": f"Exact Amount ₹{bk_amt:,.2f} with {date_diff} days clearance lag" + (f" (Party similarity {int(sim*100)}%)" if sim > 0 else ""),
+            "item_type": "MATCHED",
+            "status": "Suggested",
+            "notes": "High probability match suggested based on amount and timing proximity."
+        })
 
     # -------------------------------------------------------------
     # PASS 3: POSSIBLE MATCH (50% - 79% Score)

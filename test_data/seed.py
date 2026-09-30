@@ -2,13 +2,12 @@
 Test Database Seeder
 FinAuditPro - Test Data Architecture
 
-Seeds independent client and engagement records for:
-1. Aryan Fintech Pvt. Ltd. (FY 2025-26 and Prior FY 2024-25)
-2. Hitansh Fintech Pvt. Ltd. (FY 2025-26 and Prior FY 2024-25)
+*** TEST FIXTURES ONLY — NEVER USE THESE SEEDED CREDENTIALS IN PRODUCTION ENVIRONMENTS ***
 """
 
 import os
 import csv
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from backend.app.database import get_db_connection, init_db
 from backend.app.auth import hash_password
@@ -18,14 +17,35 @@ from test_data.findings import get_test_findings_for_company
 from test_data.working_papers import get_test_working_papers_for_company
 from test_data.checklists import get_test_checklist_items
 
+# Configurable passwords for test automation suites (TEST ONLY)
+TEST_ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
+TEST_AUDITOR_PASSWORD = os.environ.get("TEST_AUDITOR_PASSWORD", "audit123")
+TEST_STAFF_PASSWORD = os.environ.get("TEST_STAFF_PASSWORD", "staff123")
+
+
+def clean_currency(val) -> float:
+    """Accurately normalizes monetary amounts to 2 decimal places using Decimal."""
+    if val is None or val == "":
+        return 0.0
+    if isinstance(val, (int, float)):
+        d = Decimal(str(val))
+    else:
+        s = str(val).replace(",", "").replace("₹", "").replace("$", "").strip()
+        try:
+            d = Decimal(s)
+        except Exception:
+            return 0.0
+    return float(d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
 def seed_test_users(conn):
-    """Explicitly seeds test users and staff assignments for testing/development."""
+    """Explicitly seeds isolated test users for testing/development (NEVER FOR PRODUCTION)."""
     cursor = conn.cursor()
     now_str = datetime.now().isoformat()
     
-    admin_hash = hash_password("admin123")
-    audit_hash = hash_password("audit123")
-    staff_hash = hash_password("staff123")
+    admin_hash = hash_password(TEST_ADMIN_PASSWORD)
+    audit_hash = hash_password(TEST_AUDITOR_PASSWORD)
+    staff_hash = hash_password(TEST_STAFF_PASSWORD)
 
     test_users = [
         (1, "admin", "admin@finauditpro.local", "System Administrator (FCA)", "Admin", admin_hash),
@@ -97,8 +117,8 @@ def seed_company_engagement(conn, company: dict) -> dict:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             py_eng_id, t["date"], t["voucher_no"], t["invoice_no"], t["ledger"], t["account_group"],
-            t["description"], float(t["debit"] or 0.0), float(t["credit"] or 0.0), float(t["amount"] or 0.0),
-            t["party_name"], t["party_gstin"], float(t["tax_amount"] or 0.0), t["reference"]
+            t["description"], clean_currency(t["debit"]), clean_currency(t["credit"]), clean_currency(t["amount"]),
+            t["party_name"], t["party_gstin"], clean_currency(t["tax_amount"]), t["reference"]
         ))
 
     # 5. Insert CY Transactions
@@ -113,8 +133,8 @@ def seed_company_engagement(conn, company: dict) -> dict:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             cy_eng_id, t["date"], t["voucher_no"], t["invoice_no"], t["ledger"], t["account_group"],
-            t["description"], float(t["debit"] or 0.0), float(t["credit"] or 0.0), float(t["amount"] or 0.0),
-            t["party_name"], t["party_gstin"], float(t["tax_amount"] or 0.0), t["reference"]
+            t["description"], clean_currency(t["debit"]), clean_currency(t["credit"]), clean_currency(t["amount"]),
+            t["party_name"], t["party_gstin"], clean_currency(t["tax_amount"]), t["reference"]
         ))
 
     # 6. Insert Checklists

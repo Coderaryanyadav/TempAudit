@@ -4,6 +4,7 @@ import json
 import time
 import urllib.request
 import urllib.error
+from urllib.parse import urlparse
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
@@ -290,13 +291,14 @@ AVAILABLE_ENGINES = [
     }
 ]
 
-from urllib.parse import urlparse
+ALLOWED_LOCAL_AI_PORTS = {1234, 11434, 8080, 8000, 5000}
 
 def is_valid_loopback_endpoint(endpoint: str) -> bool:
     """
-    Strictly verifies endpoint is genuine loopback/local transport (Flaw 21):
+    Strictly verifies endpoint is genuine loopback/local transport (Flaw 21, Points 12 & 13):
     Allows only:
-    - scheme http/https with hostname in ('localhost', '127.0.0.1', '::1') without userinfo
+    - scheme http/https with hostname in ('localhost', '127.0.0.1', '::1') without userinfo,
+      and port restricted to standard local AI server ports (1234, 11434, 8080, 8000, 5000).
     - scheme local://
     """
     if not endpoint:
@@ -311,9 +313,12 @@ def is_valid_loopback_endpoint(endpoint: str) -> bool:
         if parsed.username or parsed.password:
             return False
         hostname = (parsed.hostname or "").lower()
-        if hostname in ("localhost", "127.0.0.1", "::1"):
-            return True
-        return False
+        if hostname not in ("localhost", "127.0.0.1", "::1"):
+            return False
+        port = parsed.port
+        if port not in ALLOWED_LOCAL_AI_PORTS:
+            return False
+        return True
     except Exception:
         return False
 
@@ -328,18 +333,24 @@ class LocalAIModelManager:
             try:
                 loaded = json.loads(row["value"])
                 config = {**DEFAULT_AI_CONFIG, **loaded}
+                # Enforce immutable security invariant: strict_offline_only is always True
+                config["strict_offline_only"] = True
                 # Validate model_location on load
                 if not is_valid_loopback_endpoint(config.get("model_location", "")):
                     config["model_location"] = "http://localhost:1234"
                 return config
             except Exception:
                 pass
-        return DEFAULT_AI_CONFIG.copy()
+        cfg = DEFAULT_AI_CONFIG.copy()
+        cfg["strict_offline_only"] = True
+        return cfg
 
     @classmethod
     def save_config(cls, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Saves AI config to app_settings table with strict loopback validation."""
+        """Saves AI config to app_settings table with strict loopback validation and offline invariant."""
         merged = {**cls.get_config(), **config}
+        # Invariant: Never allow disabling strict_offline_only
+        merged["strict_offline_only"] = True
         if not is_valid_loopback_endpoint(merged.get("model_location", "")):
             merged["model_location"] = "http://localhost:1234"
         now_str = datetime.now().isoformat()

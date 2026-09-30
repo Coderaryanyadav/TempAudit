@@ -86,6 +86,55 @@ def get_all_settings(current_user: dict = Depends(get_current_user)):
     }
 
 
+ALLOWED_SETTINGS_SCHEMA = {
+    "firm_name": {"type": str, "min_len": 1, "max_len": 200},
+    "firm_icai_reg": {"type": str, "min_len": 1, "max_len": 50},
+    "materiality_percentage": {"type": (int, float), "min_val": 0.01, "max_val": 100.0},
+    "materiality_benchmark": {"type": str, "allowed": ["Turnover", "Gross Profit", "Total Assets", "Net Profit"]},
+    "cash_threshold_40a3": {"type": (int, float), "min_val": 0.0, "max_val": 100000000.0},
+    "cash_threshold_269st": {"type": (int, float), "min_val": 0.0, "max_val": 1000000000.0},
+    "gst_turnover_threshold": {"type": (int, float), "min_val": 0.0, "max_val": 10000000000.0},
+    "benford_confidence_level": {"type": (int, float), "min_val": 0.5, "max_val": 0.999},
+    "isolation_forest_contamination": {"type": (int, float), "min_val": 0.001, "max_val": 0.5},
+    "auto_backup_enabled": {"type": bool},
+    "backup_retention_days": {"type": int, "min_val": 1, "max_val": 3650},
+    "session_timeout_minutes": {"type": int, "min_val": 5, "max_val": 1440},
+    "strict_maker_checker": {"type": bool},
+    "is_initial_setup_completed": {"type": bool},
+}
+
+
+def _validate_setting(key: str, value: Any):
+    """Strictly validates key against whitelist and bounds/types."""
+    if key not in ALLOWED_SETTINGS_SCHEMA:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown configuration setting '{key}'. Allowed keys: {list(ALLOWED_SETTINGS_SCHEMA.keys())}"
+        )
+    schema = ALLOWED_SETTINGS_SCHEMA[key]
+    expected_type = schema["type"]
+
+    if expected_type is bool:
+        if not isinstance(value, bool):
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' must be a boolean.")
+    elif isinstance(expected_type, tuple) or expected_type in (int, float):
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' must be numeric.")
+        if "min_val" in schema and value < schema["min_val"]:
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' must be >= {schema['min_val']}.")
+        if "max_val" in schema and value > schema["max_val"]:
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' must be <= {schema['max_val']}.")
+    elif expected_type is str:
+        if not isinstance(value, str):
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' must be a string.")
+        if "min_len" in schema and len(value.strip()) < schema["min_len"]:
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' cannot be empty.")
+        if "max_len" in schema and len(value) > schema["max_len"]:
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' exceeds max length of {schema['max_len']}.")
+        if "allowed" in schema and value not in schema["allowed"]:
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' must be one of {schema['allowed']}.")
+
+
 @router.post("")
 def update_settings(
     update_req: BulkSettingsUpdate,
@@ -95,6 +144,9 @@ def update_settings(
     Admin: Update system and audit engine configuration settings.
     Records SETTINGS_CHANGE in the append-only audit trail with Old and New values.
     """
+    for k, v in update_req.settings.items():
+        _validate_setting(k, v)
+
     conn = get_db_connection()
     now_str = datetime.now().isoformat()
     old_settings = {}

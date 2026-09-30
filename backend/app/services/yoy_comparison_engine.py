@@ -119,7 +119,7 @@ def run_yoy_comparison(
             py_eng = dict(py_row)
     
     if not py_eng:
-        # Step A: Look for exact prior financial year (e.g. FY 2025-26 -> FY 2024-25)
+        # Look for exact prior financial year (e.g. FY 2025-26 -> FY 2024-25)
         target_py_fy = derive_prior_financial_year(cy_fy)
         if target_py_fy:
             py_row = conn.execute("""
@@ -130,18 +130,9 @@ def run_yoy_comparison(
             if py_row:
                 py_eng = dict(py_row)
 
-    if not py_eng:
-        # Step B: Fallback to most recent earlier engagement
-        py_row = conn.execute("""
-            SELECT * FROM engagements
-            WHERE client_id = ? AND id != ? AND financial_year != ?
-            ORDER BY id DESC LIMIT 1
-        """, (client_id, engagement_id, cy_fy)).fetchone()
-        if py_row:
-            py_eng = dict(py_row)
-
     py_id = py_eng["id"] if py_eng else None
-    py_fy = py_eng.get("financial_year", "2023-24") if py_eng else f"PY ({cy_fy} Baseline)"
+    target_py_fy = derive_prior_financial_year(cy_fy)
+    py_fy = py_eng.get("financial_year") if py_eng else (target_py_fy or f"PY ({cy_fy} Baseline)")
 
     # 3. Fetch Existing Reviews & Comments
     rev_rows = conn.execute("SELECT * FROM yoy_comparison_reviews WHERE engagement_id = ?", (engagement_id,)).fetchall()

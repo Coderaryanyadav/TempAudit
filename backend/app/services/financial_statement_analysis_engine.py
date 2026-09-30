@@ -121,14 +121,18 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         GROUP BY ledger, account_group
     """, (engagement_id,)).fetchall()
 
-    # 2. Check for Previous Year (PY) Engagement
-    py_eng_row = conn.execute("""
-        SELECT id, financial_year FROM engagements
-        WHERE client_id = ? AND id != ? AND financial_year != ?
-        ORDER BY id DESC LIMIT 1
-    """, (client_id, engagement_id, cy_year)).fetchone()
+    # 2. Check for exact Previous Year (PY) Engagement (e.g. 2025-26 -> 2024-25)
+    from backend.app.utils.financial_year import derive_prior_financial_year
+    target_py_fy = derive_prior_financial_year(cy_year)
+    py_eng_row = None
+    if target_py_fy:
+        py_eng_row = conn.execute("""
+            SELECT id, financial_year FROM engagements
+            WHERE client_id = ? AND id != ? AND financial_year = ?
+            ORDER BY id DESC LIMIT 1
+        """, (client_id, engagement_id, target_py_fy)).fetchone()
 
-    py_year = py_eng_row["financial_year"] if py_eng_row else "2023-24"
+    py_year = py_eng_row["financial_year"] if py_eng_row else (target_py_fy or "Prior FY")
     py_rows = []
     if py_eng_row:
         py_rows = conn.execute("""
@@ -139,7 +143,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         """, (py_eng_row["id"],)).fetchall()
 
     # 3. Aggregate Ledger Figures
-    def aggregate_statements(rows, is_synthetic_py=False):
+    def aggregate_statements(rows):
         rev = 0.0
         cogs = 0.0
         employee_exp = 0.0

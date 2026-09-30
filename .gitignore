@@ -21,5 +21,8 @@ backend/reports_generated/*
 *.db-wal
 *.db-journal
 1.md
+.DS_Store
+backend/backups/*
+!backend/backups/.gitkeep
 
 

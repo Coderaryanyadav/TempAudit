@@ -24,13 +24,14 @@ def get_session_timeout_minutes() -> int:
     return 60
 
 def get_jwt_secret() -> str:
-    """Retrieves secret key from environment or persisted database settings."""
+    """Retrieves secret key from environment or persisted database settings (Refusing hardcoded fallbacks)."""
     env_secret = os.environ.get("FINAUDIT_SECRET_KEY")
     if env_secret:
         return env_secret
     
     try:
         conn = get_db_connection()
+        conn.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)")
         row = conn.execute("SELECT value FROM app_settings WHERE key = 'jwt_secret_key'").fetchone()
         if row and row["value"]:
             secret = row["value"]
@@ -43,8 +44,8 @@ def get_jwt_secret() -> str:
         conn.commit()
         conn.close()
         return new_secret
-    except Exception:
-        return "finauditpro-local-secure-key-2026-offline"
+    except Exception as e:
+        raise RuntimeError("JWT secret is unavailable; refusing to start authentication.") from e
 
 SECRET_KEY = get_jwt_secret()
 
