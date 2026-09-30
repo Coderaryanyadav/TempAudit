@@ -1,0 +1,21 @@
+date,voucher_no,invoice_no,ledger,account_group,description,debit,credit,amount,party_name,gstin,invoice_date,payment_date,transaction_type
+2024-04-05,VR-2024-001,INV-101,Sales Revenue,Revenue,Domestic sales of industrial machinery parts,0.0,500000.0,500000.0,Bharat Heavy Infra Ltd,27AAACB1234A1Z5,2024-04-05,2024-04-20,
+2024-04-10,VR-2024-002,PUR-501,Raw Material Purchase,Expense,Purchase of structural steel grade A,354000.0,0.0,354000.0,Tata Steel Supply Depot,27AAACT1234F1Z8,2024-04-08,2024-04-10,
+2024-04-30,VR-2024-003,SAL-04,Salaries & Wages,Expense,Staff salary disbursement for April 2024,450000.0,0.0,450000.0,HDFC Bank Salary Account,,2024-04-30,2024-04-30,
+2024-05-02,VR-2024-004,RNT-05,Office Rent,Expense,Factory and corporate office rent for May 2024,125000.0,0.0,125000.0,Kedia Realtors LLP,27AAEFK8899D1ZV,2024-05-01,2024-05-02,
+2024-05-15,CPV-001,TRN-909,Freight & Cartage (Cash),Expense,Urgent cash payment for inter-state consignment freight,45000.0,0.0,45000.0,Sharma Logistics Express,,2024-05-15,2024-05-15,Cash
+2024-06-02,CRV-012,SCR-01,Scrap Sales (Cash),Revenue,Spot cash receipt for bulk metal scrap liquidation,0.0,250000.0,250000.0,Vikas Scrap Traders,,2024-06-02,2024-06-02,Cash
+2024-06-18,PV-108,INV-7744,Power & Fuel,Expense,Backup DG diesel and electricity utility billing,118000.0,0.0,118000.0,Reliance Power Solutions,27AABCR9911C1ZX,2024-06-18,2024-06-20,
+2024-06-18,PV-109,INV-7744,Power & Fuel,Expense,Backup DG diesel and electricity utility billing (Duplicate),118000.0,0.0,118000.0,Reliance Power Solutions,27AABCR9911C1ZX,2024-06-18,2024-06-20,
+2024-07-05,PV-145,ZTS-99,IT Software & Cloud Services,Expense,Annual ERP license and cloud hosting fees,88500.0,0.0,88500.0,Zenith Tech Systems,27AABC1234D1Z,2024-07-01,2024-07-05,
+2024-07-20,PV-162,MN-441,Maintenance Expenses,Expense,HVAC compressor overhaul servicing,65000.0,0.0,65000.0,Cooling Point Services,27AABCP7766A1ZQ,2024-08-10,2024-07-20,
+2024-08-14,JV-088,ADJ-01,Consultancy & Professional Fees,Expense,Miscellaneous adjustment and management fees,500000.0,0.0,500000.0,Apex Advisory Services,27AAACP5522K1Z3,2024-08-14,2024-08-14,
+2024-09-01,,DIR-09,Directors Remuneration,Expense,,250000.0,0.0,250000.0,Rajesh Singhania,,2024-09-01,2024-09-01,
+2024-10-12,PV-289,REP-998,Plant & Machinery Repairs,Expense,Emergency high-pressure turbine overhaul and turbine rotor reconditioning,1850000.0,0.0,1850000.0,Siemens Precision Engineering,27AAACS4411P1Z9,2024-10-10,2024-10-12,
+2024-11-17,PV-312,ADV-02,Advertisement & Marketing,Expense,Print media campaign and exhibition sponsorship,175000.0,0.0,175000.0,Metro Media House,27AABCM6611J1ZK,2024-11-17,2024-11-17,
+2024-12-05,VR-2024-055,INV-188,Sales Revenue,Revenue,Export sales of engineering components,0.0,1250000.0,1250000.0,Global Tech FZE,,2024-12-05,2024-12-15,
+2024-12-20,VR-2024-056,PUR-912,Raw Material Purchase,Expense,Alloy ingots purchase,620000.0,0.0,620000.0,Hindalco Industries Ltd,27AAACH2233M1Z2,2024-12-18,2024-12-20,
+2025-01-15,VR-2025-001,BNK-01,Bank Interest & Finance Charges,Expense,Working capital CC limit interest charges,48250.0,0.0,48250.0,State Bank of India,27AAACS0000A1Z1,2025-01-15,2025-01-15,
+2025-02-10,VR-2025-014,AUD-01,Audit & Legal Fees,Expense,Interim statutory audit fee provision,75000.0,0.0,75000.0,Kherani & Associates CA,27AAAFF1234A1Z7,2025-02-10,2025-02-10,
+2025-03-25,VR-2025-030,TEL-03,Telephone & Internet,Expense,High-speed optical fiber leased line bill,18450.0,0.0,18450.0,Airtel Business Enterprise,27AAACB2233Q1Z6,2025-03-20,2025-03-25,
+2025-03-31,VR-2025-031,DEP-01,Depreciation Expense,Expense,Year-end depreciation as per Schedule II Companies Act 2013,215000.0,0.0,215000.0,Accumulated Depreciation,,2025-03-31,2025-03-31,

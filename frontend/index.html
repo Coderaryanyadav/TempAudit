@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinAuditPro — Offline AI-Assisted Audit Assistant</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body>
+  <div id="app-container">
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar">
+      <div class="brand-header">
+        <div class="brand-icon">F</div>
+        <div>
+          <div class="brand-title">FinAuditPro</div>
+          <div style="font-size: 10px; color: #94a3b8;">Standalone CA Suite</div>
+        </div>
+        <div class="brand-badge">v1.0</div>
+      </div>
+
+      <div class="nav-section-title">Audit Management</div>
+      <ul class="nav-list">
+        <li class="nav-item active" data-tab="dashboard">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+            </path>
+          </svg>
+          Dashboard
+        </li>
+        <li class="nav-item" data-tab="clients">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+            </path>
+          </svg>
+          Clients
+        </li>
+        <li class="nav-item" data-tab="engagements">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
+            </path>
+          </svg>
+          Engagements
+        </li>
+        <li class="nav-item" data-tab="import">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+          </svg>
+          Data Import
+        </li>
+        <li class="nav-item" data-tab="cleaning_logs">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z">
+            </path>
+          </svg>
+          Data Cleaning Log
+        </li>
+
+        <div class="nav-section-title">Core Accounting & Audit</div>
+        <li class="nav-item" data-tab="trial_balance">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3">
+            </path>
+          </svg>
+          Trial Balance
+        </li>
+        <li class="nav-item" data-tab="general_ledger">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253">
+            </path>
+          </svg>
+          General Ledger
+        </li>
+        <li class="nav-item" data-tab="reconciliation">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+          </svg>
+          Reconciliation (BRS/2B)
+        </li>
+        <li class="nav-item" data-tab="financial_statements">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+            </path>
+          </svg>
+          Financial Statements
+        </li>
+        <li class="nav-item" data-tab="yoy_comparison">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+          </svg>
+          YoY Comparison
+        </li>
+        <li class="nav-item" data-tab="duplicate_missing">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+            </path>
+          </svg>
+          Duplicates & Sequence Gaps
+        </li>
+
+        <div class="nav-section-title">AI & Exception Engine</div>
+        <li class="nav-item" data-tab="anomaly_detection">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          Anomaly & ML Engine
+        </li>
+        <li class="nav-item" data-tab="findings">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+            </path>
+          </svg>
+          Risk & Findings
+        </li>
+        <li class="nav-item" data-tab="assistant">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z">
+            </path>
+          </svg>
+          AI Audit Assistant
+        </li>
+
+        <div class="nav-section-title">Compliance & Output</div>
+        <li class="nav-item" data-tab="checklist">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Audit Checklist
+        </li>
+        <li class="nav-item" data-tab="working_papers">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z">
+            </path>
+          </svg>
+          Working Papers
+        </li>
+        <li class="nav-item" data-tab="reports">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+            </path>
+          </svg>
+          Audit Reports (PDF)
+        </li>
+        <li class="nav-item" data-tab="audit_trail">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Audit Trail Log
+        </li>
+
+        <div class="nav-section-title">Administration</div>
+        <li class="nav-item" id="nav-users-item" data-tab="users">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+            </path>
+          </svg>
+          User Management
+        </li>
+        <li class="nav-item" data-tab="ai_manager">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+            </path>
+          </svg>
+          Offline AI Manager
+        </li>
+        <li class="nav-item" data-tab="settings">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+            </path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z">
+            </path>
+          </svg>
+          Settings & Backup
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <span class="offline-pill"><span class="offline-dot"></span> 100% OFFLINE</span>
+        <span>Local SQLite</span>
+      </div>
+    </nav>
+
+    <!-- Main Content Wrapper -->
+    <div id="main-wrapper">
+      <!-- Top Application Header -->
+      <header id="top-bar">
+        <div class="engagement-selector-box">
+          <span class="engagement-label">Active Engagement:</span>
+          <select id="engagement-select" class="engagement-select">
+            <option value="1">Apex Engineering & Logistics (2024-25) — Statutory Audit</option>
+          </select>
+        </div>
+
+        <div class="top-bar-actions" style="display: flex; align-items: center; gap: 14px;">
+          <!-- Prominent Offline Mode & AI Indicator -->
+          <div id="top-offline-badge" class="top-offline-pill" onclick="navigateTo('ai_manager')"
+            title="100% Offline Standalone Application — Click to configure Local AI Model & Privacy Guard">
+            <span class="offline-dot"></span>
+            <span style="font-weight: 700; letter-spacing: 0.03em;">OFFLINE MODE</span>
+            <span style="color: #475569;">|</span>
+            <span id="top-ai-status-text">🤖 Local AI: Checking...</span>
+          </div>
+
+          <div class="user-profile-menu-wrap">
+            <div class="user-profile-badge" id="top-user-badge">
+              <div class="user-avatar admin" id="top-user-avatar">CA</div>
+              <span id="top-user-name">Aaliya Kherani (Partner, FCA)</span>
+              <span id="top-user-role-badge"></span>
+              <span style="font-size: 10px; color: #64748b;">▼</span>
+            </div>
+
+            <!-- Profile Dropdown -->
+            <div class="user-dropdown-menu" id="user-dropdown-menu">
+              <div class="user-dropdown-item" onclick="openChangePasswordModal()">
+                <span>🔒</span> Change My Password
+              </div>
+              <div class="user-dropdown-item" onclick="navigateTo('ai_manager')">
+                <span>🤖</span> Local AI Manager
+              </div>
+              <div class="user-dropdown-item danger" onclick="handleLogout()">
+                <span>🚪</span> Sign Out
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- View Container -->
+      <main id="content-container">
+        <!-- Rendered dynamically by app.js -->
+      </main>
+    </div>
+  </div>
+
+  <!-- Slide-out Evidence Drawer -->
+  <div id="drawer-overlay"></div>
+  <aside id="evidence-drawer">
+    <div class="drawer-header">
+      <h3 id="drawer-title" style="font-size: 14px; font-weight: 700; color: #0f172a;">Audit Evidence</h3>
+      <button id="drawer-close-btn" class="btn btn-sm btn-secondary" style="border: none; font-size: 16px;">✕</button>
+    </div>
+    <div class="drawer-body" id="drawer-content">
+      <!-- Populated dynamically -->
+    </div>
+  </aside>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+
+</html>

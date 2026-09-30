@@ -1,0 +1,8 @@
+date,voucher_no,invoice_no,ledger,account_group,debit,credit,amount,party_name
+2023-05-10,PY-01,PY-INV-01,Sales Revenue,Revenue,0.0,1400000.0,1400000.0,Bharat Heavy Infra Ltd
+2023-06-15,PY-02,PY-PUR-01,Raw Material Purchase,Expense,850000.0,0.0,850000.0,Tata Steel Supply Depot
+2023-07-30,PY-03,PY-SAL-01,Salaries & Wages,Expense,380000.0,0.0,380000.0,HDFC Bank Salary Account
+2023-08-12,PY-04,PY-RNT-01,Office Rent,Expense,110000.0,0.0,110000.0,Kedia Realtors LLP
+2023-09-20,PY-05,PY-POW-01,Power & Fuel,Expense,82000.0,0.0,82000.0,Reliance Power Solutions
+2023-10-15,PY-06,PY-REP-01,Plant & Machinery Repairs,Expense,650000.0,0.0,650000.0,Siemens Precision Engineering
+2023-11-20,PY-07,PY-ADV-01,Advertisement & Marketing,Expense,120000.0,0.0,120000.0,Metro Media House
