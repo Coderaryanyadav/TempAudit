@@ -5484,9 +5484,10 @@ async function openRunGSTReconModal() {
     ]);
 
     const allLedgers = ledgersRes.all_ledgers || [];
-    const files = filesRes || [];
-    const gstFiles = files.filter(f => f.data_category === "GST Data" || f.filename.toLowerCase().includes("2b") || f.filename.toLowerCase().includes("gst") || f.filename.toLowerCase().includes("gstr"));
-    const bookFiles = files.filter(f => f.data_category === "Purchase Register" || f.data_category === "Sales Register" || f.data_category === "General Ledger" || f.filename.toLowerCase().includes("purchase") || f.filename.toLowerCase().includes("register"));
+    const files = Array.isArray(filesRes) ? filesRes : [];
+    const getFileName = (f) => (f?.file_name || f?.filename || f?.original_filename || "").toLowerCase();
+    const gstFiles = files.filter(f => f?.data_category === "GST Data" || getFileName(f).includes("2b") || getFileName(f).includes("gst") || getFileName(f).includes("gstr"));
+    const bookFiles = files.filter(f => f?.data_category === "Purchase Register" || f?.data_category === "Sales Register" || f?.data_category === "General Ledger" || getFileName(f).includes("purchase") || getFileName(f).includes("register") || getFileName(f).includes("sales"));
 
     const modalHtml = `
       <div class="modal-overlay" id="run-gst-recon-modal">
@@ -5513,7 +5514,7 @@ async function openRunGSTReconModal() {
                   <select id="gst-source-a-file" class="form-control">
                     <option value="">-- Auto-Detect Uploaded File --</option>
                     ${gstFiles.map(f => `
-                      <option value="${f.id}">${escapeHtml(f.filename)} (${f.data_category})</option>
+                      <option value="${f.id}">${escapeHtml(f.file_name || f.filename || 'File #' + f.id)} (${f.data_category || 'File'})</option>
                     `).join('')}
                   </select>
                 </div>
@@ -5530,7 +5531,7 @@ async function openRunGSTReconModal() {
                   <select id="gst-source-b-file" class="form-control">
                     <option value="">-- Auto-Detect Uploaded File --</option>
                     ${bookFiles.map(f => `
-                      <option value="${f.id}">${escapeHtml(f.filename)} (${f.data_category})</option>
+                      <option value="${f.id}">${escapeHtml(f.file_name || f.filename || 'File #' + f.id)} (${f.data_category || 'File'})</option>
                     `).join('')}
                   </select>
                 </div>
@@ -6112,14 +6113,15 @@ async function openRunSalesPurchaseReconModal() {
     ]);
 
     const allLedgers = ledgersRes.all_ledgers || [];
-    const files = filesRes || [];
+    const files = Array.isArray(filesRes) ? filesRes : [];
+    const getFileName = (f) => (f?.file_name || f?.filename || f?.original_filename || "").toLowerCase();
     const registerFiles = files.filter(f => 
-      f.data_category === "Sales Register" || 
-      f.data_category === "Purchase Register" || 
-      f.data_category === "GST Data" ||
-      f.filename.toLowerCase().includes("sales") || 
-      f.filename.toLowerCase().includes("purchase") ||
-      f.filename.toLowerCase().includes("register")
+      f?.data_category === "Sales Register" || 
+      f?.data_category === "Purchase Register" || 
+      f?.data_category === "GST Data" ||
+      getFileName(f).includes("sales") || 
+      getFileName(f).includes("purchase") ||
+      getFileName(f).includes("register")
     );
 
     const modalHtml = `
@@ -6148,7 +6150,7 @@ async function openRunSalesPurchaseReconModal() {
                 <select id="sp-register-file" class="form-control">
                   <option value="">-- Auto-Detect from Uploaded Engagement Datasets --</option>
                   ${registerFiles.map(f => `
-                    <option value="${f.id}">${escapeHtml(f.filename)} (${f.data_category})</option>
+                    <option value="${f.id}">${escapeHtml(f.file_name || f.filename || 'File #' + f.id)} (${f.data_category || 'File'})</option>
                   `).join('')}
                 </select>
                 <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
@@ -6569,8 +6571,9 @@ async function openRunBRSModal() {
     ]);
 
     const bankLedgers = ledgersRes.bank_ledgers || ["Bank Account"];
-    const files = filesRes || [];
-    const bankFiles = files.filter(f => f.data_category === "Bank Statement" || f.filename.toLowerCase().includes("bank") || f.filename.toLowerCase().includes("stmt"));
+    const files = Array.isArray(filesRes) ? filesRes : [];
+    const getFileName = (f) => (f?.file_name || f?.filename || f?.original_filename || "").toLowerCase();
+    const bankFiles = files.filter(f => f?.data_category === "Bank Statement" || getFileName(f).includes("bank") || getFileName(f).includes("stmt"));
 
     const modalHtml = `
       <div class="modal-overlay" id="run-brs-modal">
@@ -6599,7 +6602,7 @@ async function openRunBRSModal() {
                 <select id="brs-file-b" class="form-control">
                   <option value="">-- Auto-Detect / Engagement Bank Dataset --</option>
                   ${bankFiles.map(f => `
-                    <option value="${f.id}">${escapeHtml(f.filename)} (${f.data_category})</option>
+                    <option value="${f.id}">${escapeHtml(f.file_name || f.filename || 'File #' + f.id)} (${f.data_category || 'File'})</option>
                   `).join('')}
                 </select>
                 <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
@@ -10009,7 +10012,7 @@ async function renderClients() {
             </thead>
             <tbody>
               ${clients.map(c => `
-                <tr data-name="${c.name.toLowerCase()}" data-pan="${(c.pan || '').toLowerCase()}" data-gstin="${(c.gstin || '').toLowerCase()}" data-entity="${c.entity_type || ''}" data-industry="${c.industry || ''}">
+                <tr data-name="${(c.name || '').toLowerCase()}" data-pan="${(c.pan || '').toLowerCase()}" data-gstin="${(c.gstin || '').toLowerCase()}" data-entity="${c.entity_type || ''}" data-industry="${c.industry || ''}">
                   <td>
                     <div style="font-weight: 700; color: #0f172a; font-size: 13.5px;">${c.name}</div>
                     <span class="badge badge-medium" style="margin-top: 2px;">${c.entity_type || 'Private Limited Company'}</span>
@@ -10421,7 +10424,7 @@ async function renderEngagements() {
             </thead>
             <tbody>
               ${engagements.map(e => `
-                <tr style="${e.id === state.currentEngagementId ? 'background-color: var(--primary-light);' : ''}" data-title="${e.title.toLowerCase()}" data-client="${e.client_name.toLowerCase()}" data-fy="${e.financial_year}" data-type="${e.audit_type}" data-status="${e.status}">
+                <tr style="${e.id === state.currentEngagementId ? 'background-color: var(--primary-light);' : ''}" data-title="${(e.title || '').toLowerCase()}" data-client="${(e.client_name || '').toLowerCase()}" data-fy="${e.financial_year || ''}" data-type="${e.audit_type || ''}" data-status="${e.status || ''}">
                   <td>
                     <div style="font-weight: 700; color: #0f172a; font-size: 13.5px;">
                       ${e.title}
@@ -10856,8 +10859,8 @@ async function renderSettings() {
         </div>
         <div style="padding: 6px 0;">
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div class="user-avatar ${state.currentUser?.role.toLowerCase().replace(' ', '')}" style="width: 44px; height: 44px; font-size: 16px;">
-              ${state.currentUser?.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+            <div class="user-avatar ${(state.currentUser?.role || 'Admin').toLowerCase().replace(' ', '')}" style="width: 44px; height: 44px; font-size: 16px;">
+              ${(state.currentUser?.full_name || 'Admin').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
             </div>
             <div>
               <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${state.currentUser?.full_name}</div>

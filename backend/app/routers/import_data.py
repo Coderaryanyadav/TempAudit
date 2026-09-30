@@ -279,6 +279,8 @@ def list_uploaded_files(
         for r in rows:
             f = dict(r)
             f.pop("file_path", None)
+            f["filename"] = f.get("file_name") or f.get("filename") or ""
+            f["file_name"] = f["filename"]
             if f.get("errors_json"):
                 try:
                     f["errors_data"] = json.loads(f["errors_json"])
