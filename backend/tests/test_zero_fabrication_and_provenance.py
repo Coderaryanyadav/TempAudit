@@ -95,9 +95,9 @@ class TestZeroFabricationAndProvenance(unittest.TestCase):
         self.assertEqual(yoy_res["provenance"]["data_status"], "MISSING_PY")
         self.assertIsNone(yoy_res["previous_engagement_id"])
 
-        # Check that PY figures in executive comparison are strictly 0.0 (not synthetic)
+        # Check that PY figures in executive comparison are None (not fabricated/synthetic)
         for item in yoy_res["executive_comparison"]:
-            self.assertEqual(item["previous_year"], 0.0)
+            self.assertIsNone(item["previous_year"])
 
     def test_empty_engagement_provenance(self):
         """When engagement has 0 transactions, provenance reports MISSING."""

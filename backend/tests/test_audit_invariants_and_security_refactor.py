@@ -104,3 +104,74 @@ def test_brs_exact_match_requires_strong_party_or_cheque():
     result = run_bank_reconciliation(eid)
     exact_matches = [m for m in result.get("matched_transactions", []) if m.get("confidence") == 1.0]
     assert len(exact_matches) == 0, "Different parties without cheque/ref must not produce confidence 1.0 EXACT MATCH"
+
+
+def test_missing_py_financial_statements_returns_none_not_zero():
+    """Verify that when prior year is missing, financial statement engine returns None/NOT_AVAILABLE rather than fake zeroes."""
+    from backend.app.services.financial_statement_analysis_engine import run_financial_statement_analysis
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (name, entity_type, created_at) VALUES ('No PY Client', 'Pvt Ltd', datetime('now'))")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO engagements (client_id, title, financial_year, audit_type, created_at, updated_at) VALUES (?, 'Standalone Audit', '2025-26', 'Statutory Audit', datetime('now'), datetime('now'))", (cid,))
+    eid = cur.lastrowid
+
+    cur.execute("""
+        INSERT INTO transactions (engagement_id, date, ledger, account_group, debit, credit, amount, voucher_no)
+        VALUES (?, '2025-05-01', 'Sales Revenue', 'Revenue', 0.0, 5000000.0, 5000000.0, 'INV-1')
+    """, (eid,))
+    conn.commit()
+    conn.close()
+
+    res = run_financial_statement_analysis(eid)
+    assert res["previous_year_data_status"] == "NOT_AVAILABLE"
+    assert res["profit_and_loss"]["previous_year"] is None
+    assert res["balance_sheet"]["previous_year"] is None
+    assert res["ratios"]["previous_year"] is None
+    assert res["cash_flow_statement"]["status"] == "INSUFFICIENT_PRIOR_YEAR_DATA"
+    # Verify no metric has fake 100% or is_significant=True from missing baseline
+    for comp in res["comparisons"]:
+        assert comp["previous_year_value"] is None
+        assert comp["is_significant"] is False
+        assert comp["change_type"] == "NO_PRIOR_YEAR_DATA"
+
+
+def test_missing_py_yoy_comparison_not_significant():
+    """Verify that YoY comparison with missing prior year marks is_significant=False and NO_PRIOR_YEAR_DATA."""
+    from backend.app.services.yoy_comparison_engine import run_yoy_comparison
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (name, entity_type, created_at) VALUES ('YoY No PY Client', 'Pvt Ltd', datetime('now'))")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO engagements (client_id, title, financial_year, audit_type, created_at, updated_at) VALUES (?, 'YoY Single Year Audit', '2025-26', 'Statutory Audit', datetime('now'), datetime('now'))", (cid,))
+    eid = cur.lastrowid
+
+    cur.execute("""
+        INSERT INTO transactions (engagement_id, date, ledger, account_group, debit, credit, amount, voucher_no)
+        VALUES (?, '2025-05-01', 'Sales Revenue', 'Revenue', 0.0, 10000000.0, 10000000.0, 'INV-100')
+    """, (eid,))
+    conn.commit()
+    conn.close()
+
+    res = run_yoy_comparison(eid)
+    assert res["previous_year_data_status"] == "NOT_AVAILABLE"
+    assert res["summary"]["significant_movements_count"] == 0
+    for item in res["executive_comparison"]:
+        assert item["previous_year"] is None
+        assert item["is_significant"] is False
+
+
+def test_jwt_session_timeout_setting_respected():
+    """Verify JWT exp - iat matches session_timeout_minutes setting."""
+    import jwt
+    from backend.app.auth import ALGORITHM
+    conn = get_db_connection()
+    conn.execute("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('session_timeout_minutes', '45', datetime('now'))")
+    conn.commit()
+    conn.close()
+
+    token = create_access_token({"sub": "admin", "role": "Admin", "uid": 1})
+    secret = get_jwt_secret()
+    payload = jwt.decode(token, secret, algorithms=[ALGORITHM], audience="finauditpro-app")
+    duration_mins = (payload["exp"] - payload["iat"]) / 60
+    assert round(duration_mins) == 45

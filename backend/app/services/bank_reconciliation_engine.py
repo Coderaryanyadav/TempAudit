@@ -152,12 +152,28 @@ def run_bank_reconciliation(
             is_exact_date_party = bool(date_diff <= 1 and bk_party and bn_party and (bk_party in bn_party or bn_party in bk_party))
 
             if is_exact_chq or is_exact_ref or is_exact_date_party:
-                priority = 100 if is_exact_chq else (98 if is_exact_ref else 95)
-                exact_candidates.append((priority, -date_diff, bk, bn, is_exact_chq, is_exact_ref, bk_chq, bk_ref, bk_amt, date_diff))
+                # Check for duplicate ambiguity if relying purely on date + party without distinct cheque/ref
+                is_ambiguous = False
+                if not is_exact_chq and not is_exact_ref:
+                    bk_dupes = sum(1 for b in book_txs if round(float(b.get("amount") or 0), 2) == bk_amt and str(b.get("party_name") or "").strip().lower() == bk_party)
+                    bn_dupes = sum(1 for b in bank_txs if round(float(b.get("amount") or 0), 2) == bk_amt and str(b.get("party_name") or "").strip().lower() == bn_party)
+                    if bk_dupes > 1 or bn_dupes > 1:
+                        is_ambiguous = True
+
+                if is_exact_chq:
+                    priority = 100
+                elif is_exact_ref:
+                    priority = 98
+                elif not is_ambiguous:
+                    priority = 95
+                else:
+                    priority = 85
+
+                exact_candidates.append((priority, -date_diff, bk, bn, is_exact_chq, is_exact_ref, is_ambiguous, bk_chq, bk_ref, bk_amt, date_diff))
 
     # Sort exact candidates by priority descending, date proximity ascending
     exact_candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    for _, _, bk, bn, is_exact_chq, is_exact_ref, bk_chq, bk_ref, bk_amt, date_diff in exact_candidates:
+    for priority, _, bk, bn, is_exact_chq, is_exact_ref, is_ambiguous, bk_chq, bk_ref, bk_amt, date_diff in exact_candidates:
         if bk["id"] in matched_book_ids or bn["id"] in matched_bank_ids:
             continue
         matched_book_ids.add(bk["id"])
@@ -168,7 +184,9 @@ def run_bank_reconciliation(
             reason_parts.append(f"Matching Cheque #{bk_chq}")
         elif is_exact_ref:
             reason_parts.append(f"Matching Ref #{bk_ref}")
-        if date_diff == 0:
+        if is_ambiguous:
+            reason_parts.append("Ambiguous Duplicate Entry (Multiple Identical Amounts/Parties - Requires Auditor Verification)")
+        elif date_diff == 0:
             reason_parts.append("Same Day Clearance")
         else:
             reason_parts.append(f"{date_diff}d timing clearance")
@@ -188,12 +206,12 @@ def run_bank_reconciliation(
             "amount_b": bk_amt,
             "difference": 0.0,
             "date_diff_days": date_diff,
-            "match_level": "EXACT MATCH",
-            "match_score": 100.0,
+            "match_level": "AMBIGUOUS EXACT CANDIDATE" if is_ambiguous else "EXACT MATCH",
+            "match_score": 85.0 if is_ambiguous else 100.0,
             "match_reason": " • ".join(reason_parts),
             "item_type": "MATCHED",
-            "status": "Confirmed",
-            "notes": "System verified exact voucher and statement match with strong identifier."
+            "status": "Review Required" if is_ambiguous else "Confirmed",
+            "notes": "Ambiguous duplicate candidates require manual auditor verification." if is_ambiguous else "System verified exact voucher and statement match with strong identifier."
         })
 
     # -------------------------------------------------------------

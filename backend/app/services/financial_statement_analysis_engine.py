@@ -325,108 +325,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
             }
         }
 
-    # Aggregate CY
-    cy_data = aggregate_statements(cy_rows)
-
-    # Aggregate PY strictly from real PY data (no synthetic generation - Flaw 45)
-    py_available = bool(py_rows)
-    if py_rows:
-        py_data = aggregate_statements(py_rows)
-    else:
-        # If no previous year data exists, represent as zeroes with clear indication
-        zero_pnl = {
-            "revenue": 0.0, "cogs": 0.0, "gross_profit": 0.0, "employee_expenses": 0.0,
-            "finance_costs": 0.0, "depreciation": 0.0, "other_operating_expenses": 0.0,
-            "total_operating_expenses": 0.0, "ebitda": 0.0, "ebit": 0.0, "pbt": 0.0,
-            "tax_expense": 0.0, "pat": 0.0, "revenue_items": [], "expense_items": []
-        }
-        zero_bs = {
-            "cash_bank": 0.0, "trade_debtors": 0.0, "inventory": 0.0, "other_current_assets": 0.0,
-            "current_assets": 0.0, "total_current_assets": 0.0, "fixed_assets_ppe": 0.0,
-            "investments": 0.0, "other_non_current_assets": 0.0, "non_current_assets": 0.0,
-            "total_non_current_assets": 0.0, "total_assets": 0.0, "trade_creditors": 0.0,
-            "short_term_borrowings": 0.0, "other_current_liabilities": 0.0, "current_liabilities": 0.0,
-            "total_current_liabilities": 0.0, "long_term_borrowings": 0.0, "other_non_current_liabilities": 0.0,
-            "non_current_liabilities": 0.0, "total_non_current_liabilities": 0.0, "total_liabilities": 0.0,
-            "share_capital": 0.0, "reserves_surplus": 0.0, "pat_retained": 0.0, "total_equity": 0.0,
-            "total_equity_and_liabilities": 0.0, "total_liabilities_and_equity": 0.0, "difference": 0.0
-        }
-        py_data = {"pnl": zero_pnl, "balance_sheet": zero_bs}
-
-    # 4. Compute Cash Flow Statement (Indirect Method)
-    def compute_cash_flow(cy_pnl, cy_bs, py_bs):
-        pat = cy_pnl["pat"]
-        dep = cy_pnl["depreciation"]
-        
-        # Working capital changes
-        delta_debtors = cy_bs["trade_debtors"] - py_bs["trade_debtors"]
-        delta_inv = cy_bs["inventory"] - py_bs["inventory"]
-        delta_other_ca = cy_bs["other_current_assets"] - py_bs["other_current_assets"]
-        delta_creditors = cy_bs["trade_creditors"] - py_bs["trade_creditors"]
-        delta_other_cl = cy_bs["other_current_liabilities"] - py_bs["other_current_liabilities"]
-
-        cfo = round(pat + dep - delta_debtors - delta_inv - delta_other_ca + delta_creditors + delta_other_cl, 2)
-
-        # Investing Activities (Capex & Investments)
-        delta_ppe = cy_bs["fixed_assets_ppe"] - py_bs["fixed_assets_ppe"] + dep
-        delta_invst = cy_bs["investments"] - py_bs["investments"]
-        cfi = round(- (delta_ppe + delta_invst), 2)
-
-        # Financing Activities (Borrowings & Equity)
-        delta_lt_debt = cy_bs["long_term_borrowings"] - py_bs["long_term_borrowings"]
-        delta_st_debt = cy_bs["short_term_borrowings"] - py_bs["short_term_borrowings"]
-        delta_equity = cy_bs["share_capital"] - py_bs["share_capital"]
-        cff = round(delta_lt_debt + delta_st_debt + delta_equity, 2)
-
-        net_change = round(cfo + cfi + cff, 2)
-        opening_cash = py_bs["cash_bank"]
-        closing_cash = cy_bs["cash_bank"]
-
-        return {
-            "cash_flow_operating": cfo,
-            "cash_flow_investing": cfi,
-            "cash_flow_financing": cff,
-            "net_cash_flow": {
-                "net_increase_in_cash_and_equivalents": net_change,
-                "cash_at_beginning_of_period": opening_cash,
-                "cash_at_end_of_period": closing_cash
-            },
-            "opening_cash_balance": opening_cash,
-            "closing_cash_balance": closing_cash,
-            "operating_activities": {
-                "net_cash_from_operating_activities": cfo,
-                "net_profit_before_tax": cy_pnl.get("pbt", pat),
-                "adjustments_for_depreciation": dep,
-                "adjustments_for_finance_costs": cy_pnl.get("finance_costs", 0.0),
-                "change_in_trade_receivables": -delta_debtors,
-                "change_in_inventories": -delta_inv,
-                "change_in_trade_payables": delta_creditors,
-                "change_in_other_working_capital": delta_other_cl - delta_other_ca,
-                "direct_taxes_paid": cy_pnl.get("tax_expense", 0.0)
-            },
-            "investing_activities": {
-                "net_cash_from_investing_activities": cfi,
-                "purchase_of_fixed_assets": -delta_ppe,
-                "other_investing_cash_flow": -delta_invst
-            },
-            "financing_activities": {
-                "net_cash_from_financing_activities": cff,
-                "proceeds_from_borrowings": delta_lt_debt + delta_st_debt,
-                "finance_costs_paid": cy_pnl.get("finance_costs", 0.0),
-                "dividend_paid": delta_equity
-            },
-            "details": {
-                "net_profit_pat": pat,
-                "depreciation_added_back": dep,
-                "working_capital_adjustments": round(- delta_debtors - delta_inv + delta_creditors, 2),
-                "capex_outflow": round(- delta_ppe, 2),
-                "net_borrowing_change": round(delta_lt_debt + delta_st_debt, 2)
-            }
-        }
-
-    cash_flow_stmt = compute_cash_flow(cy_data["pnl"], cy_data["balance_sheet"], py_data["balance_sheet"])
-
-    # 5. Compute Deterministic Ratios for CY and PY
+    # 4. Compute Deterministic Ratios
     def compute_ratios(pnl, bs):
         rev = pnl["revenue"]
         cogs = pnl["cogs"]
@@ -487,8 +386,108 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
             "working_capital_turnover": round(wc_turnover, 2)
         }
 
+    # Aggregate CY
+    cy_data = aggregate_statements(cy_rows)
     cy_ratios = compute_ratios(cy_data["pnl"], cy_data["balance_sheet"])
-    py_ratios = compute_ratios(py_data["pnl"], py_data["balance_sheet"])
+
+    # Aggregate PY strictly from real PY data (no estimations or fake zeroes)
+    py_available = bool(py_rows)
+    if py_rows:
+        py_data = aggregate_statements(py_rows)
+        py_pnl = py_data["pnl"]
+        py_bs = py_data["balance_sheet"]
+        py_ratios = compute_ratios(py_pnl, py_bs)
+    else:
+        py_data = None
+        py_pnl = None
+        py_bs = None
+        py_ratios = None
+
+    # 5. Compute Cash Flow Statement (Indirect Method)
+    def compute_cash_flow(cy_pnl, cy_bs, py_bs):
+        if not py_bs:
+            return {
+                "status": "INSUFFICIENT_PRIOR_YEAR_DATA",
+                "message": "Cash flow comparative statement requires prior-year balance sheet figures.",
+                "cash_flow_operating": None,
+                "cash_flow_investing": None,
+                "cash_flow_financing": None,
+                "net_cash_flow": None,
+                "opening_cash_balance": None,
+                "closing_cash_balance": cy_bs["cash_bank"]
+            }
+
+        pat = cy_pnl["pat"]
+        dep = cy_pnl["depreciation"]
+        
+        # Working capital changes
+        delta_debtors = cy_bs["trade_debtors"] - py_bs["trade_debtors"]
+        delta_inv = cy_bs["inventory"] - py_bs["inventory"]
+        delta_other_ca = cy_bs["other_current_assets"] - py_bs["other_current_assets"]
+        delta_creditors = cy_bs["trade_creditors"] - py_bs["trade_creditors"]
+        delta_other_cl = cy_bs["other_current_liabilities"] - py_bs["other_current_liabilities"]
+
+        cfo = round(pat + dep - delta_debtors - delta_inv - delta_other_ca + delta_creditors + delta_other_cl, 2)
+
+        # Investing Activities (Capex & Investments)
+        delta_ppe = cy_bs["fixed_assets_ppe"] - py_bs["fixed_assets_ppe"] + dep
+        delta_invst = cy_bs["investments"] - py_bs["investments"]
+        cfi = round(- (delta_ppe + delta_invst), 2)
+
+        # Financing Activities (Borrowings & Equity)
+        delta_lt_debt = cy_bs["long_term_borrowings"] - py_bs["long_term_borrowings"]
+        delta_st_debt = cy_bs["short_term_borrowings"] - py_bs["short_term_borrowings"]
+        delta_equity = cy_bs["share_capital"] - py_bs["share_capital"]
+        cff = round(delta_lt_debt + delta_st_debt + delta_equity, 2)
+
+        net_change = round(cfo + cfi + cff, 2)
+        opening_cash = py_bs["cash_bank"]
+        closing_cash = cy_bs["cash_bank"]
+
+        return {
+            "status": "COMPUTED",
+            "cash_flow_operating": cfo,
+            "cash_flow_investing": cfi,
+            "cash_flow_financing": cff,
+            "net_cash_flow": {
+                "net_increase_in_cash_and_equivalents": net_change,
+                "cash_at_beginning_of_period": opening_cash,
+                "cash_at_end_of_period": closing_cash
+            },
+            "opening_cash_balance": opening_cash,
+            "closing_cash_balance": closing_cash,
+            "operating_activities": {
+                "net_cash_from_operating_activities": cfo,
+                "net_profit_before_tax": cy_pnl.get("pbt", pat),
+                "adjustments_for_depreciation": dep,
+                "adjustments_for_finance_costs": cy_pnl.get("finance_costs", 0.0),
+                "change_in_trade_receivables": -delta_debtors,
+                "change_in_inventories": -delta_inv,
+                "change_in_trade_payables": delta_creditors,
+                "change_in_other_working_capital": delta_other_cl - delta_other_ca,
+                "direct_taxes_paid": cy_pnl.get("tax_expense", 0.0)
+            },
+            "investing_activities": {
+                "net_cash_from_investing_activities": cfi,
+                "purchase_of_fixed_assets": -delta_ppe,
+                "other_investing_cash_flow": -delta_invst
+            },
+            "financing_activities": {
+                "net_cash_from_financing_activities": cff,
+                "proceeds_from_borrowings": delta_lt_debt + delta_st_debt,
+                "finance_costs_paid": cy_pnl.get("finance_costs", 0.0),
+                "dividend_paid": delta_equity
+            },
+            "details": {
+                "net_profit_pat": pat,
+                "depreciation_added_back": dep,
+                "working_capital_adjustments": round(- delta_debtors - delta_inv + delta_creditors, 2),
+                "capex_outflow": round(- delta_ppe, 2),
+                "net_borrowing_change": round(delta_lt_debt + delta_st_debt, 2)
+            }
+        }
+
+    cash_flow_stmt = compute_cash_flow(cy_data["pnl"], cy_data["balance_sheet"], py_bs)
 
     # 6. Fetch Existing Auditor Explanations
     saved_expls = {}
@@ -506,46 +505,59 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
     # 7. Build Significant Movement Comparison Matrix
     metrics_to_compare = [
         # Ratios
-        ("current_ratio", "Current Ratio", "Liquidity", cy_ratios["current_ratio"], py_ratios["current_ratio"], "Ratio"),
-        ("quick_ratio", "Quick Ratio (Acid Test)", "Liquidity", cy_ratios["quick_ratio"], py_ratios["quick_ratio"], "Ratio"),
-        ("debt_equity_ratio", "Debt-to-Equity Ratio", "Solvency / Leverage", cy_ratios["debt_equity_ratio"], py_ratios["debt_equity_ratio"], "Ratio"),
-        ("gross_profit_margin_pct", "Gross Profit Margin (%)", "Profitability", cy_ratios["gross_profit_margin_pct"], py_ratios["gross_profit_margin_pct"], "%"),
-        ("net_profit_margin_pct", "Net Profit Margin (%)", "Profitability", cy_ratios["net_profit_margin_pct"], py_ratios["net_profit_margin_pct"], "%"),
-        ("operating_margin_pct", "Operating Profit Margin (%)", "Profitability", cy_ratios["operating_margin_pct"], py_ratios["operating_margin_pct"], "%"),
-        ("receivable_turnover", "Debtors / Receivable Turnover", "Operating Efficiency", cy_ratios["receivable_turnover"], py_ratios["receivable_turnover"], "Times"),
-        ("inventory_turnover", "Inventory Turnover", "Operating Efficiency", cy_ratios["inventory_turnover"], py_ratios["inventory_turnover"], "Times"),
-        ("payable_turnover", "Creditors / Payable Turnover", "Operating Efficiency", cy_ratios["payable_turnover"], py_ratios["payable_turnover"], "Times"),
+        ("current_ratio", "Current Ratio", "Liquidity", cy_ratios["current_ratio"], py_ratios["current_ratio"] if py_ratios else None, "Ratio"),
+        ("quick_ratio", "Quick Ratio (Acid Test)", "Liquidity", cy_ratios["quick_ratio"], py_ratios["quick_ratio"] if py_ratios else None, "Ratio"),
+        ("debt_equity_ratio", "Debt-to-Equity Ratio", "Solvency / Leverage", cy_ratios["debt_equity_ratio"], py_ratios["debt_equity_ratio"] if py_ratios else None, "Ratio"),
+        ("gross_profit_margin_pct", "Gross Profit Margin (%)", "Profitability", cy_ratios["gross_profit_margin_pct"], py_ratios["gross_profit_margin_pct"] if py_ratios else None, "%"),
+        ("net_profit_margin_pct", "Net Profit Margin (%)", "Profitability", cy_ratios["net_profit_margin_pct"], py_ratios["net_profit_margin_pct"] if py_ratios else None, "%"),
+        ("operating_margin_pct", "Operating Profit Margin (%)", "Profitability", cy_ratios["operating_margin_pct"], py_ratios["operating_margin_pct"] if py_ratios else None, "%"),
+        ("receivable_turnover", "Debtors / Receivable Turnover", "Operating Efficiency", cy_ratios["receivable_turnover"], py_ratios["receivable_turnover"] if py_ratios else None, "Times"),
+        ("inventory_turnover", "Inventory Turnover", "Operating Efficiency", cy_ratios["inventory_turnover"], py_ratios["inventory_turnover"] if py_ratios else None, "Times"),
+        ("payable_turnover", "Creditors / Payable Turnover", "Operating Efficiency", cy_ratios["payable_turnover"], py_ratios["payable_turnover"] if py_ratios else None, "Times"),
         # P&L Line Items
-        ("revenue", "Revenue from Operations", "P&L Summary", cy_data["pnl"]["revenue"], py_data["pnl"]["revenue"], "INR"),
-        ("cogs", "Cost of Goods Sold / Materials", "P&L Summary", cy_data["pnl"]["cogs"], py_data["pnl"]["cogs"], "INR"),
-        ("employee_expenses", "Employee Benefit Expenses", "P&L Summary", cy_data["pnl"]["employee_expenses"], py_data["pnl"]["employee_expenses"], "INR"),
-        ("finance_costs", "Finance Costs / Interest", "P&L Summary", cy_data["pnl"]["finance_costs"], py_data["pnl"]["finance_costs"], "INR"),
-        ("ebitda", "Operating EBITDA", "P&L Summary", cy_data["pnl"]["ebitda"], py_data["pnl"]["ebitda"], "INR"),
-        ("pat", "Net Profit After Tax (PAT)", "P&L Summary", cy_data["pnl"]["pat"], py_data["pnl"]["pat"], "INR"),
+        ("revenue", "Revenue from Operations", "P&L Summary", cy_data["pnl"]["revenue"], py_pnl["revenue"] if py_pnl else None, "INR"),
+        ("cogs", "Cost of Goods Sold / Materials", "P&L Summary", cy_data["pnl"]["cogs"], py_pnl["cogs"] if py_pnl else None, "INR"),
+        ("employee_expenses", "Employee Benefit Expenses", "P&L Summary", cy_data["pnl"]["employee_expenses"], py_pnl["employee_expenses"] if py_pnl else None, "INR"),
+        ("finance_costs", "Finance Costs / Interest", "P&L Summary", cy_data["pnl"]["finance_costs"], py_pnl["finance_costs"] if py_pnl else None, "INR"),
+        ("ebitda", "Operating EBITDA", "P&L Summary", cy_data["pnl"]["ebitda"], py_pnl["ebitda"] if py_pnl else None, "INR"),
+        ("pat", "Net Profit After Tax (PAT)", "P&L Summary", cy_data["pnl"]["pat"], py_pnl["pat"] if py_pnl else None, "INR"),
         # Balance Sheet Line Items
-        ("trade_debtors", "Trade Receivables (Debtors)", "Balance Sheet", cy_data["balance_sheet"]["trade_debtors"], py_data["balance_sheet"]["trade_debtors"], "INR"),
-        ("inventory", "Inventories (Stock)", "Balance Sheet", cy_data["balance_sheet"]["inventory"], py_data["balance_sheet"]["inventory"], "INR"),
-        ("cash_bank", "Cash & Bank Balances", "Balance Sheet", cy_data["balance_sheet"]["cash_bank"], py_data["balance_sheet"]["cash_bank"], "INR"),
-        ("fixed_assets_ppe", "Property Plant & Equipment (PPE)", "Balance Sheet", cy_data["balance_sheet"]["fixed_assets_ppe"], py_data["balance_sheet"]["fixed_assets_ppe"], "INR"),
-        ("trade_creditors", "Trade Payables (Creditors)", "Balance Sheet", cy_data["balance_sheet"]["trade_creditors"], py_data["balance_sheet"]["trade_creditors"], "INR"),
-        ("long_term_borrowings", "Long-Term Borrowings (Debt)", "Balance Sheet", cy_data["balance_sheet"]["long_term_borrowings"], py_data["balance_sheet"]["long_term_borrowings"], "INR"),
-        ("total_equity", "Shareholder Equity & Reserves", "Balance Sheet", cy_data["balance_sheet"]["total_equity"], py_data["balance_sheet"]["total_equity"], "INR")
+        ("trade_debtors", "Trade Receivables (Debtors)", "Balance Sheet", cy_data["balance_sheet"]["trade_debtors"], py_bs["trade_debtors"] if py_bs else None, "INR"),
+        ("inventory", "Inventories (Stock)", "Balance Sheet", cy_data["balance_sheet"]["inventory"], py_bs["inventory"] if py_bs else None, "INR"),
+        ("cash_bank", "Cash & Bank Balances", "Balance Sheet", cy_data["balance_sheet"]["cash_bank"], py_bs["cash_bank"] if py_bs else None, "INR"),
+        ("fixed_assets_ppe", "Property Plant & Equipment (PPE)", "Balance Sheet", cy_data["balance_sheet"]["fixed_assets_ppe"], py_bs["fixed_assets_ppe"] if py_bs else None, "INR"),
+        ("trade_creditors", "Trade Payables (Creditors)", "Balance Sheet", cy_data["balance_sheet"]["trade_creditors"], py_bs["trade_creditors"] if py_bs else None, "INR"),
+        ("long_term_borrowings", "Long-Term Borrowings (Debt)", "Balance Sheet", cy_data["balance_sheet"]["long_term_borrowings"], py_bs["long_term_borrowings"] if py_bs else None, "INR"),
+        ("total_equity", "Shareholder Equity & Reserves", "Balance Sheet", cy_data["balance_sheet"]["total_equity"], py_bs["total_equity"] if py_bs else None, "INR")
     ]
 
     comparisons: List[Dict[str, Any]] = []
     significant_movements_count = 0
 
     for key, name, cat, cy_val, py_val, unit in metrics_to_compare:
-        chg = calculate_change(cy_val, py_val)
-        is_sig = chg["is_significant"]
-        if is_sig:
-            significant_movements_count += 1
-            pct_d = chg["percentage_difference"]
-            finding_status = "Significant movement" if (pct_d is None or abs(pct_d) >= 35.0) else "Unusual change"
+        if py_val is not None:
+            chg = calculate_change(cy_val, py_val)
+            is_sig = chg["is_significant"]
+            if is_sig:
+                significant_movements_count += 1
+                pct_d = chg["percentage_difference"]
+                finding_status = "Significant movement" if (pct_d is None or abs(pct_d) >= 35.0) else "Unusual change"
+            else:
+                finding_status = "Stable trend"
+            expl_categories = get_possible_explanations(key, cy_val, py_val, chg["percentage_difference"])
+            abs_diff = chg["absolute_difference"]
+            pct_diff = chg["percentage_difference"]
+            change_type = chg["change_type"]
+            prev_val = chg["previous_value"]
         else:
-            finding_status = "Stable trend"
+            is_sig = False
+            finding_status = "No prior year data"
+            expl_categories = []
+            abs_diff = None
+            pct_diff = None
+            change_type = "NO_PRIOR_YEAR_DATA"
+            prev_val = None
 
-        expl_categories = get_possible_explanations(key, cy_val, py_val, chg["percentage_difference"])
         saved = saved_expls.get(key, {})
 
         comparisons.append({
@@ -553,41 +565,53 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
             "metric_name": name,
             "category": cat,
             "unit": unit,
-            "current_year_value": chg["current_value"],
-            "previous_year_value": chg["previous_value"],
-            "absolute_difference": chg["absolute_difference"],
-            "percentage_difference": chg["percentage_difference"],
+            "current_year_value": cy_val,
+            "previous_year_value": prev_val,
+            "absolute_difference": abs_diff,
+            "percentage_difference": pct_diff,
+            "change_type": change_type,
             "is_significant": is_sig,
-            "audit_verdict": finding_status if is_sig else "Normal variance",
+            "audit_verdict": finding_status if is_sig else ("No prior baseline" if py_val is None else "Normal variance"),
             "possible_explanation_categories": expl_categories,
             "auditor_explanation": saved.get("explanation", ""),
             "selected_category": saved.get("category", expl_categories[0] if expl_categories else "Normal Business Operations"),
-            "review_status": saved.get("review_status", "Requires auditor review" if is_sig else "Reviewed")
+            "review_status": saved.get("review_status", "Requires auditor review" if is_sig else ("No baseline" if py_val is None else "Reviewed"))
         })
 
     # 8. Management / Audit Analysis Summary Synthesis
-    summary_text = (
-        f"Financial Statement Analysis for FY {cy_year} (vs FY {py_year}) reveals a revenue trajectory of "
-        f"₹{cy_data['pnl']['revenue']:,.2f} ({'+' if cy_data['pnl']['revenue'] >= py_data['pnl']['revenue'] else ''}"
-        f"{((cy_data['pnl']['revenue'] - py_data['pnl']['revenue'])/max(py_data['pnl']['revenue'],1)*100):.1f}%) with PAT of "
-        f"₹{cy_data['pnl']['pat']:,.2f} (Net Margin: {cy_ratios['net_profit_margin_pct']}%). "
-        f"Liquidity remains {'adequate' if cy_ratios['current_ratio'] >= 1.33 else 'tight'} with a Current Ratio of {cy_ratios['current_ratio']}x "
-        f"and Quick Ratio of {cy_ratios['quick_ratio']}x. Solvency profile reflects Debt-to-Equity of {cy_ratios['debt_equity_ratio']}x. "
-        f"Working capital cycle indicates DSO of {cy_ratios['dso_days']} days, DSI of {cy_ratios['dsi_days']} days, and DPO of {cy_ratios['dpo_days']} days. "
-        f"{significant_movements_count} significant movements detected requiring auditor review."
-    )
+    if py_available and py_data:
+        rev_cy = cy_data['pnl']['revenue']
+        rev_py = py_data['pnl']['revenue']
+        pct_rev = ((rev_cy - rev_py) / max(rev_py, 1.0) * 100.0) if rev_py > 0 else 0.0
+        summary_text = (
+            f"Financial Statement Analysis for FY {cy_year} (vs FY {py_year}) reveals a revenue trajectory of "
+            f"₹{rev_cy:,.2f} ({'+' if rev_cy >= rev_py else ''}{pct_rev:.1f}%) with PAT of "
+            f"₹{cy_data['pnl']['pat']:,.2f} (Net Margin: {cy_ratios['net_profit_margin_pct']}%). "
+            f"Liquidity remains {'adequate' if cy_ratios['current_ratio'] >= 1.33 else 'tight'} with a Current Ratio of {cy_ratios['current_ratio']}x "
+            f"and Quick Ratio of {cy_ratios['quick_ratio']}x. Solvency profile reflects Debt-to-Equity of {cy_ratios['debt_equity_ratio']}x. "
+            f"Working capital cycle indicates DSO of {cy_ratios['dso_days']} days, DSI of {cy_ratios['dsi_days']} days, and DPO of {cy_ratios['dpo_days']} days. "
+            f"{significant_movements_count} significant movements detected requiring auditor review."
+        )
+    else:
+        summary_text = (
+            f"Financial Statement Analysis for FY {cy_year} (Standalone CY). Revenue is ₹{cy_data['pnl']['revenue']:,.2f} "
+            f"with PAT of ₹{cy_data['pnl']['pat']:,.2f} (Net Margin: {cy_ratios['net_profit_margin_pct']}%). "
+            f"Liquidity reflects Current Ratio of {cy_ratios['current_ratio']}x and Quick Ratio of {cy_ratios['quick_ratio']}x. "
+            f"Prior year source dataset is NOT AVAILABLE; comparative cash flow and YoY baseline movements are omitted."
+        )
 
     return {
         "engagement_id": engagement_id,
         "financial_year_current": cy_year,
-        "financial_year_previous": py_year,
+        "financial_year_previous": py_year if py_available else None,
+        "previous_year_data_status": "ACTUAL" if py_available else "NOT_AVAILABLE",
         "profit_and_loss": {
             "current_year": cy_data["pnl"],
-            "previous_year": py_data["pnl"]
+            "previous_year": py_data["pnl"] if py_data else None
         },
         "balance_sheet": {
             "current_year": cy_data["balance_sheet"],
-            "previous_year": py_data["balance_sheet"]
+            "previous_year": py_data["balance_sheet"] if py_data else None
         },
         "cash_flow_statement": cash_flow_stmt,
         "ratios": {

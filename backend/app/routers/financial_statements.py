@@ -123,11 +123,18 @@ def download_financial_analysis_report(engagement_id: int, current_user: dict = 
         ("working_capital_turnover", "Working Capital Turnover (times)", "> 5.0x")
     ]
     for r_key, r_name, bench in ratio_labels:
-        cy_v = ratios["current_year"].get(r_key, 0.0)
-        py_v = ratios["previous_year"].get(r_key, 0.0)
-        diff = round(cy_v - py_v, 2)
-        pct = round(((cy_v - py_v) / abs(py_v) * 100.0) if abs(py_v) > 0 else 0.0, 2)
-        writer.writerow([r_name, cy_v, py_v, diff, f"{pct}%", bench])
+        cy_v = ratios["current_year"].get(r_key, 0.0) if ratios.get("current_year") else 0.0
+        py_r = ratios.get("previous_year")
+        if py_r:
+            py_v = py_r.get(r_key, 0.0)
+            diff = round(cy_v - py_v, 2)
+            pct = round(((cy_v - py_v) / abs(py_v) * 100.0) if abs(py_v) > 0 else 0.0, 2)
+            pct_s = f"{pct}%"
+        else:
+            py_v = "N/A"
+            diff = "N/A"
+            pct_s = "N/A"
+        writer.writerow([r_name, cy_v, py_v, diff, pct_s, bench])
     writer.writerow([])
 
     # Significant Movements & Variance Matrix
@@ -136,7 +143,7 @@ def download_financial_analysis_report(engagement_id: int, current_user: dict = 
         "Metric / Account Head",
         "Category",
         f"CY ({cy_fy})",
-        f"PY ({py_fy})",
+        f"PY ({py_fy or 'N/A'})",
         "Absolute Difference",
         "Percentage Change (%)",
         "Audit Status / Finding",
@@ -145,13 +152,16 @@ def download_financial_analysis_report(engagement_id: int, current_user: dict = 
         "Review Status"
     ])
     for c in comparisons:
+        pct_diff_str = f"{c['percentage_difference']}%" if c.get("percentage_difference") is not None else "N/A"
+        prev_val_str = c.get("previous_year_value") if c.get("previous_year_value") is not None else "N/A"
+        abs_diff_str = c.get("absolute_difference") if c.get("absolute_difference") is not None else "N/A"
         writer.writerow([
             c["metric_name"],
             c["category"],
             c["current_year_value"],
-            c["previous_year_value"],
-            c["absolute_difference"],
-            f"{c['percentage_difference']}%",
+            prev_val_str,
+            abs_diff_str,
+            pct_diff_str,
             c["audit_verdict"],
             c["selected_category"],
             c["auditor_explanation"],

@@ -144,13 +144,10 @@ class TestFinancialStatementAnalysisModule(unittest.TestCase):
         self.assertEqual(bs["total_current_assets"], 4000000.0)
         self.assertEqual(bs["total_current_liabilities"], 2000000.0)
 
-        # Cash Flow Statement checks
+        # Cash Flow Statement checks (Standalone CY returns status and closing cash)
         cf = analysis["cash_flow_statement"]
-        self.assertIn("operating_activities", cf)
-        self.assertIn("investing_activities", cf)
-        self.assertIn("financing_activities", cf)
-        self.assertIn("net_cash_flow", cf)
-        self.assertEqual(cf["net_cash_flow"]["cash_at_end_of_period"], 800000.0)
+        self.assertEqual(cf["status"], "INSUFFICIENT_PRIOR_YEAR_DATA")
+        self.assertEqual(cf["closing_cash_balance"], 800000.0)
 
     def test_03_comparative_multi_year_and_significant_movement(self):
         """Test CY vs PY variance detection with audit-compliant terminology (no fraud labels)."""
@@ -159,8 +156,8 @@ class TestFinancialStatementAnalysisModule(unittest.TestCase):
 
         self.assertGreater(len(comparisons), 0)
         
-        # Check audit verdicts format: strictly "Significant movement", "Unusual change", "Requires auditor review", or "Normal variance"
-        allowed_verdicts = {"Significant movement", "Unusual change", "Requires auditor review", "Normal variance", "Stable trend"}
+        # Check audit verdicts format: strictly "Significant movement", "Unusual change", "Requires auditor review", "Normal variance", "No prior year data", or "No prior baseline"
+        allowed_verdicts = {"Significant movement", "Unusual change", "Requires auditor review", "Normal variance", "Stable trend", "No prior year data", "No prior baseline"}
         for comp in comparisons:
             self.assertIn(comp["audit_verdict"], allowed_verdicts)
             self.assertNotIn("fraud", comp["audit_verdict"].lower())
@@ -169,7 +166,6 @@ class TestFinancialStatementAnalysisModule(unittest.TestCase):
             self.assertIn("absolute_difference", comp)
             self.assertIn("percentage_difference", comp)
             self.assertIsInstance(comp["possible_explanation_categories"], list)
-            self.assertGreater(len(comp["possible_explanation_categories"]), 0)
 
     def test_04_save_and_retrieve_auditor_explanation(self):
         """Test persisting auditor explanation and working paper notes."""

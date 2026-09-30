@@ -68,6 +68,8 @@ def test_local_ai_endpoint_validation_prevents_ssrf():
         "http://localhost:22",
         "http://127.0.0.1:5432",
         "http://localhost:6379",
+        "http://127.0.0.1:8080",
+        "local://evil_scheme",
         "https://google.com",
         "ftp://localhost:1234"
     ]
@@ -78,7 +80,7 @@ def test_local_ai_endpoint_validation_prevents_ssrf():
     valid_endpoints = [
         "http://localhost:1234",
         "http://127.0.0.1:1234",
-        "http://127.0.0.1:8080",
+        "http://127.0.0.1:11434",
         "http://[::1]:1234",
         "local://builtin"
     ]

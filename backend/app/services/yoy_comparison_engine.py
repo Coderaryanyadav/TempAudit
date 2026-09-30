@@ -375,6 +375,8 @@ def run_yoy_comparison(
     cy_heads = compute_statement_heads(cy_ledger_balances)
     py_heads = compute_statement_heads(py_ledger_balances)
 
+    py_available = bool(py_txs or py_ledgers_db)
+
     # Executive line items display labels
     exec_definitions = [
         ("revenue_from_operations", "Revenue from Operations", "Revenue"),
@@ -407,23 +409,37 @@ def run_yoy_comparison(
     executive_comparison = []
     for key, label, grp in exec_definitions:
         cy_v = cy_heads.get(key, 0.0)
-        py_v = py_heads.get(key, 0.0)
-        var = calculate_variance(cy_v, py_v, threshold_pct, materiality_threshold, is_executive=True)
-        
         rev_item = reviews_map.get(key, {})
+        if py_available:
+            py_v = py_heads.get(key, 0.0)
+            var = calculate_variance(cy_v, py_v, threshold_pct, materiality_threshold, is_executive=True)
+            prev_y = var["previous_year"]
+            abs_diff = var["absolute_difference"]
+            pct_diff = var["percentage_difference"]
+            mov_dir = var["movement_direction"]
+            is_sig = var["is_significant"]
+            risk = var["risk"]
+        else:
+            prev_y = None
+            abs_diff = None
+            pct_diff = None
+            mov_dir = "No Prior Year Data"
+            is_sig = False
+            risk = "NORMAL"
+
         executive_comparison.append({
             "item_key": key,
             "account_name": label,
             "category": "Executive Total",
             "group": grp,
-            "previous_year": var["previous_year"],
-            "current_year": var["current_year"],
-            "absolute_difference": var["absolute_difference"],
-            "percentage_difference": var["percentage_difference"],
-            "movement_direction": var["movement_direction"],
-            "is_significant": var["is_significant"],
-            "risk": var["risk"],
-            "status": rev_item.get("status", "Unreviewed"),
+            "previous_year": prev_y,
+            "current_year": round(cy_v, 2),
+            "absolute_difference": abs_diff,
+            "percentage_difference": pct_diff,
+            "movement_direction": mov_dir,
+            "is_significant": is_sig,
+            "risk": risk,
+            "status": rev_item.get("status", "No Prior Baseline" if not py_available else "Unreviewed"),
             "auditor_comment": rev_item.get("auditor_comment", ""),
             "ai_reason": rev_item.get("ai_reason", "")
         })
@@ -450,29 +466,43 @@ def run_yoy_comparison(
 
         # Only include active ledgers
         if abs(cy_net) > 0 or abs(py_net) > 0:
-            var = calculate_variance(cy_net, py_net, threshold_pct, materiality_threshold, is_executive=False)
             item_k = f"LEDGER_{l_name.upper().replace(' ', '_').replace('/', '_')}"
             rev_item = reviews_map.get(item_k, {})
+            if py_available:
+                var = calculate_variance(cy_net, py_net, threshold_pct, materiality_threshold, is_executive=False)
+                prev_y = var["previous_year"]
+                abs_diff = var["absolute_difference"]
+                pct_diff = var["percentage_difference"]
+                mov_dir = var["movement_direction"]
+                is_sig = var["is_significant"]
+                risk = var["risk"]
+            else:
+                prev_y = None
+                abs_diff = None
+                pct_diff = None
+                mov_dir = "No Prior Year Data"
+                is_sig = False
+                risk = "NORMAL"
 
             major_ledgers_comparison.append({
                 "item_key": item_k,
                 "account_name": l_name,
                 "category": "Major Ledger",
                 "group": grp,
-                "previous_year": var["previous_year"],
-                "current_year": var["current_year"],
-                "absolute_difference": var["absolute_difference"],
-                "percentage_difference": var["percentage_difference"],
-                "movement_direction": var["movement_direction"],
-                "is_significant": var["is_significant"],
-                "risk": var["risk"],
-                "status": rev_item.get("status", "Unreviewed"),
+                "previous_year": prev_y,
+                "current_year": round(cy_net, 2),
+                "absolute_difference": abs_diff,
+                "percentage_difference": pct_diff,
+                "movement_direction": mov_dir,
+                "is_significant": is_sig,
+                "risk": risk,
+                "status": rev_item.get("status", "No Prior Baseline" if not py_available else "Unreviewed"),
                 "auditor_comment": rev_item.get("auditor_comment", ""),
                 "ai_reason": rev_item.get("ai_reason", "")
             })
 
     # Sort major ledgers by absolute difference descending
-    major_ledgers_comparison.sort(key=lambda x: abs(x["absolute_difference"]), reverse=True)
+    major_ledgers_comparison.sort(key=lambda x: abs(x["absolute_difference"]) if x["absolute_difference"] is not None else 0, reverse=True)
 
     # -------------------------------------------------------------
     # SECTION 3: PARTY BALANCES COMPARISON (Top Customers & Vendors)
@@ -488,34 +518,48 @@ def run_yoy_comparison(
         py_amt = py_p["total_amt"]
 
         if cy_amt >= 25000.0 or py_amt >= 25000.0:
-            var = calculate_variance(cy_amt, py_amt, threshold_pct, materiality_threshold, is_executive=False)
             item_k = f"PARTY_{p_name.upper().replace(' ', '_').replace('/', '_')}"
             rev_item = reviews_map.get(item_k, {})
+            if py_available:
+                var = calculate_variance(cy_amt, py_amt, threshold_pct, materiality_threshold, is_executive=False)
+                prev_y = var["previous_year"]
+                abs_diff = var["absolute_difference"]
+                pct_diff = var["percentage_difference"]
+                mov_dir = var["movement_direction"]
+                is_sig = var["is_significant"]
+                risk = var["risk"]
+            else:
+                prev_y = None
+                abs_diff = None
+                pct_diff = None
+                mov_dir = "No Prior Year Data"
+                is_sig = False
+                risk = "NORMAL"
 
             party_comparison.append({
                 "item_key": item_k,
                 "account_name": p_name,
                 "category": "Party Balance",
                 "group": "Counterparty",
-                "previous_year": var["previous_year"],
-                "current_year": var["current_year"],
-                "absolute_difference": var["absolute_difference"],
-                "percentage_difference": var["percentage_difference"],
-                "movement_direction": var["movement_direction"],
-                "is_significant": var["is_significant"],
-                "risk": var["risk"],
-                "status": rev_item.get("status", "Unreviewed"),
+                "previous_year": prev_y,
+                "current_year": round(cy_amt, 2),
+                "absolute_difference": abs_diff,
+                "percentage_difference": pct_diff,
+                "movement_direction": mov_dir,
+                "is_significant": is_sig,
+                "risk": risk,
+                "status": rev_item.get("status", "No Prior Baseline" if not py_available else "Unreviewed"),
                 "auditor_comment": rev_item.get("auditor_comment", ""),
                 "ai_reason": rev_item.get("ai_reason", "")
             })
 
-    party_comparison.sort(key=lambda x: abs(x["absolute_difference"]), reverse=True)
+    party_comparison.sort(key=lambda x: abs(x["absolute_difference"]) if x["absolute_difference"] is not None else 0, reverse=True)
 
     # -------------------------------------------------------------
     # SECTION 4: OPERATIONAL VOLUMES & TICKETS
     # -------------------------------------------------------------
     cy_count = len(cy_txs)
-    py_count = len(py_txs) if py_txs else max(1, len(py_ledger_balances))
+    py_count = len(py_txs) if py_txs else len(py_ledger_balances)
     
     cy_tot_dr = sum(float(t.get("debit") or 0.0) for t in cy_txs)
     py_tot_dr = sum(float(t.get("debit") or 0.0) for t in py_txs) if py_txs else sum(v["debit"] for v in py_ledger_balances.values())
@@ -523,8 +567,8 @@ def run_yoy_comparison(
     cy_tot_cr = sum(float(t.get("credit") or 0.0) for t in cy_txs)
     py_tot_cr = sum(float(t.get("credit") or 0.0) for t in py_txs) if py_txs else sum(v["credit"] for v in py_ledger_balances.values())
 
-    cy_avg_size = safe_divide(cy_tot_dr + cy_tot_cr, cy_count * 2)
-    py_avg_size = safe_divide(py_tot_dr + py_tot_cr, py_count * 2)
+    cy_avg_size = safe_divide(cy_tot_dr + cy_tot_cr, cy_count * 2) if cy_count > 0 else 0.0
+    py_avg_size = safe_divide(py_tot_dr + py_tot_cr, py_count * 2) if py_count > 0 else 0.0
 
     vol_definitions = [
         ("total_transaction_count", "Total Transactions Recorded", py_count, cy_count, "Volume", 1.0),
@@ -537,21 +581,36 @@ def run_yoy_comparison(
 
     volume_comparison = []
     for k, lbl, p_v, c_v, grp, mat in vol_definitions:
-        var = calculate_variance(float(c_v), float(p_v), threshold_pct, mat, is_executive=True)
         rev_item = reviews_map.get(k, {})
+        if py_available:
+            var = calculate_variance(float(c_v), float(p_v), threshold_pct, mat, is_executive=True)
+            prev_y = var["previous_year"]
+            abs_diff = var["absolute_difference"]
+            pct_diff = var["percentage_difference"]
+            mov_dir = var["movement_direction"]
+            is_sig = var["is_significant"]
+            risk = var["risk"]
+        else:
+            prev_y = None
+            abs_diff = None
+            pct_diff = None
+            mov_dir = "No Prior Year Data"
+            is_sig = False
+            risk = "NORMAL"
+
         volume_comparison.append({
             "item_key": k,
             "account_name": lbl,
             "category": "Operational Metric",
             "group": grp,
-            "previous_year": var["previous_year"],
-            "current_year": var["current_year"],
-            "absolute_difference": var["absolute_difference"],
-            "percentage_difference": var["percentage_difference"],
-            "movement_direction": var["movement_direction"],
-            "is_significant": var["is_significant"],
-            "risk": var["risk"],
-            "status": rev_item.get("status", "Unreviewed"),
+            "previous_year": prev_y,
+            "current_year": round(float(c_v), 2),
+            "absolute_difference": abs_diff,
+            "percentage_difference": pct_diff,
+            "movement_direction": mov_dir,
+            "is_significant": is_sig,
+            "risk": risk,
+            "status": rev_item.get("status", "No Prior Baseline" if not py_available else "Unreviewed"),
             "auditor_comment": rev_item.get("auditor_comment", ""),
             "ai_reason": rev_item.get("ai_reason", "")
         })
@@ -562,15 +621,19 @@ def run_yoy_comparison(
     sig_count = sum(1 for i in all_combined if i["is_significant"])
     crit_count = sum(1 for i in all_combined if i["risk"] == "CRITICAL")
     high_count = sum(1 for i in all_combined if i["risk"] == "HIGH")
-    reviewed_count = sum(1 for i in all_combined if i["status"] != "Unreviewed")
+    reviewed_count = sum(1 for i in all_combined if i["status"] != "Unreviewed" and i["status"] != "No Prior Baseline")
 
     conn.close()
+
+    rev_growth = next((i["percentage_difference"] for i in executive_comparison if i["item_key"] == "revenue_from_operations"), None)
+    np_growth = next((i["percentage_difference"] for i in executive_comparison if i["item_key"] == "net_profit"), None)
 
     return {
         "engagement_id": engagement_id,
         "current_financial_year": cy_fy,
         "previous_engagement_id": py_id,
-        "previous_financial_year": py_fy,
+        "previous_financial_year": py_fy if py_available else None,
+        "previous_year_data_status": "ACTUAL" if py_available else "NOT_AVAILABLE",
         "configured_threshold_pct": threshold_pct,
         "materiality_threshold": materiality_threshold,
         "summary": {
@@ -579,15 +642,16 @@ def run_yoy_comparison(
             "critical_risk_count": crit_count,
             "high_risk_count": high_count,
             "reviewed_count": reviewed_count,
-            "revenue_growth_pct": next((i["percentage_difference"] for i in executive_comparison if i["item_key"] == "revenue_from_operations"), 0.0),
-            "net_profit_growth_pct": next((i["percentage_difference"] for i in executive_comparison if i["item_key"] == "net_profit"), 0.0)
+            "revenue_growth_pct": rev_growth,
+            "net_profit_growth_pct": np_growth
         },
         "provenance": {
             "source_type": "GENERAL_LEDGER_TRANSACTIONS",
             "calculation_method": "DETERMINISTIC_YOY_VARIANCE_ANALYSIS",
             "calculation_timestamp": datetime.now().isoformat(),
             "calculation_version": "2.0",
-            "data_status": "ACTUAL" if (bool(cy_txs) and bool(py_txs)) else ("MISSING_PY" if bool(cy_txs) else "MISSING")
+            "data_status": "ACTUAL" if (bool(cy_txs) and bool(py_txs)) else ("MISSING_PY" if bool(cy_txs) else "MISSING"),
+            "previous_year_data_status": "ACTUAL" if py_available else "NOT_AVAILABLE"
         },
         "executive_comparison": executive_comparison,
         "major_ledgers_comparison": major_ledgers_comparison,
@@ -641,7 +705,17 @@ def explain_yoy_movement_factually(
     dir_m = target["movement_direction"]
     cat = target["category"]
 
-    # If change is 0 or insignificant
+    # If prior year data is missing or change is 0
+    if abs_d is None:
+        reason = "Prior-year source dataset is not available for YoY variance explanation."
+        save_ai_reason_to_db(engagement_id, item_key, cat, acc, reason)
+        return {
+            "item_key": item_key,
+            "account_name": acc,
+            "ai_reason": reason,
+            "is_sufficient": False
+        }
+
     if abs_d == 0.0:
         return {
             "item_key": item_key,

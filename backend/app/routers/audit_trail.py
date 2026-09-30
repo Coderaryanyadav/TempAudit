@@ -493,18 +493,39 @@ def create_full_backup_bundle(current_user: dict = Depends(require_role(["Admin"
         dest_conn.close()
         src_conn.close()
 
-    # 2. Package into zip with evidence directory
-    bundle_filename = f"finauditpro_full_bundle_{timestamp}_{short_uid}.zip"
+    # 2. Package into zip with evidence directory, manifest.json, and checksums.json
+    bundle_filename = f"finauditpro_full_bundle_{timestamp}_{short_uid}.auditbundle.zip"
     bundle_filepath = os.path.join(BACKUP_DIR, bundle_filename)
+
+    file_checksums = {}
+    file_checksums["database.db"] = calculate_file_hash(temp_db_path)
+
+    included_files = ["database.db"]
+    evidence_files_map = {}
+    if os.path.exists(EVIDENCE_DIR):
+        for root, dirs, files in os.walk(EVIDENCE_DIR):
+            for f in files:
+                full_p = os.path.join(root, f)
+                rel_p = os.path.relpath(full_p, os.path.dirname(EVIDENCE_DIR))
+                file_checksums[rel_p] = calculate_file_hash(full_p)
+                included_files.append(rel_p)
+                evidence_files_map[rel_p] = full_p
+
+    manifest = {
+        "format": "FinAuditPro Comprehensive Audit Bundle",
+        "version": "1.0.0",
+        "created_at": datetime.now().isoformat(),
+        "created_by": current_user.get("username", "admin"),
+        "total_files": len(included_files),
+        "files": included_files
+    }
 
     with zipfile.ZipFile(bundle_filepath, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.write(temp_db_path, arcname="database.db")
-        if os.path.exists(EVIDENCE_DIR):
-            for root, dirs, files in os.walk(EVIDENCE_DIR):
-                for f in files:
-                    full_p = os.path.join(root, f)
-                    rel_p = os.path.relpath(full_p, os.path.dirname(EVIDENCE_DIR))
-                    zf.write(full_p, arcname=rel_p)
+        for rel_p, full_p in evidence_files_map.items():
+            zf.write(full_p, arcname=rel_p)
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+        zf.writestr("checksums.json", json.dumps(file_checksums, indent=2))
 
     # Clean up temp db file if bundled
     if os.path.exists(temp_db_path):
@@ -521,8 +542,8 @@ def create_full_backup_bundle(current_user: dict = Depends(require_role(["Admin"
             action="DATABASE_BACKUP",
             module="BACKUP",
             record_id=bundle_filename,
-            new_value={"filename": bundle_filename, "size_kb": size_kb, "sha256": checksum, "type": "FULL_BUNDLE"},
-            details=f"Created complete audit backup bundle (DB + evidence files): {bundle_filename} ({size_kb} KB)",
+            new_value={"filename": bundle_filename, "size_kb": size_kb, "sha256": checksum, "type": "COMPREHENSIVE_AUDIT_BUNDLE"},
+            details=f"Created complete audit backup bundle (DB + evidence files + manifest): {bundle_filename} ({size_kb} KB)",
             user=current_user
         )
         conn.commit()
@@ -530,7 +551,7 @@ def create_full_backup_bundle(current_user: dict = Depends(require_role(["Admin"
         conn.close()
 
     return {
-        "message": "Full audit backup bundle (Database + Evidence) created successfully",
+        "message": "Full audit backup bundle (Database + Evidence + Manifest) created successfully",
         "filename": bundle_filename,
         "size_kb": size_kb,
         "checksum_sha256": checksum,

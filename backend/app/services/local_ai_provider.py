@@ -291,20 +291,22 @@ AVAILABLE_ENGINES = [
     }
 ]
 
-ALLOWED_LOCAL_AI_PORTS = {1234, 11434, 8080, 8000, 5000}
+ALLOWED_LOCAL_AI_PORTS = {1234, 11434}
 
 def is_valid_loopback_endpoint(endpoint: str) -> bool:
     """
-    Strictly verifies endpoint is genuine loopback/local transport (Flaw 21, Points 12 & 13):
+    Strictly verifies endpoint is genuine loopback/local transport (Flaw 21, Points 7 & 8):
     Allows only:
     - scheme http/https with hostname in ('localhost', '127.0.0.1', '::1') without userinfo,
-      and port restricted to standard local AI server ports (1234, 11434, 8080, 8000, 5000).
-    - scheme local://
+      and port strictly restricted to supported local AI server ports (1234 for LM Studio, 11434 for Ollama).
+    - scheme local://builtin (internal deterministic provider)
     """
     if not endpoint:
         return False
-    if endpoint.startswith("local://"):
+    if endpoint == "local://builtin":
         return True
+    if endpoint.startswith("local://"):
+        return False
     try:
         parsed = urlparse(endpoint)
         if parsed.scheme not in ("http", "https"):
