@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-from backend.app.routers.auth import get_current_user, require_role
+from backend.app.auth import get_current_user, require_role, require_engagement_access
 from backend.app.services.duplicate_missing_detector import (
     detect_duplicates_and_gaps,
     update_duplicate_group_review,
@@ -36,6 +36,7 @@ def get_duplicates_and_gaps_endpoint(
     current_user: dict = Depends(get_current_user)
 ):
     """Executes duplicate detection and missing sequence gap detection for an engagement."""
+    require_engagement_access(engagement_id, current_user)
     try:
         return detect_duplicates_and_gaps(engagement_id)
     except Exception as e:
@@ -48,6 +49,7 @@ def review_duplicate_group_endpoint(
     current_user: dict = Depends(require_role(["Admin", "Auditor"]))
 ):
     """Allows auditor to action a duplicate group (Confirm Duplicate, Mark as Valid, Ignore, Add Comment)."""
+    require_engagement_access(engagement_id, current_user)
     valid_statuses = {"Confirmed Duplicate", "Marked Valid", "Ignored", "Unreviewed"}
     if req.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
@@ -73,6 +75,7 @@ def review_sequence_gap_endpoint(
     current_user: dict = Depends(require_role(["Admin", "Auditor"]))
 ):
     """Allows auditor to document sequence gap findings (Cancelled invoice, Spoiled cheque, Multi-branch)."""
+    require_engagement_access(engagement_id, current_user)
     valid_statuses = {"Open", "In Review", "Documented / Valid Gap", "Resolved"}
     if req.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
@@ -98,6 +101,7 @@ def download_duplicates_and_gaps_csv_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Generates a downloadable CSV report of duplicate groups and missing sequence gaps."""
+    require_engagement_access(engagement_id, current_user)
     try:
         data = detect_duplicates_and_gaps(engagement_id)
         summary = data["summary"]

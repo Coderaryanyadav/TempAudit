@@ -77,6 +77,21 @@ class TestGSTReconciliationModule(unittest.TestCase):
         conn = get_db_connection()
         cur = conn.cursor()
 
+        # Source A: GSTR-2B Uploaded File & Invoices
+        cur.execute("""
+            INSERT INTO uploaded_files (engagement_id, file_name, file_type, file_path, data_category, row_count, uploaded_at)
+            VALUES (?, 'gstr2b_may2024.xlsx', 'GST_2B', 'gstr2b_may2024.xlsx', 'GST Data', 4, datetime('now'))
+        """, (self.eng_id,))
+        source_a_file_id = cur.lastrowid
+        cur.execute("""
+            INSERT INTO transactions (engagement_id, file_id, date, ledger, party_name, debit, amount, invoice_no, gstin, tax_amount)
+            VALUES 
+            (?, ?, '2024-05-10', 'GSTR-2B', 'Steel Fabricators Pvt Ltd', 118000.0, 118000.0, 'SF-001', '27AAACS9999A1Z1', 18000.0),
+            (?, ?, '2024-05-16', 'GSTR-2B', 'Micro Electronics Corp', 59000.0, 59000.0, 'ME-002', '27AAACM8888B1Z2', 9000.0),
+            (?, ?, '2024-05-20', 'GSTR-2B', 'Bangalore Tech Spares', 236000.0, 236000.0, 'BTS-003', '29AAACB7777C1Z3', 36000.0),
+            (?, ?, '2024-05-28', 'GSTR-2B', 'Portal Only Supplier', 65000.0, 65000.0, 'POS-005', '27AAACP5555E1Z5', 9915.0)
+        """, (self.eng_id, source_a_file_id, self.eng_id, source_a_file_id, self.eng_id, source_a_file_id, self.eng_id, source_a_file_id))
+
         # Source B: Purchase Register Vouchers
         cur.execute("""
             INSERT INTO transactions (engagement_id, date, ledger, party_name, debit, amount, invoice_no, gstin, tax_amount)
@@ -91,6 +106,7 @@ class TestGSTReconciliationModule(unittest.TestCase):
 
         result = run_gst_reconciliation(
             engagement_id=self.eng_id,
+            source_a_file_id=source_a_file_id,
             source_a_type="GSTR-2B (Portal Download)",
             source_b_type="Purchase Register (Books)",
             recon_title="GSTR-2B vs Purchase Register Audit Recon"

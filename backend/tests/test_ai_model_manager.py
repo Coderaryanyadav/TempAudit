@@ -47,7 +47,7 @@ class TestOfflineAIModelManager(unittest.TestCase):
 
     def test_02_get_ai_manager_status(self):
         """Test retrieval of Local AI Model Manager status and LM Studio configuration."""
-        res = self.client.get("/api/ai-manager/status")
+        res = self.client.get("/api/ai-manager/status", headers={"Authorization": f"Bearer {self.auditor_token}"})
         self.assertEqual(res.status_code, 200)
         data = res.json()
 
@@ -102,7 +102,7 @@ class TestOfflineAIModelManager(unittest.TestCase):
 
     def test_04_test_connection_and_fallback_guarantee(self):
         """Test live connection check and verify deterministic fallback if LM Studio is offline."""
-        res = self.client.post("/api/ai-manager/test-connection")
+        res = self.client.post("/api/ai-manager/test-connection", headers={"Authorization": f"Bearer {self.auditor_token}"})
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertIn("is_available", data)
@@ -117,7 +117,7 @@ class TestOfflineAIModelManager(unittest.TestCase):
             "system_prompt": "You are an ICAI Statutory Auditor.",
             "client_name": "Apex Engineering"
         }
-        res = self.client.post("/api/ai-manager/generate", json=gen_payload)
+        res = self.client.post("/api/ai-manager/generate", json=gen_payload, headers={"Authorization": f"Bearer {self.auditor_token}"})
         self.assertEqual(res.status_code, 200)
         result = res.json()
 
@@ -148,7 +148,7 @@ class TestOfflineAIModelManager(unittest.TestCase):
 
     def test_08_test_ai_prompt_endpoint(self):
         """Test /api/ai-manager/test-ai endpoint."""
-        res = self.client.post("/api/ai-manager/test-ai", json={"prompt": "Verify audit assistant"})
+        res = self.client.post("/api/ai-manager/test-ai", json={"prompt": "Verify audit assistant"}, headers={"Authorization": f"Bearer {self.auditor_token}"})
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertIn("status", data)

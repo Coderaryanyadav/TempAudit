@@ -1,6 +1,8 @@
 import json
 import os
 import shutil
+import sqlite3
+import time
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -43,6 +45,25 @@ DEFAULT_SETTINGS = {
     "session_timeout_minutes": 60,
     "strict_maker_checker": True
 }
+
+
+def _enforce_backup_retention(retention_days: int = 30):
+    """Deletes backup files older than retention_days."""
+    try:
+        if not os.path.exists(BACKUP_DIR) or retention_days <= 0:
+            return
+        now = time.time()
+        max_age_seconds = retention_days * 86400
+        for f in os.listdir(BACKUP_DIR):
+            fpath = os.path.join(BACKUP_DIR, f)
+            if os.path.isfile(fpath) and (f.startswith("finauditpro_backup_") or f.endswith(".db")):
+                if (now - os.path.getmtime(fpath)) > max_age_seconds:
+                    try:
+                        os.remove(fpath)
+                    except OSError:
+                        pass
+    except Exception:
+        pass
 
 
 @router.get("")
@@ -125,7 +146,7 @@ def update_settings(
 
 
 @router.get("/system-info")
-def get_system_info():
+def get_system_info(current_user: dict = Depends(get_current_user)):
     """Returns local host environment status, database statistics, and offline certification."""
     conn = get_db_connection()
     user_count = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
@@ -144,7 +165,7 @@ def get_system_info():
         "version": "1.0.0 (Offline Desktop Edition)",
         "mode": "100% Offline (Local SQLite Database)",
         "database_engine": "SQLite 3 (Immutable Audit Trail Enabled)",
-        "database_path": DB_PATH,
+        "database_path": os.path.basename(DB_PATH),
         "database_size_kb": db_size_kb,
         "statistics": {
             "users": user_count,
@@ -163,6 +184,17 @@ def create_backup(current_user: dict = Depends(require_role(["Admin"]))):
     """Admin: Creates a timestamped local SQLite backup using SQLite Online Backup API and records an audit trail entry."""
     if not os.path.exists(DB_PATH):
         raise HTTPException(status_code=404, detail="Database file not found")
+
+    # Fetch retention setting
+    conn_s = get_db_connection()
+    ret_row = conn_s.execute("SELECT value FROM app_settings WHERE key = 'backup_retention_days'").fetchone()
+    conn_s.close()
+    try:
+        ret_days = int(json.loads(ret_row["value"])) if ret_row else 30
+    except Exception:
+        ret_days = 30
+
+    _enforce_backup_retention(ret_days)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"finauditpro_backup_{timestamp}.db"

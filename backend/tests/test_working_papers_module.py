@@ -67,7 +67,7 @@ def test_working_papers_full_workflow():
     assert upload_json["document"]["name"] == "revenue_sampling_schedule.xlsx"
 
     # 3. Download supporting document
-    download_res = client.get(f"/api/working-papers/download-file/{wp_id}/{doc_id}")
+    download_res = client.get(f"/api/working-papers/download-file/{wp_id}/{doc_id}", headers=headers)
     assert download_res.status_code == 200
     assert download_res.content == file_content
 
@@ -80,23 +80,49 @@ def test_working_papers_full_workflow():
     assert notes_res.status_code == 200
 
     # 5. Link finding, transaction, and checklist item
+    conn = get_db_connection()
+    finding_id = conn.execute("SELECT id FROM audit_findings WHERE engagement_id = 1 LIMIT 1").fetchone()
+    if not finding_id:
+        conn.execute("INSERT INTO audit_findings (engagement_id, finding_code, title, description, category, severity, status, engine_type, created_at) VALUES (1, 'FND-001', 'Sample Finding', 'Sample Description', 'Revenue', 'MEDIUM', 'Open', 'MANUAL', datetime('now'))")
+        conn.commit()
+        finding_id = conn.execute("SELECT id FROM audit_findings WHERE engagement_id = 1 LIMIT 1").fetchone()["id"]
+    else:
+        finding_id = finding_id["id"]
+        
+    tx_id = conn.execute("SELECT id FROM transactions WHERE engagement_id = 1 LIMIT 1").fetchone()
+    if not tx_id:
+        conn.execute("INSERT INTO transactions (engagement_id, date, ledger, amount, debit, credit) VALUES (1, '2024-04-01', 'Sales', 1000, 0, 1000)")
+        conn.commit()
+        tx_id = conn.execute("SELECT id FROM transactions WHERE engagement_id = 1 LIMIT 1").fetchone()["id"]
+    else:
+        tx_id = tx_id["id"]
+        
+    chk_id = conn.execute("SELECT id FROM audit_checklists WHERE engagement_id = 1 LIMIT 1").fetchone()
+    if not chk_id:
+        conn.execute("INSERT INTO audit_checklists (engagement_id, category, item_code, question, status, created_at) VALUES (1, 'CARO', 'CARO-01', 'Test Question', 'Pending', datetime('now'))")
+        conn.commit()
+        chk_id = conn.execute("SELECT id FROM audit_checklists WHERE engagement_id = 1 LIMIT 1").fetchone()["id"]
+    else:
+        chk_id = chk_id["id"]
+    conn.close()
+
     link_f_res = client.post(
         f"/api/working-papers/{wp_id}/links",
-        json={"link_type": "finding", "action": "link", "item_id": 1},
+        json={"link_type": "finding", "action": "link", "item_id": finding_id},
         headers=headers
     )
     assert link_f_res.status_code == 200
 
     link_t_res = client.post(
         f"/api/working-papers/{wp_id}/links",
-        json={"link_type": "transaction", "action": "link", "item_id": 1},
+        json={"link_type": "transaction", "action": "link", "item_id": tx_id},
         headers=headers
     )
     assert link_t_res.status_code == 200
 
     link_c_res = client.post(
         f"/api/working-papers/{wp_id}/links",
-        json={"link_type": "checklist", "action": "link", "item_id": 1},
+        json={"link_type": "checklist", "action": "link", "item_id": chk_id},
         headers=headers
     )
     assert link_c_res.status_code == 200
@@ -142,13 +168,13 @@ def test_working_papers_full_workflow():
     assert detail["reviewed_by"] == "CA Rajesh Sharma (Partner)"
     assert len(detail["attached_files"]) == 1
     assert len(detail["reviewer_comments"]) == 2
-    assert 1 in detail["linked_findings"]
-    assert 1 in detail["linked_transactions"]
-    assert 1 in detail["linked_checklists"]
+    assert finding_id in detail["linked_findings"]
+    assert tx_id in detail["linked_transactions"]
+    assert chk_id in detail["linked_checklists"]
     assert len(detail["audit_trail"]) > 0
 
     # 10. Test CSV Export
-    csv_res = client.get(f"/api/working-papers/{engagement_id}/export/csv")
+    csv_res = client.get(f"/api/working-papers/{engagement_id}/export/csv", headers=headers)
     assert csv_res.status_code == 200
     assert "WP-REV-01" in csv_res.text
 

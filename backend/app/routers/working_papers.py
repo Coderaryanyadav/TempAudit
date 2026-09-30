@@ -18,7 +18,7 @@ from backend.app.schemas import (
     WorkingPaperLinkUpdate,
     WorkingPaperDeleteRequest
 )
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.database import get_db_connection
 
 router = APIRouter(prefix="/api/working-papers", tags=["Working Papers"])
@@ -26,6 +26,8 @@ router = APIRouter(prefix="/api/working-papers", tags=["Working Papers"])
 # Define base storage directory for working papers evidence files
 BASE_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploaded_files", "working_papers")
 os.makedirs(BASE_UPLOAD_DIR, exist_ok=True)
+
+MAX_WP_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 VALID_STATUSES = ["Prepared", "Under Review", "Reviewed", "Needs Correction"]
 VALID_AREAS = [
@@ -50,7 +52,7 @@ def _parse_wp_row(row: dict) -> dict:
     for json_col in ["attached_files_json", "reviewer_comments_json", "linked_findings_json", "linked_transactions_json", "linked_checklists_json"]:
         raw = wp.get(json_col)
         parsed_name = json_col.replace("_json", "")
-        if parsed_name == "attached_files_json":
+        if parsed_name == "attached_files":
             parsed_name = "attached_files"
         try:
             wp[parsed_name] = json.loads(raw) if raw else []
@@ -76,12 +78,14 @@ def list_working_papers(
     status: Optional[str] = None,
     search: Optional[str] = None,
     prepared_by: Optional[str] = None,
-    reviewed_by: Optional[str] = None
+    reviewed_by: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Returns list of working papers for an engagement with optional filters and
     aggregated summary counts for dashboard metrics.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     query = "SELECT * FROM working_papers WHERE engagement_id = ?"
     params = [engagement_id]
@@ -162,7 +166,7 @@ def list_working_papers(
 
 
 @router.get("/detail/{wp_id}")
-def get_working_paper_detail(wp_id: int):
+def get_working_paper_detail(wp_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns single working paper detail with fully resolved linked findings,
     transactions, checklist items, and full audit logs.
@@ -175,6 +179,7 @@ def get_working_paper_detail(wp_id: int):
 
     wp = _parse_wp_row(row)
     engagement_id = wp["engagement_id"]
+    require_engagement_access(engagement_id, current_user)
 
     # 1. Resolve Linked Findings
     resolved_findings = []
@@ -231,6 +236,7 @@ def create_working_paper(
     """
     Creates a new working paper in the engagement and registers an audit trail record.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     now_str = datetime.now().isoformat()
     prep_date = wp_data.prepared_date or datetime.now().strftime("%Y-%m-%d")
@@ -248,6 +254,31 @@ def create_working_paper(
             status_code=400,
             detail=f"Working Paper reference '{wp_data.wp_reference}' already exists for this engagement."
         )
+
+    # Validate cross-engagement link integrity
+    if wp_data.linked_findings:
+        f_ids = [int(x) for x in wp_data.linked_findings if str(x).isdigit()]
+        if f_ids:
+            cnt = conn.execute(f"SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND id IN ({','.join('?' for _ in f_ids)})", (engagement_id, *f_ids)).fetchone()["c"]
+            if cnt != len(f_ids):
+                conn.close()
+                raise HTTPException(status_code=400, detail="One or more linked findings do not belong to this engagement.")
+
+    if wp_data.linked_transactions:
+        t_ids = [int(x) for x in wp_data.linked_transactions if str(x).isdigit()]
+        if t_ids:
+            cnt = conn.execute(f"SELECT COUNT(*) as c FROM transactions WHERE engagement_id = ? AND id IN ({','.join('?' for _ in t_ids)})", (engagement_id, *t_ids)).fetchone()["c"]
+            if cnt != len(t_ids):
+                conn.close()
+                raise HTTPException(status_code=400, detail="One or more linked transactions do not belong to this engagement.")
+
+    if wp_data.linked_checklists:
+        c_ids = [int(x) for x in wp_data.linked_checklists if str(x).isdigit()]
+        if c_ids:
+            cnt = conn.execute(f"SELECT COUNT(*) as c FROM audit_checklists WHERE engagement_id = ? AND id IN ({','.join('?' for _ in c_ids)})", (engagement_id, *c_ids)).fetchone()["c"]
+            if cnt != len(c_ids):
+                conn.close()
+                raise HTTPException(status_code=400, detail="One or more linked checklists do not belong to this engagement.")
 
     linked_f_json = json.dumps(wp_data.linked_findings or [])
     linked_t_json = json.dumps(wp_data.linked_transactions or [])
@@ -318,6 +349,7 @@ def update_working_paper(
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     curr = dict(row)
+    require_engagement_access(curr["engagement_id"], current_user)
     now_str = datetime.now().isoformat()
 
     updates = []
@@ -445,7 +477,15 @@ async def upload_supporting_document(
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
     now_str = datetime.now().isoformat()
+
+    # Read and validate file size (bounded to 50 MB)
+    content = await file.read(MAX_WP_FILE_SIZE + 1)
+    file_size = len(content)
+    if file_size > MAX_WP_FILE_SIZE:
+        conn.close()
+        raise HTTPException(status_code=413, detail="File size exceeds maximum limit of 50 MB.")
 
     # Create destination directory
     wp_folder = os.path.join(BASE_UPLOAD_DIR, f"wp_{wp_id}")
@@ -454,10 +494,6 @@ async def upload_supporting_document(
     file_ext = os.path.splitext(file.filename)[1]
     safe_filename = f"{uuid.uuid4().hex[:8]}_{file.filename.replace(' ', '_')}"
     dest_path = os.path.join(wp_folder, safe_filename)
-
-    # Read and save file
-    content = await file.read()
-    file_size = len(content)
 
     with open(dest_path, "wb") as f:
         f.write(content)
@@ -524,6 +560,7 @@ def delete_supporting_document(
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
     now_str = datetime.now().isoformat()
 
     attached_files = wp.get("attached_files") or []
@@ -573,7 +610,7 @@ def delete_supporting_document(
 
 
 @router.get("/download-file/{wp_id}/{doc_id}")
-def download_working_paper_document(wp_id: int, doc_id: str):
+def download_working_paper_document(wp_id: int, doc_id: str, current_user: dict = Depends(get_current_user)):
     """
     Downloads or streams an attached supporting document.
     """
@@ -584,6 +621,8 @@ def download_working_paper_document(wp_id: int, doc_id: str):
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
+
     target_doc = None
     for doc in wp.get("attached_files", []):
         if str(doc.get("id")) == str(doc_id) or doc.get("file_name") == doc_id:
@@ -621,6 +660,7 @@ def add_reviewer_comment(
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
     now_str = datetime.now().isoformat()
     author = comment_data.author or current_user.get("full_name", "Auditor")
 
@@ -675,6 +715,7 @@ def update_working_paper_notes(
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
     now_str = datetime.now().isoformat()
 
     conn.execute(
@@ -722,6 +763,7 @@ def update_working_paper_status(
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
     old_status = wp["status"]
     new_status = status_data.status
     now_str = datetime.now().isoformat()
@@ -800,6 +842,7 @@ def update_working_paper_link(
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
     now_str = datetime.now().isoformat()
     ltype = link_data.link_type.lower()
     action = link_data.action.lower()
@@ -827,10 +870,26 @@ def update_working_paper_link(
 
     # Perform link or unlink
     if action == "link":
+        # Verify object belongs to the same engagement
+        if ltype == "finding":
+            valid = conn.execute("SELECT id FROM audit_findings WHERE id = ? AND engagement_id = ?", (item_id, wp["engagement_id"])).fetchone()
+            if not valid:
+                conn.close()
+                raise HTTPException(status_code=400, detail="Finding does not belong to this engagement.")
+        elif ltype == "transaction":
+            valid = conn.execute("SELECT id FROM transactions WHERE id = ? AND engagement_id = ?", (item_id, wp["engagement_id"])).fetchone()
+            if not valid:
+                conn.close()
+                raise HTTPException(status_code=400, detail="Transaction does not belong to this engagement.")
+        elif ltype == "checklist":
+            valid = conn.execute("SELECT id FROM audit_checklists WHERE id = ? AND engagement_id = ?", (item_id, wp["engagement_id"])).fetchone()
+            if not valid:
+                conn.close()
+                raise HTTPException(status_code=400, detail="Checklist item does not belong to this engagement.")
+
         if item_id not in field_list:
             field_list.append(item_id)
         if ltype == "checklist":
-            # Also sync reference_wp in audit_checklists table
             conn.execute("UPDATE audit_checklists SET reference_wp = ? WHERE id = ?", (wp["wp_reference"], item_id))
     elif action == "unlink":
         field_list = [fid for fid in field_list if fid != item_id]
@@ -888,6 +947,7 @@ def delete_working_paper(
         raise HTTPException(status_code=404, detail="Working paper not found.")
 
     wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
     now_str = datetime.now().isoformat()
     deletion_reason = (req.reason or reason or "").strip()
     is_reviewed = (wp.get("status") == "Reviewed")
@@ -945,11 +1005,12 @@ def delete_working_paper(
 
 
 @router.get("/{engagement_id}/linkable-items")
-def get_linkable_items(engagement_id: int):
+def get_linkable_items(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns available findings, transactions, and checklist items for this engagement
     to populate selection pickers in the UI.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
 
     # 1. Findings
@@ -989,10 +1050,11 @@ def get_linkable_items(engagement_id: int):
 
 
 @router.get("/{engagement_id}/export/csv")
-def export_working_papers_csv(engagement_id: int):
+def export_working_papers_csv(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Generates an SA 230 compliant CSV Working Papers Index & Register for the engagement.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute("""
         SELECT * FROM working_papers 

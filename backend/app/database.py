@@ -5,8 +5,13 @@ from datetime import datetime
 
 DB_PATH = os.environ.get("FINAUDIT_DB_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "finauditpro.db"))
 
+def _ensure_db_dir():
+    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
 def get_db_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    _ensure_db_dir()
     conn = sqlite3.connect(DB_PATH, timeout=30.0, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -15,7 +20,7 @@ def get_db_connection():
     return conn
 
 def init_db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    _ensure_db_dir()
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -31,6 +36,7 @@ def init_db():
         is_active INTEGER DEFAULT 1,
         phone TEXT,
         last_login TEXT,
+        token_version INTEGER DEFAULT 1,
         created_at TEXT NOT NULL
     )
     """)
@@ -42,6 +48,18 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
     if "phone" not in user_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+    if "token_version" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1")
+
+    # Revoked / Blacklisted Tokens (for explicit logout)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS revoked_tokens (
+        jti TEXT PRIMARY KEY,
+        username TEXT,
+        revoked_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+    )
+    """)
 
     # Clients
     cursor.execute("""
@@ -493,7 +511,7 @@ def init_db():
     )
     """)
 
-    # Audit Logs (Append-Only Immutable System)
+    # Audit Logs (Append-Only Immutable System with Hash Chaining)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS audit_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -509,13 +527,11 @@ def init_db():
         engagement_id INTEGER,
         ip_address TEXT,
         entity_type TEXT,
-        entity_id INTEGER
+        entity_id INTEGER,
+        previous_hash TEXT,
+        entry_hash TEXT
     )
     """)
-
-    # Temporarily drop triggers if updating schema
-    cursor.execute("DROP TRIGGER IF EXISTS trg_prevent_audit_log_update")
-    cursor.execute("DROP TRIGGER IF EXISTS trg_prevent_audit_log_delete")
 
     # Migrate audit_logs columns if missing
     cursor.execute("PRAGMA table_info(audit_logs)")
@@ -528,14 +544,13 @@ def init_db():
         ("engagement_id", "INTEGER"),
         ("ip_address", "TEXT"),
         ("username", "TEXT"),
-        ("user_id", "INTEGER")
+        ("user_id", "INTEGER"),
+        ("previous_hash", "TEXT"),
+        ("entry_hash", "TEXT")
     ]:
         if col_name not in audit_cols:
             cursor.execute(f"ALTER TABLE audit_logs ADD COLUMN {col_name} {col_type}")
 
-    # Backfill module and record_id from entity_type and entity_id if null
-    cursor.execute("UPDATE audit_logs SET module = UPPER(entity_type) WHERE (module IS NULL OR module = '') AND entity_type IS NOT NULL")
-    cursor.execute("UPDATE audit_logs SET record_id = CAST(entity_id AS TEXT) WHERE (record_id IS NULL OR record_id = '') AND entity_id IS NOT NULL")
 
     # Enforce SQLite append-only immutability triggers
     cursor.execute("""
@@ -552,6 +567,7 @@ def init_db():
         SELECT RAISE(FAIL, 'Audit trail logs are immutable and cannot be deleted.');
     END;
     """)
+
 
     # Financial Statement Auditor Explanations & Notes
     cursor.execute("""
@@ -686,6 +702,17 @@ def init_db():
         UNIQUE(engagement_id, item_key)
     )
     """)
+    # Performance & Scale Indexes (Flaw 35)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_engagement ON transactions(engagement_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_engagement_date ON transactions(engagement_id, date, id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_findings_engagement ON audit_findings(engagement_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_engagement ON audit_logs(engagement_id, id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_working_papers_engagement ON working_papers(engagement_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_recon_items_recon ON reconciliation_items(recon_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ledgers_eng ON ledgers(engagement_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_checklists_eng ON audit_checklists(engagement_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cleaning_eng ON data_cleaning_logs(engagement_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_engagement ON uploaded_files(engagement_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_yoy_reviews_eng ON yoy_comparison_reviews(engagement_id)")
 
     # Seed Initial Administrator Account if no users exist

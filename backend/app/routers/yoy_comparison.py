@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from typing import Optional, Dict, Any
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.schemas import YoYCommentRequest, YoYExplainRequest
 from backend.app.services.yoy_comparison_engine import (
     run_yoy_comparison,
@@ -27,6 +27,9 @@ def get_yoy_comparison(
     comparing Revenue, Expenses, Profit, Assets, Liabilities, Receivables, Payables,
     Inventory, Cash, Bank, Major Ledgers, Party Balances, and Transaction Volumes.
     """
+    require_engagement_access(engagement_id, current_user)
+    if py_engagement_id is not None:
+        require_engagement_access(py_engagement_id, current_user)
     try:
         data = run_yoy_comparison(
             engagement_id=engagement_id,
@@ -74,6 +77,7 @@ def add_yoy_comment(
     current_user: dict = Depends(get_current_user)
 ):
     """Saves auditor working paper comment and review status for a comparative line item."""
+    require_engagement_access(engagement_id, current_user)
     try:
         user_name = current_user.get("username", "admin")
         return save_yoy_auditor_comment(
@@ -100,6 +104,7 @@ def explain_movement(
     Generates a factual, evidence-based AI explanation for a YoY movement based strictly
     on recorded ledger data. Returns 'Insufficient data to determine the reason.' if evidence is lacking.
     """
+    require_engagement_access(engagement_id, current_user)
     try:
         return explain_yoy_movement_factually(
             engagement_id=engagement_id,
@@ -120,6 +125,9 @@ def download_yoy_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Downloads full Year-on-Year Financial Comparison Audit Report in CSV format."""
+    require_engagement_access(engagement_id, current_user)
+    if py_engagement_id is not None:
+        require_engagement_access(py_engagement_id, current_user)
     try:
         csv_content = generate_yoy_csv_report(
             engagement_id=engagement_id,

@@ -1,7 +1,8 @@
 import csv
 import io
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response, Depends
 from typing import List, Optional
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.services.general_ledger_analyzer import analyze_general_ledger
 
@@ -23,8 +24,13 @@ def get_transactions(
     min_credit: Optional[float] = None,
     max_credit: Optional[float] = None,
     limit: int = 200,
-    offset: int = 0
+    offset: int = 0,
+    current_user: dict = Depends(get_current_user)
 ):
+    require_engagement_access(engagement_id, current_user)
+    limit = min(max(1, limit), 500)
+    offset = max(0, offset)
+
     conn = get_db_connection()
     query = "SELECT * FROM transactions WHERE engagement_id = ?"
     params = [engagement_id]
@@ -98,8 +104,10 @@ def get_general_ledger_analysis(
     max_debit: Optional[float] = None,
     min_credit: Optional[float] = None,
     max_credit: Optional[float] = None,
-    anomaly_rule: Optional[str] = None
+    anomaly_rule: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
 ):
+    require_engagement_access(engagement_id, current_user)
     try:
         result = analyze_general_ledger(
             engagement_id=engagement_id,
@@ -122,7 +130,8 @@ def get_general_ledger_analysis(
         raise HTTPException(status_code=500, detail=f"GL Analysis Error: {str(e)}")
 
 @router.get("/ledgers-list/{engagement_id}")
-def get_distinct_ledgers(engagement_id: int):
+def get_distinct_ledgers(engagement_id: int, current_user: dict = Depends(get_current_user)):
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute(
         "SELECT DISTINCT ledger FROM transactions WHERE engagement_id = ? AND ledger IS NOT NULL AND ledger != '' ORDER BY ledger ASC",
@@ -133,7 +142,8 @@ def get_distinct_ledgers(engagement_id: int):
     return {"ledgers": ledgers}
 
 @router.get("/parties-list/{engagement_id}")
-def get_distinct_parties(engagement_id: int):
+def get_distinct_parties(engagement_id: int, current_user: dict = Depends(get_current_user)):
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute(
         "SELECT DISTINCT party_name FROM transactions WHERE engagement_id = ? AND party_name IS NOT NULL AND party_name != '' ORDER BY party_name ASC",
@@ -152,8 +162,10 @@ def download_gl_analysis_report(
     search: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    anomaly_rule: Optional[str] = None
+    anomaly_rule: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
 ):
+    require_engagement_access(engagement_id, current_user)
     analysis = analyze_general_ledger(
         engagement_id=engagement_id,
         ledger=ledger,
@@ -224,7 +236,7 @@ def download_gl_analysis_report(
     )
 
 @router.get("/{transaction_id}")
-def get_transaction(transaction_id: int):
+def get_transaction(transaction_id: int, current_user: dict = Depends(get_current_user)):
     conn = get_db_connection()
     row = conn.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,)).fetchone()
     if not row:
@@ -232,5 +244,6 @@ def get_transaction(transaction_id: int):
         raise HTTPException(status_code=404, detail="Transaction not found")
     tx = dict(row)
     conn.close()
+    require_engagement_access(tx["engagement_id"], current_user)
     return tx
 

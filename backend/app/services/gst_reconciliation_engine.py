@@ -64,7 +64,7 @@ def run_gst_reconciliation(
     Executes comprehensive Indian GST Reconciliation comparing Source A (e.g. GSTR-2B/GSTR-1)
     and Source B (e.g. Purchase/Sales Register or Books/Ledger).
     
-    Dynamically adheres to configurable GST rule definitions.
+    Dynamically adheres to configurable GST rule definitions and client state codes.
     """
     conn = get_db_connection()
     rules = get_active_gst_rules_map()
@@ -88,7 +88,6 @@ def run_gst_reconciliation(
 
     gstin_config = rules.get("gstin_structure_validation", {})
     gstin_pattern = gstin_config.get("regex_pattern", "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$")
-    valid_state_codes = set(gstin_config.get("valid_state_codes", []))
 
     # 2. Extract Source A (e.g. GST Portal / GSTR-2B / GSTR-1 Dataset)
     source_a_txs = []
@@ -98,7 +97,6 @@ def run_gst_reconciliation(
             source_a_txs = [dict(r) for r in rows]
 
     if not source_a_txs:
-        # Search by data category
         is_sales = "sales" in source_b_type.lower() or "gstr-1" in source_a_type.lower()
         target_cat = "GST Data" if not is_sales else "GSTR-1"
         rows = conn.execute("""
@@ -130,7 +128,6 @@ def run_gst_reconciliation(
             source_b_txs = [dict(r) for r in rows]
 
     if not source_b_txs:
-        # Fallback to engagement ledger
         is_sales = "sales" in source_b_type.lower() or "gstr-1" in source_a_type.lower()
         gl_query = "SELECT * FROM transactions WHERE engagement_id = ?"
         gl_params = [engagement_id]
@@ -141,136 +138,20 @@ def run_gst_reconciliation(
             if is_sales:
                 gl_query += " AND (LOWER(ledger) LIKE '%sale%' OR LOWER(ledger) LIKE '%revenue%' OR LOWER(account_group) = 'revenue')"
             else:
-                gl_query += " AND (LOWER(ledger) LIKE '%purchase%' OR LOWER(ledger) LIKE '%expense%' OR LOWER(account_group) = 'expense')"
+                gl_query += " AND (LOWER(ledger) LIKE '%purchase%' OR LOWER(ledger) LIKE '%expense%' OR LOWER(account_group) = 'expense' OR LOWER(ledger) NOT LIKE '%gstr%')"
+        if source_a_file_id:
+            gl_query += " AND (file_id IS NULL OR file_id != ?)"
+            gl_params.append(source_a_file_id)
         rows = conn.execute(gl_query + " ORDER BY date ASC, id ASC", tuple(gl_params)).fetchall()
         source_b_txs = [dict(r) for r in rows]
 
-    # If Source A is empty, construct a realistic simulated portal dataset from Source B
-    # injected with realistic GST audit exceptions for demonstration & testing
-    if not source_a_txs and source_b_txs:
-        for idx, b in enumerate(source_b_txs):
-            b_inv = str(b.get("invoice_no") or b.get("voucher_no") or f"INV-{idx+100}")
-            b_amt = float(b.get("amount") or max(float(b.get("debit") or 0.0), float(b.get("credit") or 0.0)))
-            b_gstin = str(b.get("gstin") or f"27AAACA{idx+1000:04d}A1Z1").upper()
-            b_tax = float(b.get("tax_amount") or round(b_amt * 0.18, 2))
-            b_taxable = round(b_amt - b_tax, 2) if b_amt > b_tax else b_amt
-
-            # Standard test exceptions based on index modulo
-            if idx % 7 == 0:
-                # 1. Clean Exact Match
-                source_a_txs.append({
-                    "id": 9000 + idx,
-                    "date": b.get("date"),
-                    "invoice_no": b_inv,
-                    "party_name": b.get("party_name") or "Verified GST Supplier Ltd",
-                    "gstin": b_gstin,
-                    "taxable_value": b_taxable,
-                    "cgst": round(b_tax / 2, 2),
-                    "sgst": round(b_tax / 2, 2),
-                    "igst": 0.0,
-                    "tax_amount": b_tax,
-                    "amount": b_amt,
-                    "doc_type": "INV"
-                })
-            elif idx % 7 == 1:
-                # 2. Taxable Value & Tax Difference (Rate Mismatch)
-                source_a_txs.append({
-                    "id": 9000 + idx,
-                    "date": b.get("date"),
-                    "invoice_no": b_inv,
-                    "party_name": b.get("party_name"),
-                    "gstin": b_gstin,
-                    "taxable_value": round(b_taxable - 1500.0, 2),
-                    "cgst": round((b_taxable - 1500.0) * 0.09, 2),
-                    "sgst": round((b_taxable - 1500.0) * 0.09, 2),
-                    "igst": 0.0,
-                    "tax_amount": round((b_taxable - 1500.0) * 0.18, 2),
-                    "amount": round((b_taxable - 1500.0) * 1.18, 2),
-                    "doc_type": "INV"
-                })
-            elif idx % 7 == 2:
-                # 3. Date Disparity (> 30 days lag)
-                orig_d = parse_iso_date(b.get("date")) or datetime(2024, 4, 15)
-                new_d = orig_d.replace(day=min(orig_d.day, 28))
-                source_a_txs.append({
-                    "id": 9000 + idx,
-                    "date": "2024-03-01",  # Prior period cutoff
-                    "invoice_no": b_inv,
-                    "party_name": b.get("party_name"),
-                    "gstin": b_gstin,
-                    "taxable_value": b_taxable,
-                    "cgst": round(b_tax / 2, 2),
-                    "sgst": round(b_tax / 2, 2),
-                    "igst": 0.0,
-                    "tax_amount": b_tax,
-                    "amount": b_amt,
-                    "doc_type": "INV"
-                })
-            elif idx % 7 == 3:
-                # 4. GSTIN Mismatch
-                source_a_txs.append({
-                    "id": 9000 + idx,
-                    "date": b.get("date"),
-                    "invoice_no": b_inv,
-                    "party_name": b.get("party_name"),
-                    "gstin": "29BBBCB9999B1Z2", # Different State (Karnataka 29 vs MH 27)
-                    "taxable_value": b_taxable,
-                    "cgst": 0.0,
-                    "sgst": 0.0,
-                    "igst": b_tax,
-                    "tax_amount": b_tax,
-                    "amount": b_amt,
-                    "doc_type": "INV"
-                })
-            elif idx % 7 == 4:
-                # 5. Duplicate in Portal (Booked twice by supplier in GSTR-1)
-                source_a_txs.append({
-                    "id": 9000 + idx,
-                    "date": b.get("date"),
-                    "invoice_no": b_inv,
-                    "party_name": b.get("party_name"),
-                    "gstin": b_gstin,
-                    "taxable_value": b_taxable,
-                    "cgst": round(b_tax / 2, 2),
-                    "sgst": round(b_tax / 2, 2),
-                    "igst": 0.0,
-                    "tax_amount": b_tax,
-                    "amount": b_amt,
-                    "doc_type": "INV"
-                })
-                source_a_txs.append({
-                    "id": 9500 + idx,
-                    "date": b.get("date"),
-                    "invoice_no": b_inv,
-                    "party_name": b.get("party_name"),
-                    "gstin": b_gstin,
-                    "taxable_value": b_taxable,
-                    "cgst": round(b_tax / 2, 2),
-                    "sgst": round(b_tax / 2, 2),
-                    "igst": 0.0,
-                    "tax_amount": b_tax,
-                    "amount": b_amt,
-                    "doc_type": "INV"
-                })
-            elif idx % 7 == 5:
-                # 6. Credit Note / Debit Note Mismatch
-                source_a_txs.append({
-                    "id": 9000 + idx,
-                    "date": b.get("date"),
-                    "invoice_no": f"CN-{b_inv}",
-                    "party_name": b.get("party_name"),
-                    "gstin": b_gstin,
-                    "taxable_value": round(b_taxable * 0.25, 2),
-                    "cgst": round(b_tax * 0.25 / 2, 2),
-                    "sgst": round(b_tax * 0.25 / 2, 2),
-                    "igst": 0.0,
-                    "tax_amount": round(b_tax * 0.25, 2),
-                    "amount": round(b_amt * 0.25, 2),
-                    "doc_type": "CRN"
-                })
-            else:
-                # 7. Unmatched / Missing in Source A (Supplier failed to file in GSTR-1)
-                pass
+    # Fetch Client Home State from client GSTIN (Flaw 48)
+    client_row = conn.execute("""
+        SELECT c.gstin FROM clients c
+        JOIN engagements e ON e.client_id = c.id
+        WHERE e.id = ?
+    """, (engagement_id,)).fetchone()
+    client_home_state = client_row["gstin"][:2] if client_row and client_row["gstin"] and len(client_row["gstin"]) >= 2 else "27"
 
     # 4. Perform Multi-Parameter Deterministic Reconciliation
     recon_items: List[Dict[str, Any]] = []
@@ -286,12 +167,18 @@ def run_gst_reconciliation(
         a_pty = str(a.get("party_name") or "GST Portal Counterparty").strip()
         a_gstin = str(a.get("gstin") or "").strip().upper()
         
-        a_taxable = round(float(a.get("taxable_value") or a.get("taxable") or 0.0), 2)
-        a_cgst = round(float(a.get("cgst") or 0.0), 2)
-        a_sgst = round(float(a.get("sgst") or 0.0), 2)
-        a_igst = round(float(a.get("igst") or 0.0), 2)
-        a_tax = round(float(a.get("tax_amount") or (a_cgst + a_sgst + a_igst)), 2)
-        a_total = round(float(a.get("amount") or (a_taxable + a_tax)), 2)
+        a_tax = round(float(a.get("tax_amount") or 0.0), 2)
+        a_total = round(float(a.get("amount") or 0.0), 2)
+        a_taxable = round(float(a.get("taxable_value") or a.get("taxable") or (a_total - a_tax if a_total > a_tax else a_total)), 2)
+        if a_total == 0.0 and (a_taxable > 0 or a_tax > 0):
+            a_total = round(a_taxable + a_tax, 2)
+
+        is_intra_a = (not a_gstin or a_gstin[:2] == client_home_state)
+        a_cgst = round(float(a.get("cgst") or (a_tax / 2 if a_tax > 0 and is_intra_a else 0.0)), 2)
+        a_sgst = round(float(a.get("sgst") or (a_tax / 2 if a_tax > 0 and is_intra_a else 0.0)), 2)
+        a_igst = round(float(a.get("igst") or (a_tax if a_tax > 0 and not is_intra_a else 0.0)), 2)
+        if a_tax == 0.0 and (a_cgst > 0 or a_sgst > 0 or a_igst > 0):
+            a_tax = round(a_cgst + a_sgst + a_igst, 2)
         a_doc_type = str(a.get("doc_type") or "INV").upper()
 
         # Check duplicate in Source A
@@ -302,7 +189,6 @@ def run_gst_reconciliation(
         # Search for best match in Source B
         best_b = None
         best_score = 0.0
-        best_diff_taxable = 0.0
 
         for b in source_b_txs:
             if b["id"] in matched_b_ids:
@@ -311,10 +197,8 @@ def run_gst_reconciliation(
             b_inv_raw = str(b.get("invoice_no") or b.get("voucher_no") or "").strip()
             b_inv_norm = normalize_invoice_string(b_inv_raw, strip_zeros)
             b_gstin = str(b.get("gstin") or "").strip().upper()
-            b_pty = str(b.get("party_name") or "").strip()
             b_total = round(float(b.get("amount") or max(float(b.get("debit") or 0.0), float(b.get("credit") or 0.0))), 2)
             b_tax = round(float(b.get("tax_amount") or 0.0), 2)
-            b_taxable = round(b_total - b_tax if b_total > b_tax else b_total, 2)
 
             score = 0.0
             # Invoice number match
@@ -327,7 +211,7 @@ def run_gst_reconciliation(
             if a_gstin and b_gstin and a_gstin == b_gstin:
                 score += 30.0
             elif not b_gstin:
-                score += 10.0 # Missing in B but possible match
+                score += 10.0
 
             # Amount proximity
             diff_amt = abs(a_total - b_total)
@@ -350,9 +234,12 @@ def run_gst_reconciliation(
             b_total = round(float(best_b.get("amount") or max(float(best_b.get("debit") or 0.0), float(best_b.get("credit") or 0.0))), 2)
             b_tax = round(float(best_b.get("tax_amount") or 0.0), 2)
             b_taxable = round(b_total - b_tax if b_total > b_tax else b_total, 2)
-            b_cgst = round(float(best_b.get("cgst") or (b_tax / 2 if b_tax > 0 and (not b_gstin or b_gstin[:2] == "27") else 0.0)), 2)
-            b_sgst = round(float(best_b.get("sgst") or (b_tax / 2 if b_tax > 0 and (not b_gstin or b_gstin[:2] == "27") else 0.0)), 2)
-            b_igst = round(float(best_b.get("igst") or (b_tax if b_tax > 0 and b_gstin and b_gstin[:2] != "27" else 0.0)), 2)
+            
+            # Dynamic intra-state vs inter-state tax split
+            is_intra = (not b_gstin or b_gstin[:2] == client_home_state)
+            b_cgst = round(float(best_b.get("cgst") or (b_tax / 2 if b_tax > 0 and is_intra else 0.0)), 2)
+            b_sgst = round(float(best_b.get("sgst") or (b_tax / 2 if b_tax > 0 and is_intra else 0.0)), 2)
+            b_igst = round(float(best_b.get("igst") or (b_tax if b_tax > 0 and not is_intra else 0.0)), 2)
 
             # Compute differences
             diff_taxable = round(abs(a_taxable - b_taxable), 2)
@@ -502,9 +389,10 @@ def run_gst_reconciliation(
             b_total = round(float(b.get("amount") or max(float(b.get("debit") or 0.0), float(b.get("credit") or 0.0))), 2)
             b_tax = round(float(b.get("tax_amount") or 0.0), 2)
             b_taxable = round(b_total - b_tax if b_total > b_tax else b_total, 2)
-            b_cgst = round(float(b.get("cgst") or (b_tax / 2 if b_tax > 0 and (not b_gstin or b_gstin[:2] == "27") else 0.0)), 2)
-            b_sgst = round(float(b.get("sgst") or (b_tax / 2 if b_tax > 0 and (not b_gstin or b_gstin[:2] == "27") else 0.0)), 2)
-            b_igst = round(float(b.get("igst") or (b_tax if b_tax > 0 and b_gstin and b_gstin[:2] != "27" else 0.0)), 2)
+            is_intra = (not b_gstin or b_gstin[:2] == client_home_state)
+            b_cgst = round(float(b.get("cgst") or (b_tax / 2 if b_tax > 0 and is_intra else 0.0)), 2)
+            b_sgst = round(float(b.get("sgst") or (b_tax / 2 if b_tax > 0 and is_intra else 0.0)), 2)
+            b_igst = round(float(b.get("igst") or (b_tax if b_tax > 0 and not is_intra else 0.0)), 2)
 
             recon_items.append({
                 "ref_a": "N/A",

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_role
 from backend.app.services.local_ai_provider import LocalAIModelManager, sanitize_audit_text
 from backend.app.utils.audit_logger import log_audit_event
 
@@ -17,19 +17,19 @@ class AISettingsUpdate(BaseModel):
     temperature: Optional[float] = None
 
 class AIGenerateRequest(BaseModel):
-    prompt: str
-    system_prompt: Optional[str] = None
-    client_name: Optional[str] = None
+    prompt: str = Field(..., max_length=15000, description="Prompt text limited to 15,000 characters")
+    system_prompt: Optional[str] = Field(None, max_length=5000)
+    client_name: Optional[str] = Field(None, max_length=200)
 
 class SanitizePreviewRequest(BaseModel):
-    text: str
-    client_name: Optional[str] = None
+    text: str = Field(..., max_length=20000)
+    client_name: Optional[str] = Field(None, max_length=200)
 
 class TestAIPromptRequest(BaseModel):
-    prompt: Optional[str] = "Confirm LM Studio connectivity with a concise verification statement."
+    prompt: Optional[str] = Field("Confirm LM Studio connectivity with a concise verification statement.", max_length=2000)
 
 @router.get("/status")
-def get_ai_status():
+def get_ai_status(current_user: dict = Depends(get_current_user)):
     """Returns complete Local AI Model Manager status, LM Studio status, active model, and fallback health."""
     try:
         return LocalAIModelManager.get_full_status()
@@ -37,7 +37,7 @@ def get_ai_status():
         raise HTTPException(status_code=500, detail=f"Failed to check local AI status: {str(e)}")
 
 @router.get("/models")
-def get_available_models():
+def get_available_models(current_user: dict = Depends(get_current_user)):
     """Fetches list of available / loaded models from the local LM Studio server."""
     try:
         models = LocalAIModelManager.get_available_models()
@@ -55,8 +55,8 @@ def get_available_models():
         }
 
 @router.post("/settings")
-def update_ai_settings(payload: AISettingsUpdate, current_user: dict = Depends(get_current_user)):
-    """Updates Local AI Model Manager settings (LM Studio endpoint, model name, context, temperature, enable/disable)."""
+def update_ai_settings(payload: AISettingsUpdate, current_user: dict = Depends(require_role(["Admin", "Auditor"]))):
+    """Updates Local AI Model Manager settings (Admin/Auditor only)."""
     try:
         old_config = LocalAIModelManager.get_config()
         update_data = {k: v for k, v in payload.model_dump().items() if v is not None}
@@ -81,7 +81,7 @@ def update_ai_settings(payload: AISettingsUpdate, current_user: dict = Depends(g
         raise HTTPException(status_code=500, detail=f"Failed to save AI configuration: {str(e)}")
 
 @router.post("/test-connection")
-def test_ai_connection():
+def test_ai_connection(current_user: dict = Depends(get_current_user)):
     """Performs live health-check against the local LM Studio endpoint (http://localhost:1234)."""
     try:
         provider = LocalAIModelManager.get_active_provider()
@@ -105,7 +105,7 @@ def test_ai_connection():
         }
 
 @router.post("/test-ai")
-def test_ai_generation(req: TestAIPromptRequest):
+def test_ai_generation(req: TestAIPromptRequest, current_user: dict = Depends(get_current_user)):
     """Tests live generation with LM Studio to verify local model responses."""
     try:
         res = LocalAIModelManager.execute_inference(
@@ -124,7 +124,7 @@ def test_ai_generation(req: TestAIPromptRequest):
         raise HTTPException(status_code=500, detail=f"AI generation test failed: {str(e)}")
 
 @router.post("/generate")
-def generate_local_ai_response(req: AIGenerateRequest):
+def generate_local_ai_response(req: AIGenerateRequest, current_user: dict = Depends(get_current_user)):
     """Executes safe, sanitized local inference via LM Studio with deterministic fallback if offline."""
     try:
         return LocalAIModelManager.execute_inference(
@@ -136,7 +136,7 @@ def generate_local_ai_response(req: AIGenerateRequest):
         raise HTTPException(status_code=500, detail=f"Local AI execution error: {str(e)}")
 
 @router.post("/sanitize-preview")
-def preview_data_sanitization(req: SanitizePreviewRequest):
+def preview_data_sanitization(req: SanitizePreviewRequest, current_user: dict = Depends(get_current_user)):
     """Previews prompt sanitization and PII/financial data redaction (PAN, GSTIN, Bank A/C, Client Name)."""
     sanitized, stats = sanitize_audit_text(req.text, req.client_name)
     return {

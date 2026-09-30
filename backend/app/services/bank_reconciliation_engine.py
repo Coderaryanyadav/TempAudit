@@ -88,83 +88,17 @@ def run_bank_reconciliation(
         stmt_rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? ORDER BY date ASC, id ASC", (file_b_id,)).fetchall()
         if stmt_rows:
             bank_txs = [dict(r) for r in stmt_rows]
-    
-    # If no bank transactions found from file, look for transactions marked as 'Bank Statement' or create representative statement from books + timing differences
-    if not bank_txs:
+    else:
         stmt_rows = conn.execute("""
             SELECT t.* FROM transactions t
-            JOIN uploaded_files u ON t.file_id = u.id
-            WHERE t.engagement_id = ? AND u.data_category = 'Bank Statement'
+            WHERE t.engagement_id = ? AND (
+                t.transaction_type = 'BANK_STATEMENT' OR
+                t.file_id IN (SELECT id FROM uploaded_files WHERE engagement_id = ? AND (file_type = 'BANK_STATEMENT' OR LOWER(file_type) LIKE '%bank%'))
+            )
             ORDER BY t.date ASC, t.id ASC
-        """, (engagement_id,)).fetchall()
+        """, (engagement_id, engagement_id)).fetchall()
         if stmt_rows:
             bank_txs = [dict(r) for r in stmt_rows]
-
-    # If still empty (e.g. initial demo/test data simulation), generate statement items mirroring books with standard timing & bank charge exceptions
-    if not bank_txs:
-        simulated_bank = []
-        for b in book_txs:
-            dr = float(b.get("debit") or 0.0)
-            cr = float(b.get("credit") or 0.0)
-            amt = float(b.get("amount") or max(dr, cr))
-            desc = str(b.get("description") or "")
-            vch = str(b.get("voucher_no") or "")
-            pty = str(b.get("party_name") or "")
-            b_date = b.get("date") or "2024-05-01"
-
-            # Check if this item is an unpresented cheque (e.g. issued at end of month)
-            if "unpresented" in desc.lower() or "outstanding" in desc.lower():
-                continue  # Exclude from bank statement to simulate unpresented item
-
-            # Flip Dr/Cr for bank statement: Book Debit (Deposit) is Bank Credit (Deposit); Book Credit (Payment) is Bank Debit (Withdrawal)
-            sim_dr = cr  # Bank Debit (Withdrawal)
-            sim_cr = dr  # Bank Credit (Deposit)
-
-            simulated_bank.append({
-                "id": 9000 + b["id"],
-                "date": b_date,
-                "voucher_no": b.get("reference_no") or vch,
-                "reference_no": b.get("reference_no") or vch,
-                "invoice_no": b.get("invoice_no") or "",
-                "party_name": pty,
-                "description": desc or f"Transfer {pty}",
-                "debit": sim_dr,
-                "credit": sim_cr,
-                "amount": amt,
-                "ledger": "Bank Statement Line"
-            })
-
-        # Add typical direct bank charges missing in books
-        simulated_bank.append({
-            "id": 9991,
-            "date": "2024-05-31",
-            "voucher_no": "CHG-MAY-01",
-            "reference_no": "BANK-CHG-99",
-            "invoice_no": "",
-            "party_name": "Bank AMC & Ledger Folio Charges",
-            "description": "Annual bank ledger folio maintenance charges and SMS alert fee",
-            "debit": 1770.0,
-            "credit": 0.0,
-            "amount": 1770.0,
-            "ledger": "Bank Statement Line"
-        })
-
-        # Add typical direct savings/FD interest credited missing in books
-        simulated_bank.append({
-            "id": 9992,
-            "date": "2024-06-30",
-            "voucher_no": "INT-Q1-01",
-            "reference_no": "BANK-INT-44",
-            "invoice_no": "",
-            "party_name": "Bank Interest Received",
-            "description": "Quarterly interest credit on auto-sweep savings balance",
-            "debit": 0.0,
-            "credit": 4520.0,
-            "amount": 4520.0,
-            "ledger": "Bank Statement Line"
-        })
-
-        bank_txs = simulated_bank
 
     now_str = datetime.now().isoformat()
     if not title:

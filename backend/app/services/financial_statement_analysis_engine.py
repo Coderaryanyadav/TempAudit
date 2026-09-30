@@ -237,31 +237,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                     else:
                         other_nca += amt
 
-        # Fallback minimum structures if ledger names are generic
-        if rev == 0.0 and len(expense_items) > 0:
-            rev = sum(i["amount"] for i in expense_items) * 1.25
-        if cogs == 0.0 and rev > 0:
-            cogs = rev * 0.60
-        if employee_exp == 0.0 and rev > 0:
-            employee_exp = rev * 0.12
-        if depreciation == 0.0 and fixed_assets > 0:
-            depreciation = fixed_assets * 0.10
-        if other_exp == 0.0 and rev > 0:
-            other_exp = rev * 0.08
-        if cash_bank == 0.0 and rev > 0:
-            cash_bank = rev * 0.08
-        if debtors == 0.0 and rev > 0:
-            debtors = rev * 0.18
-        if inventory == 0.0 and cogs > 0:
-            inventory = cogs * 0.20
-        if fixed_assets == 0.0 and rev > 0:
-            fixed_assets = rev * 0.45
-        if share_capital == 0.0 and rev > 0:
-            share_capital = rev * 0.30
-        if creditors == 0.0 and cogs > 0:
-            creditors = cogs * 0.15
-
-        # P&L Totals
+        # P&L Totals (Computed strictly from real ledger balances - no synthetic estimations)
         total_income = rev
         gross_profit = rev - cogs
         total_operating_expenses = employee_exp + other_exp
@@ -338,56 +314,30 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
     # Aggregate CY
     cy_data = aggregate_statements(cy_rows)
 
-    # Aggregate PY (either from actual PY rows, or realistic baseline if no separate prior year DB)
+    # Aggregate PY strictly from real PY data (no synthetic generation - Flaw 45)
+    py_available = bool(py_rows)
     if py_rows:
         py_data = aggregate_statements(py_rows)
     else:
-        # Construct realistic historical baseline based on CY (e.g. 82%-88% of CY)
-        py_data = {
-            "pnl": {
-                "revenue": round(cy_data["pnl"]["revenue"] * 0.84, 2),
-                "cogs": round(cy_data["pnl"]["cogs"] * 0.81, 2),
-                "gross_profit": round(cy_data["pnl"]["gross_profit"] * 0.89, 2),
-                "employee_expenses": round(cy_data["pnl"]["employee_expenses"] * 0.90, 2),
-                "finance_costs": round(cy_data["pnl"]["finance_costs"] * 1.15, 2),
-                "depreciation": round(cy_data["pnl"]["depreciation"] * 0.92, 2),
-                "other_operating_expenses": round(cy_data["pnl"]["other_operating_expenses"] * 0.85, 2),
-                "total_operating_expenses": round(cy_data["pnl"]["total_operating_expenses"] * 0.88, 2),
-                "ebitda": round(cy_data["pnl"]["ebitda"] * 0.91, 2),
-                "ebit": round(cy_data["pnl"]["ebit"] * 0.90, 2),
-                "pbt": round(cy_data["pnl"]["pbt"] * 0.85, 2),
-                "tax_expense": round(cy_data["pnl"]["tax_expense"] * 0.85, 2),
-                "pat": round(cy_data["pnl"]["pat"] * 0.85, 2),
-                "revenue_items": [],
-                "expense_items": []
-            },
-            "balance_sheet": {
-                "cash_bank": round(cy_data["balance_sheet"]["cash_bank"] * 0.75, 2),
-                "trade_debtors": round(cy_data["balance_sheet"]["trade_debtors"] * 0.78, 2),
-                "inventory": round(cy_data["balance_sheet"]["inventory"] * 0.80, 2),
-                "other_current_assets": round(cy_data["balance_sheet"]["other_current_assets"] * 0.85, 2),
-                "current_assets": round(cy_data["balance_sheet"]["current_assets"] * 0.79, 2),
-                "fixed_assets_ppe": round(cy_data["balance_sheet"]["fixed_assets_ppe"] * 0.92, 2),
-                "investments": round(cy_data["balance_sheet"]["investments"] * 0.88, 2),
-                "other_non_current_assets": round(cy_data["balance_sheet"]["other_non_current_assets"] * 0.90, 2),
-                "non_current_assets": round(cy_data["balance_sheet"]["non_current_assets"] * 0.91, 2),
-                "total_assets": round(cy_data["balance_sheet"]["total_assets"] * 0.86, 2),
-                "trade_creditors": round(cy_data["balance_sheet"]["trade_creditors"] * 0.82, 2),
-                "short_term_borrowings": round(cy_data["balance_sheet"]["short_term_borrowings"] * 0.95, 2),
-                "other_current_liabilities": round(cy_data["balance_sheet"]["other_current_liabilities"] * 0.88, 2),
-                "current_liabilities": round(cy_data["balance_sheet"]["current_liabilities"] * 0.87, 2),
-                "long_term_borrowings": round(cy_data["balance_sheet"]["long_term_borrowings"] * 1.10, 2),
-                "other_non_current_liabilities": round(cy_data["balance_sheet"]["other_non_current_liabilities"] * 0.90, 2),
-                "non_current_liabilities": round(cy_data["balance_sheet"]["non_current_liabilities"] * 1.05, 2),
-                "total_liabilities": round(cy_data["balance_sheet"]["total_liabilities"] * 0.94, 2),
-                "share_capital": round(cy_data["balance_sheet"]["share_capital"], 2),
-                "reserves_surplus": round(cy_data["balance_sheet"]["reserves_surplus"] * 0.80, 2),
-                "pat_retained": round(cy_data["pnl"]["pat"] * 0.85, 2),
-                "total_equity": round(cy_data["balance_sheet"]["total_equity"] * 0.82, 2),
-                "total_equity_and_liabilities": round(cy_data["balance_sheet"]["total_equity_and_liabilities"] * 0.86, 2),
-                "difference": 0.0
-            }
+        # If no previous year data exists, represent as zeroes with clear indication
+        zero_pnl = {
+            "revenue": 0.0, "cogs": 0.0, "gross_profit": 0.0, "employee_expenses": 0.0,
+            "finance_costs": 0.0, "depreciation": 0.0, "other_operating_expenses": 0.0,
+            "total_operating_expenses": 0.0, "ebitda": 0.0, "ebit": 0.0, "pbt": 0.0,
+            "tax_expense": 0.0, "pat": 0.0, "revenue_items": [], "expense_items": []
         }
+        zero_bs = {
+            "cash_bank": 0.0, "trade_debtors": 0.0, "inventory": 0.0, "other_current_assets": 0.0,
+            "current_assets": 0.0, "total_current_assets": 0.0, "fixed_assets_ppe": 0.0,
+            "investments": 0.0, "other_non_current_assets": 0.0, "non_current_assets": 0.0,
+            "total_non_current_assets": 0.0, "total_assets": 0.0, "trade_creditors": 0.0,
+            "short_term_borrowings": 0.0, "other_current_liabilities": 0.0, "current_liabilities": 0.0,
+            "total_current_liabilities": 0.0, "long_term_borrowings": 0.0, "other_non_current_liabilities": 0.0,
+            "non_current_liabilities": 0.0, "total_non_current_liabilities": 0.0, "total_liabilities": 0.0,
+            "share_capital": 0.0, "reserves_surplus": 0.0, "pat_retained": 0.0, "total_equity": 0.0,
+            "total_equity_and_liabilities": 0.0, "total_liabilities_and_equity": 0.0, "difference": 0.0
+        }
+        py_data = {"pnl": zero_pnl, "balance_sheet": zero_bs}
 
     # 4. Compute Cash Flow Statement (Indirect Method)
     def compute_cash_flow(cy_pnl, cy_bs, py_bs):

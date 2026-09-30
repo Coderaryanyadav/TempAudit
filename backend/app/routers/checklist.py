@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 
 from backend.app.schemas import ChecklistItemUpdate, ChecklistItemCreate, ChecklistGenerateRequest
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.services.checklist_generator import (
     ChecklistGenerator,
@@ -21,12 +21,14 @@ def get_checklist(
     category: Optional[str] = None,
     status: Optional[str] = None,
     assigned_staff: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieves the audit checklist items for an engagement with optional category,
     status, assigned staff, and search query filters.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     query = "SELECT * FROM audit_checklists WHERE engagement_id = ?"
     params = [engagement_id]
@@ -67,11 +69,12 @@ def get_checklist(
     return items
 
 @router.get("/{engagement_id}/summary")
-def get_checklist_summary(engagement_id: int):
+def get_checklist_summary(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns executive metrics for the audit checklist:
     Total items, counts by category (all 15 categories), counts by status, and completion %.
     """
+    require_engagement_access(engagement_id, current_user)
     try:
         summary = ChecklistGenerator.get_checklist_summary(engagement_id)
         return summary
@@ -92,6 +95,7 @@ def generate_checklist(
     - Selected modules
     - Detected Risk findings (automatically flags relevant substantive procedures as 'Requires Review')
     """
+    require_engagement_access(engagement_id, current_user)
     req_dict = gen_req.model_dump() if gen_req else {}
     try:
         result = ChecklistGenerator.generate_checklist(
@@ -132,6 +136,7 @@ def create_custom_checklist_item(
     """
     Allows the auditor to create custom checklist procedures under any of the 15 categories.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     eng_row = conn.execute("SELECT * FROM engagements WHERE id = ?", (engagement_id,)).fetchone()
     if not eng_row:
@@ -209,6 +214,8 @@ def update_checklist_item(
     if not row:
         conn.close()
         raise HTTPException(status_code=404, detail="Checklist item not found")
+
+    require_engagement_access(row["engagement_id"], current_user)
 
     updates = []
     params = []
@@ -322,6 +329,8 @@ def delete_checklist_item(item_id: int, current_user: dict = Depends(get_current
         conn.close()
         raise HTTPException(status_code=404, detail="Checklist item not found")
 
+    require_engagement_access(row["engagement_id"], current_user)
+
     conn.execute("DELETE FROM audit_checklists WHERE id = ?", (item_id,))
     
     from backend.app.utils.audit_logger import log_audit_event
@@ -343,6 +352,7 @@ def delete_checklist_item(item_id: int, current_user: dict = Depends(get_current
 @router.get("/{engagement_id}/export/csv")
 def export_checklist_csv(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """Exports full audit checklist register to CSV."""
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute("""
         SELECT item_code, category, question, guidance, status, assigned_staff,

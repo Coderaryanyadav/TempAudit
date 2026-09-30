@@ -137,7 +137,7 @@ def test_centralized_findings_sync_and_dashboard():
     assert sync_data["new_findings_created"] > 0
 
     # 4. Fetch Dashboard Summary
-    dash_res = client.get(f"/api/findings/{eng_id}/dashboard-summary")
+    dash_res = client.get(f"/api/findings/{eng_id}/dashboard-summary", headers=headers)
     assert dash_res.status_code == 200
     summary = dash_res.json()
     assert summary["total_findings"] >= 3
@@ -146,7 +146,7 @@ def test_centralized_findings_sync_and_dashboard():
     assert "Statutory & Tax Rules" in summary["by_module"] or "Duplicate & Sequence Engine" in summary["by_module"]
 
     # 5. Fetch Findings List with filters
-    list_res = client.get(f"/api/findings/{eng_id}?sort_by=risk_score_desc")
+    list_res = client.get(f"/api/findings/{eng_id}?sort_by=risk_score_desc", headers=headers)
     assert list_res.status_code == 200
     findings = list_res.json()
     assert len(findings) >= 3
@@ -160,7 +160,7 @@ def test_centralized_findings_sync_and_dashboard():
     finding_id = first_finding["id"]
 
     # 6. Fetch Detail for Single Finding
-    detail_res = client.get(f"/api/findings/detail/{finding_id}")
+    detail_res = client.get(f"/api/findings/detail/{finding_id}", headers=headers)
     assert detail_res.status_code == 200
     detail = detail_res.json()
     assert detail["id"] == finding_id
@@ -176,7 +176,7 @@ def test_centralized_findings_sync_and_dashboard():
     assert update_res.status_code == 200
 
     # Verify update persisted
-    verify_res = client.get(f"/api/findings/detail/{finding_id}")
+    verify_res = client.get(f"/api/findings/detail/{finding_id}", headers=headers)
     assert verify_res.status_code == 200
     v_data = verify_res.json()
     assert v_data["status"] == "Under Review"
@@ -192,7 +192,7 @@ def test_centralized_findings_sync_and_dashboard():
     assert "Recommended Substantive Audit Procedures" in ai_data["ai_explanation"]
 
     # 9. Test Filter by Status and Module
-    filter_res = client.get(f"/api/findings/{eng_id}?status=Under%20Review")
+    filter_res = client.get(f"/api/findings/{eng_id}?status=Under%20Review", headers=headers)
     assert filter_res.status_code == 200
     assert len(filter_res.json()) >= 1
 

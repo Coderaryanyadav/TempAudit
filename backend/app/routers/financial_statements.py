@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends, Response
 from pydantic import BaseModel
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.services.financial_statement_analysis_engine import run_financial_statement_analysis
 
@@ -17,8 +17,9 @@ class SaveExplanationRequest(BaseModel):
     review_status: str = "Reviewed"  # 'In Review', 'Reviewed', 'Flagged'
 
 @router.get("/{engagement_id}")
-def get_financial_statements(engagement_id: int):
+def get_financial_statements(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """Generates Schedule III Balance Sheet, P&L, Cash Flow, and deterministic ratio comparison."""
+    require_engagement_access(engagement_id, current_user)
     try:
         return run_financial_statement_analysis(engagement_id)
     except Exception as e:
@@ -31,6 +32,7 @@ def save_auditor_explanation(
     current_user: dict = Depends(get_current_user)
 ):
     """Saves or updates an auditor's working-paper explanation for a significant movement."""
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     eng_row = conn.execute("SELECT financial_year FROM engagements WHERE id = ?", (engagement_id,)).fetchone()
     if not eng_row:
@@ -69,8 +71,9 @@ def save_auditor_explanation(
     return {"success": True, "message": "Auditor explanation saved successfully."}
 
 @router.get("/{engagement_id}/report/download")
-def download_financial_analysis_report(engagement_id: int):
+def download_financial_analysis_report(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """Generates and downloads a comprehensive CSV Financial Statement Analysis report."""
+    require_engagement_access(engagement_id, current_user)
     try:
         data = run_financial_statement_analysis(engagement_id)
     except Exception as e:

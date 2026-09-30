@@ -302,14 +302,13 @@ def detect_duplicates_and_gaps(engagement_id: int) -> Dict[str, Any]:
     duplicate_pairs.sort(key=lambda p: (p["similarity_pct"], p["tx_a"]["amount"]), reverse=True)
 
     for p in duplicate_pairs:
-        g_code = f"D{group_counter:03d}"
-        group_counter += 1
-
         tx_a = p["tx_a"]
         tx_b = p["tx_b"]
+        g_code = f"DUP-{min(tx_a['id'], tx_b['id'])}-{max(tx_a['id'], tx_b['id'])}"
+        group_counter += 1
 
-        # Check if reviewed
-        rev_a = dup_reviews_map.get((g_code, tx_b["id"]), {})
+        # Check if reviewed by deterministic code or transaction IDs
+        rev_a = dup_reviews_map.get((g_code, tx_b["id"])) or dup_reviews_map.get((f"D{group_counter:03d}", tx_b["id"]), {})
         status = rev_a.get("status", "Unreviewed")
         auditor_comment = rev_a.get("auditor_comment", "")
         reviewed_by = rev_a.get("reviewed_by")

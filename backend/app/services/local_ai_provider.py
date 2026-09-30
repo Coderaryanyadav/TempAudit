@@ -289,6 +289,33 @@ AVAILABLE_ENGINES = [
     }
 ]
 
+from urllib.parse import urlparse
+
+def is_valid_loopback_endpoint(endpoint: str) -> bool:
+    """
+    Strictly verifies endpoint is genuine loopback/local transport (Flaw 21):
+    Allows only:
+    - scheme http/https with hostname in ('localhost', '127.0.0.1', '::1') without userinfo
+    - scheme local://
+    """
+    if not endpoint:
+        return False
+    if endpoint.startswith("local://"):
+        return True
+    try:
+        parsed = urlparse(endpoint)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        # Reject userinfo trick (e.g., http://localhost@evil.com)
+        if parsed.username or parsed.password:
+            return False
+        hostname = (parsed.hostname or "").lower()
+        if hostname in ("localhost", "127.0.0.1", "::1"):
+            return True
+        return False
+    except Exception:
+        return False
+
 class LocalAIModelManager:
     @classmethod
     def get_config(cls) -> Dict[str, Any]:
@@ -300,6 +327,9 @@ class LocalAIModelManager:
             try:
                 loaded = json.loads(row["value"])
                 config = {**DEFAULT_AI_CONFIG, **loaded}
+                # Validate model_location on load
+                if not is_valid_loopback_endpoint(config.get("model_location", "")):
+                    config["model_location"] = "http://localhost:1234"
                 return config
             except Exception:
                 pass
@@ -307,8 +337,10 @@ class LocalAIModelManager:
 
     @classmethod
     def save_config(cls, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Saves AI config to app_settings table."""
+        """Saves AI config to app_settings table with strict loopback validation."""
         merged = {**cls.get_config(), **config}
+        if not is_valid_loopback_endpoint(merged.get("model_location", "")):
+            merged["model_location"] = "http://localhost:1234"
         now_str = datetime.now().isoformat()
         conn = get_db_connection()
         conn.execute("""
@@ -329,8 +361,8 @@ class LocalAIModelManager:
         endpoint = config.get("model_location", "http://localhost:1234")
         model_name = config.get("model_name", "local-model")
 
-        # Strict offline localhost verification (prevent external cloud URLs)
-        if not endpoint.startswith("http://localhost") and not endpoint.startswith("http://127.0.0.1") and not endpoint.startswith("local://"):
+        # Strict offline localhost verification (prevent external cloud URLs - Flaw 21)
+        if not is_valid_loopback_endpoint(endpoint):
             endpoint = "http://localhost:1234"
 
         if engine == "LMStudio":

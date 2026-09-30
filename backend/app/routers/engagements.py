@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime
 from typing import List, Optional
 from backend.app.schemas import EngagementCreate, EngagementUpdate, DuplicateEngagementRequest
-from backend.app.auth import get_current_user, require_role
+from backend.app.auth import get_current_user, require_role, require_engagement_access
 from backend.app.database import get_db_connection
 
 router = APIRouter(prefix="/api/engagements", tags=["Audit Engagements Management"])
@@ -32,6 +32,9 @@ def get_dashboard_summary_stats(
     current_user: dict = Depends(get_current_user)
 ):
     """Provides high-level dashboard metrics across engagements and for active engagement."""
+    if engagement_id:
+        require_engagement_access(engagement_id, current_user)
+
     conn = get_db_connection()
     try:
         # 1. Total Active Clients
@@ -106,6 +109,8 @@ def get_comprehensive_dashboard_route(
     current_user: dict = Depends(get_current_user)
 ):
     """Returns complete real database metrics across all dashboard cards, sections, charts, and drill-down datasets."""
+    if engagement_id:
+        require_engagement_access(engagement_id, current_user)
     try:
         return DashboardService.get_comprehensive_dashboard(engagement_id)
     except Exception as e:
@@ -117,6 +122,7 @@ def get_engagement_comprehensive_dashboard_route(
     current_user: dict = Depends(get_current_user)
 ):
     """Returns comprehensive dashboard data for a specific engagement."""
+    require_engagement_access(engagement_id, current_user)
     try:
         return DashboardService.get_comprehensive_dashboard(engagement_id)
     except Exception as e:
@@ -165,6 +171,12 @@ def list_engagements(
         elif not include_archived:
             query += " AND e.status != 'Archived'"
 
+        # If user is Audit Staff, only return engagements where assigned or lead
+        if current_user.get("role") not in ["Admin", "Auditor"]:
+            user_id = current_user.get("id")
+            query += " AND (e.lead_auditor_id = ? OR e.assigned_staff_id = ?)"
+            params.extend([user_id, user_id])
+
         query += " ORDER BY e.id DESC"
         rows = conn.execute(query, tuple(params)).fetchall()
 
@@ -184,6 +196,7 @@ def get_engagement_details(
     current_user: dict = Depends(get_current_user)
 ):
     """Retrieve detailed engagement record with isolated summary metrics."""
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     try:
         row = conn.execute("""
@@ -280,6 +293,7 @@ def create_engagement(eng_data: EngagementCreate, current_user: dict = Depends(r
 @router.put("/{engagement_id}")
 def update_engagement(engagement_id: int, eng_data: EngagementUpdate, current_user: dict = Depends(require_role(["Admin", "Auditor"]))):
     """Update engagement configuration, dates, auditor assignments, or notes."""
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     eng = conn.execute("SELECT * FROM engagements WHERE id = ?", (engagement_id,)).fetchone()
     if not eng:
@@ -366,6 +380,7 @@ def update_engagement(engagement_id: int, eng_data: EngagementUpdate, current_us
 @router.put("/{engagement_id}/status")
 def update_engagement_status(engagement_id: int, status: str, current_user: dict = Depends(require_role(["Admin", "Auditor"]))):
     """Change engagement status (Draft, In Progress, Under Review, Completed, Archived)."""
+    require_engagement_access(engagement_id, current_user)
     if status not in VALID_STATUSES:
         raise HTTPException(status_code=400, detail=f"Invalid status. Choose from: {VALID_STATUSES}")
 
@@ -402,6 +417,7 @@ def duplicate_engagement_structure(req: DuplicateEngagementRequest, current_user
     Duplicates the audit engagement structure from a prior financial year into a new year.
     Clones checklists and working paper templates while keeping transaction data clean and isolated.
     """
+    require_engagement_access(req.source_engagement_id, current_user)
     conn = get_db_connection()
     src_row = conn.execute("SELECT * FROM engagements WHERE id = ?", (req.source_engagement_id,)).fetchone()
     if not src_row:
@@ -472,11 +488,12 @@ def duplicate_engagement_structure(req: DuplicateEngagementRequest, current_user
 
     # Log action
     conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'DUPLICATE_ENGAGEMENT', 'engagement', ?, ?, ?)
+    INSERT INTO audit_logs (user_id, username, action, module, record_id, engagement_id, details, timestamp)
+    VALUES (?, ?, 'DUPLICATE_ENGAGEMENT', 'ENGAGEMENTS', ?, ?, ?, ?)
     """, (
         current_user.get("id"),
         current_user.get("username"),
+        new_engagement_id,
         new_engagement_id,
         f"Duplicated structure from Engagement #{req.source_engagement_id} (FY {src_eng['financial_year']}) to FY {target_fy}: {cloned_checklists} checklists, {cloned_wps} WPs.",
         now_str

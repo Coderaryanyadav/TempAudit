@@ -1,6 +1,6 @@
 import re
 import json
-from datetime import datetime
+from datetime import datetime, date
 from typing import Dict, Any, List, Tuple, Optional
 
 GSTIN_PATTERN = r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
@@ -19,6 +19,16 @@ MONTH_MAP = {
     "nov": "11", "november": "11",
     "dec": "12", "december": "12"
 }
+
+def is_valid_calendar_date(y: int, m: int, d: int) -> bool:
+    """Verifies that the year, month, and day form a legitimate calendar date."""
+    try:
+        if y < 1900 or y > 2100:
+            return False
+        date(y, m, d)
+        return True
+    except (ValueError, OverflowError):
+        return False
 
 def clean_whitespace(val: Any) -> str:
     """Removes non-breaking spaces, zero-width spaces, and collapses multiple spaces into single space."""
@@ -44,7 +54,7 @@ def normalize_date(raw_val: Any) -> Tuple[str, str, int, float]:
     m_iso = re.match(r'^(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})(?:[T ].*)?$', raw)
     if m_iso:
         y, m, d = int(m_iso.group(1)), int(m_iso.group(2)), int(m_iso.group(3))
-        if 1 <= m <= 12 and 1 <= d <= 31:
+        if is_valid_calendar_date(y, m, d):
             norm = f"{y:04d}-{m:02d}-{d:02d}"
             return norm, "ISO_STANDARD", 0, 1.0
 
@@ -55,10 +65,11 @@ def normalize_date(raw_val: Any) -> Tuple[str, str, int, float]:
         mon_str = m_text.group(2).lower()
         y_str = m_text.group(3)
         y = int(f"20{y_str}" if len(y_str) == 2 and int(y_str) < 50 else (f"19{y_str}" if len(y_str) == 2 else y_str))
-        if mon_str in MONTH_MAP and 1 <= d <= 31:
+        if mon_str in MONTH_MAP:
             m = int(MONTH_MAP[mon_str])
-            norm = f"{y:04d}-{m:02d}-{d:02d}"
-            return norm, "DATE_TEXT_MONTH", 0, 1.0
+            if is_valid_calendar_date(y, m, d):
+                norm = f"{y:04d}-{m:02d}-{d:02d}"
+                return norm, "DATE_TEXT_MONTH", 0, 1.0
 
     # 2b. Month text first: "Apr 01, 2026", "April 1, 2026"
     m_text2 = re.match(r'^([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{2,4})$', raw)
@@ -67,10 +78,11 @@ def normalize_date(raw_val: Any) -> Tuple[str, str, int, float]:
         d = int(m_text2.group(2))
         y_str = m_text2.group(3)
         y = int(f"20{y_str}" if len(y_str) == 2 and int(y_str) < 50 else (f"19{y_str}" if len(y_str) == 2 else y_str))
-        if mon_str in MONTH_MAP and 1 <= d <= 31:
+        if mon_str in MONTH_MAP:
             m = int(MONTH_MAP[mon_str])
-            norm = f"{y:04d}-{m:02d}-{d:02d}"
-            return norm, "DATE_MONTH_FIRST_TEXT", 0, 1.0
+            if is_valid_calendar_date(y, m, d):
+                norm = f"{y:04d}-{m:02d}-{d:02d}"
+                return norm, "DATE_MONTH_FIRST_TEXT", 0, 1.0
 
     # 3. Numeric Day-Month-Year: e.g. "01/04/2026", "01-04-2026", "1.4.26"
     m_dmy = re.match(r'^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})$', raw)
@@ -82,23 +94,24 @@ def normalize_date(raw_val: Any) -> Tuple[str, str, int, float]:
         if part1 <= 12 and part2 <= 12:
             # Default Indian CA accounting standard: DD/MM/YYYY
             d, m = part1, part2
-            norm = f"{y:04d}-{m:02d}-{d:02d}"
-            # Flag as questionable if both day and month are ambiguous (different values)
-            is_quest = 1 if part1 != part2 else 0
-            conf = 0.85 if is_quest else 1.0
-            return norm, "DATE_INDIAN_DMY_AMBIGUOUS" if is_quest else "DATE_INDIAN_DMY", is_quest, conf
+            if is_valid_calendar_date(y, m, d):
+                norm = f"{y:04d}-{m:02d}-{d:02d}"
+                # Flag as questionable if both day and month are ambiguous (different values)
+                is_quest = 1 if part1 != part2 else 0
+                conf = 0.85 if is_quest else 1.0
+                return norm, "DATE_INDIAN_DMY_AMBIGUOUS" if is_quest else "DATE_INDIAN_DMY", is_quest, conf
 
         # If part1 > 12 -> Must be Day (DD/MM/YYYY)
         if part1 > 12 and part2 <= 12:
             d, m = part1, part2
-            if 1 <= d <= 31:
+            if is_valid_calendar_date(y, m, d):
                 norm = f"{y:04d}-{m:02d}-{d:02d}"
                 return norm, "DATE_DAY_FIRST_DMY", 0, 1.0
 
         # If part2 > 12 -> Must be Month-first (MM/DD/YYYY)
         if part1 <= 12 and part2 > 12:
             m, d = part1, part2
-            if 1 <= d <= 31:
+            if is_valid_calendar_date(y, m, d):
                 norm = f"{y:04d}-{m:02d}-{d:02d}"
                 return norm, "DATE_MONTH_FIRST_MDY", 0, 0.95
 
@@ -106,12 +119,12 @@ def normalize_date(raw_val: Any) -> Tuple[str, str, int, float]:
     if re.match(r'^\d{8}$', raw):
         if raw.startswith("20") or raw.startswith("19"):
             y, m, d = int(raw[:4]), int(raw[4:6]), int(raw[6:8])
-            if 1 <= m <= 12 and 1 <= d <= 31:
+            if is_valid_calendar_date(y, m, d):
                 norm = f"{y:04d}-{m:02d}-{d:02d}"
                 return norm, "DATE_COMPACT_ISO", 0, 1.0
         else:
             d, m, y = int(raw[:2]), int(raw[2:4]), int(raw[4:8])
-            if 1 <= m <= 12 and 1 <= d <= 31:
+            if is_valid_calendar_date(y, m, d):
                 norm = f"{y:04d}-{m:02d}-{d:02d}"
                 return norm, "DATE_COMPACT_DMY", 1, 0.85
 

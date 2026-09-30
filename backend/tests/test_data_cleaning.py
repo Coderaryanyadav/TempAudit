@@ -156,7 +156,7 @@ class TestDataCleaningAndNormalization(unittest.TestCase):
         res = self.client.post("/api/cleaning/normalize-preview", json={
             "field_name": "date",
             "raw_value": "01-Apr-2026"
-        })
+        }, headers=self.headers)
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data["normalized_value"], "2026-04-01")
@@ -189,13 +189,13 @@ class TestDataCleaningAndNormalization(unittest.TestCase):
         conn.close()
 
         # 1. Check summary endpoint
-        res = self.client.get(f"/api/cleaning/summary/{eng_id}")
+        res = self.client.get(f"/api/cleaning/summary/{eng_id}", headers=self.headers)
         self.assertEqual(res.status_code, 200)
         summary = res.json()
         self.assertGreaterEqual(summary["total_transformations"], 1)
 
         # 2. Check list logs endpoint
-        res = self.client.get(f"/api/cleaning/logs/{eng_id}")
+        res = self.client.get(f"/api/cleaning/logs/{eng_id}", headers=self.headers)
         self.assertEqual(res.status_code, 200)
         logs_data = res.json()
         self.assertGreaterEqual(logs_data["total"], 1)

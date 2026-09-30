@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from backend.app.schemas import FindingUpdate, FindingCreateCustom
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.audit_engine.engine import HybridAuditEngine
 from backend.app.services.centralized_findings_engine import CentralizedFindingsEngine
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/findings", tags=["Audit Findings & Risk Manageme
 @router.post("/run-engine/{engagement_id}")
 def run_hybrid_audit(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """Triggers hybrid audit engine and synchronizes into centralized findings."""
+    require_engagement_access(engagement_id, current_user)
     try:
         engine = HybridAuditEngine(engagement_id)
         results = engine.execute_audit()
@@ -32,6 +33,7 @@ def sync_all_findings(engagement_id: int, current_user: dict = Depends(get_curre
      Trial Balance, General Ledger, BRS, and GST Reconciliations) and calculates
     deterministic explainable risk scores.
     """
+    require_engagement_access(engagement_id, current_user)
     try:
         sync_result = CentralizedFindingsEngine.sync_all_engagement_findings(engagement_id)
         return {
@@ -45,12 +47,13 @@ def sync_all_findings(engagement_id: int, current_user: dict = Depends(get_curre
         raise HTTPException(status_code=500, detail=f"Failed to synchronize findings: {str(e)}")
 
 @router.get("/{engagement_id}/dashboard-summary")
-def get_findings_dashboard_summary(engagement_id: int):
+def get_findings_dashboard_summary(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns executive metrics for the findings dashboard:
     Total Findings, Open Findings, High Risk, Critical, Resolved, Under Review,
     and breakdowns by module & severity.
     """
+    require_engagement_access(engagement_id, current_user)
     try:
         summary = CentralizedFindingsEngine.get_dashboard_summary(engagement_id)
         return summary
@@ -68,11 +71,13 @@ def get_findings(
     search: Optional[str] = None,
     min_risk_score: Optional[float] = None,
     max_risk_score: Optional[float] = None,
-    sort_by: Optional[str] = Query("risk_score_desc", description="risk_score_desc, severity_desc, created_desc, id_asc")
+    sort_by: Optional[str] = Query("risk_score_desc", description="risk_score_desc, severity_desc, created_desc, id_asc"),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieves centralized audit findings with comprehensive filtering, search, and sorting.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     query = "SELECT * FROM audit_findings WHERE engagement_id = ?"
     params = [engagement_id]
@@ -146,7 +151,7 @@ def get_findings(
     return findings
 
 @router.get("/detail/{finding_id}")
-def get_finding_detail(finding_id: int):
+def get_finding_detail(finding_id: int, current_user: dict = Depends(get_current_user)):
     """Retrieves single finding detail with full affected transaction records and evidence."""
     conn = get_db_connection()
     row = conn.execute("SELECT * FROM audit_findings WHERE id = ?", (finding_id,)).fetchone()
@@ -155,6 +160,7 @@ def get_finding_detail(finding_id: int):
         raise HTTPException(status_code=404, detail="Finding not found")
 
     finding = dict(row)
+    require_engagement_access(finding["engagement_id"], current_user)
     try:
         finding["affected_records"] = json.loads(finding.get("affected_records_json") or "[]")
     except Exception:
@@ -191,6 +197,8 @@ def update_finding(finding_id: int, update_data: FindingUpdate, current_user: di
     if not finding_row:
         conn.close()
         raise HTTPException(status_code=404, detail="Finding not found")
+
+    require_engagement_access(finding_row["engagement_id"], current_user)
 
     updates = []
     params = []
@@ -265,6 +273,7 @@ def get_finding_ai_explanation(finding_id: int, current_user: dict = Depends(get
         raise HTTPException(status_code=404, detail="Finding not found")
 
     finding = dict(row)
+    require_engagement_access(finding["engagement_id"], current_user)
     try:
         risk_factors = json.loads(finding.get("risk_factors_json") or "{}")
     except Exception:
@@ -316,11 +325,21 @@ def get_finding_ai_explanation(finding_id: int, current_user: dict = Depends(get
 @router.post("/custom")
 def create_custom_finding(finding_in: FindingCreateCustom, current_user: dict = Depends(get_current_user)):
     """Allows an auditor to record a manual audit observation with deterministic risk calculation."""
+    require_engagement_access(finding_in.engagement_id, current_user)
     conn = get_db_connection()
     eng_row = conn.execute("SELECT * FROM engagements WHERE id = ?", (finding_in.engagement_id,)).fetchone()
     if not eng_row:
         conn.close()
         raise HTTPException(status_code=404, detail="Engagement not found")
+
+    # Validate that affected records belong to this engagement
+    if finding_in.affected_records:
+        t_ids = [int(x) for x in finding_in.affected_records if str(x).isdigit()]
+        if t_ids:
+            cnt = conn.execute(f"SELECT COUNT(*) as c FROM transactions WHERE engagement_id = ? AND id IN ({','.join('?' for _ in t_ids)})", (finding_in.engagement_id, *t_ids)).fetchone()["c"]
+            if cnt != len(t_ids):
+                conn.close()
+                raise HTTPException(status_code=400, detail="One or more affected records do not belong to this engagement.")
 
     eng_dict = dict(eng_row)
     materiality_thresh = float(eng_dict.get("materiality_threshold") or 50000.0)
@@ -406,6 +425,7 @@ def create_custom_finding(finding_in: FindingCreateCustom, current_user: dict = 
 @router.get("/{engagement_id}/export/csv")
 def export_findings_csv(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """Exports complete audit findings register to CSV."""
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute("""
         SELECT finding_code, module, category, severity, risk_score, title, description,

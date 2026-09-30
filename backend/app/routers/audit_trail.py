@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
-from backend.app.auth import get_current_user, require_role
+from backend.app.auth import get_current_user, require_role, require_engagement_access
 from backend.app.database import DB_PATH, get_db_connection
 from backend.app.utils.audit_logger import log_audit_event
 
@@ -50,6 +50,9 @@ def get_audit_trail(
     Search and filter append-oriented immutable audit logs with multi-parameter criteria.
     Supports full-text search, action/module/user/date filtering, and pagination.
     """
+    if engagement_id:
+        require_engagement_access(engagement_id, current_user)
+
     conn = get_db_connection()
     conditions = ["1=1"]
     params = []
@@ -107,7 +110,7 @@ def get_audit_trail(
     # Fetch page items
     data_query = f"""
         SELECT id, timestamp, user_id, username, action, module, record_id, 
-               old_value, new_value, details, engagement_id, ip_address
+               old_value, new_value, details, engagement_id, ip_address, previous_hash, entry_hash
         FROM audit_logs
         {where_clause}
         ORDER BY id DESC
@@ -256,7 +259,7 @@ def export_audit_trail_csv(
     where_clause = " WHERE " + " AND ".join(conditions)
     rows = conn.execute(f"""
         SELECT id, timestamp, username, action, module, record_id, 
-               old_value, new_value, details, engagement_id, ip_address
+               old_value, new_value, details, engagement_id, ip_address, entry_hash
         FROM audit_logs
         {where_clause}
         ORDER BY id DESC
@@ -276,7 +279,7 @@ def export_audit_trail_csv(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Log ID", "Timestamp (ISO)", "User", "Action", "Module", "Record ID", "Old Value", "New Value", "Details", "Engagement ID", "IP Address"])
+    writer.writerow(["Log ID", "Timestamp (ISO)", "User", "Action", "Module", "Record ID", "Old Value", "New Value", "Details", "Engagement ID", "IP Address", "Entry Hash"])
 
     for r in rows:
         writer.writerow([
@@ -290,7 +293,8 @@ def export_audit_trail_csv(
             r["new_value"] or "",
             r["details"] or "",
             r["engagement_id"] or "",
-            r["ip_address"] or ""
+            r["ip_address"] or "",
+            r["entry_hash"] or ""
         ])
 
     csv_data = output.getvalue()
@@ -352,7 +356,7 @@ def export_audit_trail_json(
     where_clause = " WHERE " + " AND ".join(conditions)
     rows = conn.execute(f"""
         SELECT id, timestamp, username, user_id, action, module, record_id, 
-               old_value, new_value, details, engagement_id, ip_address
+               old_value, new_value, details, engagement_id, ip_address, entry_hash
         FROM audit_logs
         {where_clause}
         ORDER BY id DESC
@@ -559,6 +563,8 @@ def restore_database_backup(filename: str, current_user: dict = Depends(require_
     }
 
 
+MAX_RESTORE_SIZE = 100 * 1024 * 1024  # 100MB max database upload limit
+
 @router.post("/backup/restore-upload")
 async def restore_database_upload(
     file: UploadFile = File(...),
@@ -566,7 +572,7 @@ async def restore_database_upload(
 ):
     """
     Admin: Upload an external SQLite .db file and restore the local database from it using SQLite Online Backup API.
-    Automatically creates a pre-restore safety snapshot before replacing active DB.
+    Automatically creates a pre-restore safety snapshot before replacing active DB. Enforces 100MB size limit.
     """
     if not file.filename.endswith(".db") and not file.filename.endswith(".sqlite"):
         raise HTTPException(status_code=400, detail="Only .db or .sqlite database files are accepted.")
@@ -575,8 +581,16 @@ async def restore_database_upload(
     uploaded_backup_filename = f"uploaded_restore_{timestamp}_{os.path.basename(file.filename)}"
     uploaded_filepath = os.path.join(BACKUP_DIR, uploaded_backup_filename)
 
+    total_size = 0
     with open(uploaded_filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        while chunk := await file.read(1024 * 1024):  # 1MB chunks
+            total_size += len(chunk)
+            if total_size > MAX_RESTORE_SIZE:
+                buffer.close()
+                if os.path.exists(uploaded_filepath):
+                    os.remove(uploaded_filepath)
+                raise HTTPException(status_code=413, detail="Database file exceeds maximum allowed upload size (100MB).")
+            buffer.write(chunk)
 
     try:
         test_conn = sqlite3.connect(uploaded_filepath)

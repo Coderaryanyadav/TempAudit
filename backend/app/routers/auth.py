@@ -8,7 +8,7 @@ from backend.app.schemas import (
 )
 from backend.app.auth import (
     verify_password, hash_password, create_access_token,
-    get_current_user, require_role, normalize_role
+    get_current_user, require_role, normalize_role, invalidate_user_sessions
 )
 from backend.app.database import get_db_connection
 
@@ -57,7 +57,8 @@ def login(creds: UserLogin):
     conn.commit()
     conn.close()
 
-    token = create_access_token({"sub": user["username"], "role": role, "uid": user["id"]})
+    user_dict = dict(user)
+    token = create_access_token({"sub": user_dict["username"], "role": role, "uid": user_dict["id"], "token_version": user_dict.get("token_version", 1)})
 
     return {
         "access_token": token,
@@ -76,7 +77,8 @@ def login(creds: UserLogin):
 
 @router.post("/logout")
 def logout(current_user: dict = Depends(get_current_user)):
-    """Log the logout event in the audit trail."""
+    """Log the logout event in the audit trail and invalidate user session."""
+    invalidate_user_sessions(current_user["id"])
     conn = get_db_connection()
     log_audit_event(
         conn,
@@ -120,7 +122,7 @@ def get_me(current_user: dict = Depends(get_current_user)):
 
 @router.post("/change-password")
 def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
-    """Change password for currently authenticated user."""
+    """Change password for currently authenticated user and invalidate old tokens."""
     conn = get_db_connection()
     user = conn.execute("SELECT * FROM users WHERE id = ?", (current_user["id"],)).fetchone()
     
@@ -135,7 +137,9 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
     new_hash = hash_password(req.new_password)
     now_str = datetime.now().isoformat()
     
-    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user["id"]))
+    # Increment token_version so all older tokens become invalid (Flaw 28)
+    new_version = (user["token_version"] or 1) + 1
+    conn.execute("UPDATE users SET password_hash = ?, token_version = ? WHERE id = ?", (new_hash, new_version, user["id"]))
     conn.execute("""
     INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
     VALUES (?, ?, 'CHANGE_PASSWORD', 'user', ?, 'User updated account password', ?)
@@ -143,7 +147,7 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
     
     conn.commit()
     conn.close()
-    return {"message": "Password changed successfully"}
+    return {"message": "Password changed successfully. Please log in with your new password."}
 
 # ----------------- ADMIN USER MANAGEMENT -----------------
 
@@ -271,7 +275,7 @@ def toggle_user_status(user_id: int, status_req: UserStatusUpdate, current_user:
     new_status = 1 if status_req.is_active else 0
     now_str = datetime.now().isoformat()
 
-    conn.execute("UPDATE users SET is_active = ? WHERE id = ?", (new_status, user_id))
+    conn.execute("UPDATE users SET is_active = ?, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (new_status, user_id))
     action_desc = "Enabled" if new_status else "Disabled"
     conn.execute("""
     INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
@@ -297,7 +301,7 @@ def admin_reset_password(user_id: int, req: AdminResetPasswordRequest, current_u
     new_hash = hash_password(req.new_password)
     now_str = datetime.now().isoformat()
 
-    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
+    conn.execute("UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (new_hash, user_id))
     conn.execute("""
     INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
     VALUES (?, ?, 'ADMIN_RESET_PASSWORD', 'user', ?, ?, ?)

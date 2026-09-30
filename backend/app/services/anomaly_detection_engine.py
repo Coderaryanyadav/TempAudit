@@ -4,6 +4,7 @@ import json
 import io
 import csv
 from datetime import datetime
+import hashlib
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 from sklearn.ensemble import IsolationForest
@@ -671,13 +672,12 @@ def detect_all_anomalies(engagement_id: int) -> Dict[str, Any]:
     # Sort candidates by Anomaly Score descending
     anomaly_candidates.sort(key=lambda x: x["anomaly_score"], reverse=True)
 
-    # Format structured output with unique Anomaly ID (ANOM-001, ANOM-002, ...)
+    # Format structured output with unique, immutable Anomaly ID tied to transaction ID and pattern
     formatted_anomalies: List[Dict[str, Any]] = []
-    anom_counter = 1
 
     for c in anomaly_candidates:
-        anom_id = f"ANOM-{anom_counter:03d}"
-        anom_counter += 1
+        pattern_hash = hashlib.sha256(c["pattern_type"].encode("utf-8")).hexdigest()[:6].upper()
+        anom_id = f"ANOM-TX{c['transaction_id']}-{pattern_hash}"
 
         tx_obj = tx_by_id.get(c["transaction_id"], {})
         

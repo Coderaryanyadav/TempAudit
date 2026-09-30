@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
 from backend.app.schemas import CleaningLogReviewRequest, NormalizationPreviewRequest
-from backend.app.auth import get_current_user, require_role
+from backend.app.auth import get_current_user, require_role, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.services.data_normalizer import (
     normalize_date,
@@ -16,8 +16,9 @@ from backend.app.services.data_normalizer import (
 router = APIRouter(prefix="/api/cleaning", tags=["Data Cleaning & Normalization"])
 
 @router.get("/summary/{engagement_id}")
-def get_cleaning_summary(engagement_id: int):
+def get_cleaning_summary(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """Returns aggregated summary metrics of all automatic and reviewed data transformations."""
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     
     total = conn.execute("SELECT COUNT(*) as c FROM data_cleaning_logs WHERE engagement_id = ?", (engagement_id,)).fetchone()["c"]
@@ -65,9 +66,13 @@ def list_cleaning_logs(
     review_status: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = 100,
-    offset: int = 0
+    offset: int = 0,
+    current_user: dict = Depends(get_current_user)
 ):
     """Lists data cleaning and normalization transformation logs with multi-criteria filtering."""
+    require_engagement_access(engagement_id, current_user)
+    limit = min(max(1, limit), 500)
+    offset = max(0, offset)
     conn = get_db_connection()
     query = """
         SELECT l.*, f.file_name, t.voucher_no as txn_voucher, t.ledger as txn_ledger
@@ -138,6 +143,7 @@ def review_cleaning_log(
         raise HTTPException(status_code=404, detail="Cleaning log record not found.")
 
     log = dict(log_row)
+    require_engagement_access(log["engagement_id"], current_user)
     now_str = datetime.now().isoformat()
 
     new_normalized_val = log["normalized_value"]
@@ -205,7 +211,7 @@ def review_cleaning_log(
     }
 
 @router.post("/normalize-preview")
-def test_normalization_preview(req: NormalizationPreviewRequest):
+def test_normalization_preview(req: NormalizationPreviewRequest, current_user: dict = Depends(get_current_user)):
     """
     Interactive test tool for auditors to preview how a raw string is deterministically
     cleaned and transformed according to FinAuditPro normalization rules.

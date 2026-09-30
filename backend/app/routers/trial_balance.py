@@ -1,9 +1,10 @@
 import io
 import csv
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Depends, Response
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.services.trial_balance_analyzer import analyze_trial_balance, get_ai_explanation_for_exception
 
@@ -17,11 +18,12 @@ class AIExplainRequest(BaseModel):
     sa_reference: Optional[str] = None
 
 @router.get("/{engagement_id}")
-def get_trial_balance(engagement_id: int):
+def get_trial_balance(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns the comprehensive Trial Balance along with all 12 deterministic audit checks,
     exceptions list, difference calculation, and risk summary.
     """
+    require_engagement_access(engagement_id, current_user)
     result = analyze_trial_balance(engagement_id)
     
     # Maintain backward compatibility with existing frontend `ledgers` field
@@ -44,17 +46,19 @@ def get_trial_balance(engagement_id: int):
     return result
 
 @router.get("/{engagement_id}/analysis")
-def get_trial_balance_analysis(engagement_id: int):
+def get_trial_balance_analysis(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns only the 12 deterministic audit checks, risk summary, and exception breakdown.
     """
+    require_engagement_access(engagement_id, current_user)
     return analyze_trial_balance(engagement_id)
 
 @router.get("/{engagement_id}/ledger-drilldown")
-def get_ledger_drilldown(engagement_id: int, ledger_name: str):
+def get_ledger_drilldown(engagement_id: int, ledger_name: str, current_user: dict = Depends(get_current_user)):
     """
     Returns chronological transaction ledger statement for drilldown inspection.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute("""
         SELECT * FROM transactions
@@ -88,11 +92,12 @@ def get_ledger_drilldown(engagement_id: int, ledger_name: str):
     }
 
 @router.post("/{engagement_id}/ai-explain")
-def explain_trial_balance_exception(engagement_id: int, req: AIExplainRequest):
+def explain_trial_balance_exception(engagement_id: int, req: AIExplainRequest, current_user: dict = Depends(get_current_user)):
     """
     Provides local offline deterministic ICAI audit guidance and Standard on Auditing (SA)
     explanation for any specific trial balance exception.
     """
+    require_engagement_access(engagement_id, current_user)
     return get_ai_explanation_for_exception(
         check_id=req.check_id,
         context_data={
@@ -104,7 +109,7 @@ def explain_trial_balance_exception(engagement_id: int, req: AIExplainRequest):
     )
 
 @router.get("/{engagement_id}/report/download")
-def download_trial_balance_report(engagement_id: int):
+def download_trial_balance_report(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Generates and downloads a complete Trial Balance Analysis Report (CSV format)
     containing summary figures, tally verification, exception log, and account schedule.

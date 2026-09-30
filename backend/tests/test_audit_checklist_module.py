@@ -50,7 +50,7 @@ def test_checklist_generation_across_15_categories():
     assert gen_data["total_items"] >= 20
 
     # 3. Verify all 15 categories are present in summary
-    summary_res = client.get(f"/api/checklist/{eng_id}/summary")
+    summary_res = client.get(f"/api/checklist/{eng_id}/summary", headers=headers)
     assert summary_res.status_code == 200
     summary = summary_res.json()
     for cat in CHECKLIST_CATEGORIES:
@@ -98,7 +98,7 @@ def test_risk_findings_integration_in_checklist():
     assert gen_res.json()["risk_finding_procedures_count"] >= 1
 
     # Fetch checklist and check for the risk procedure
-    items_res = client.get(f"/api/checklist/{eng_id}?status=Requires%20Review")
+    items_res = client.get(f"/api/checklist/{eng_id}?status=Requires%20Review", headers=headers)
     assert items_res.status_code == 200
     req_items = items_res.json()
     assert len(req_items) >= 1

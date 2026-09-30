@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import FileResponse
 
 from backend.app.schemas import GenerateReportRequest
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.utils.pdf_generator import generate_audit_report_pdf, REPORT_TITLES
 
@@ -101,8 +101,9 @@ def list_report_types():
     return REPORT_DEFINITIONS
 
 @router.get("/{engagement_id}")
-def list_reports(engagement_id: int):
+def list_reports(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """Lists all previously generated PDF reports for the engagement."""
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute("SELECT * FROM reports WHERE engagement_id = ? ORDER BY id DESC", (engagement_id,)).fetchall()
     reports = [dict(r) for r in rows]
@@ -120,6 +121,7 @@ def generate_pdf_report(
     Generates a professional ICAI-compliant PDF report for the specified engagement.
     Supports all 10 specialized report types with traceable Finding IDs and SA 230 review notice.
     """
+    require_engagement_access(engagement_id, current_user)
     selected_type = (req.report_type if req and req.report_type else None) or report_type or "complete_audit_analysis"
     
     if selected_type not in REPORT_TITLES:
@@ -179,7 +181,7 @@ def generate_pdf_report(
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF report: {str(e)}")
 
 @router.get("/download/{report_id}")
-def download_report(report_id: int):
+def download_report(report_id: int, current_user: dict = Depends(get_current_user)):
     """Downloads the generated PDF report."""
     conn = get_db_connection()
     row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
@@ -187,6 +189,8 @@ def download_report(report_id: int):
     if not row:
         conn.close()
         raise HTTPException(status_code=404, detail="Report not found")
+
+    require_engagement_access(row["engagement_id"], current_user)
 
     file_path = row["file_path"]
     if not os.path.exists(file_path):
@@ -200,7 +204,8 @@ def download_report(report_id: int):
         module="REPORTS",
         record_id=report_id,
         engagement_id=row["engagement_id"],
-        details=f"Exported / downloaded PDF report '{row['report_title']}'"
+        details=f"Exported / downloaded PDF report '{row['report_title']}'",
+        user=current_user
     )
     conn.commit()
     conn.close()

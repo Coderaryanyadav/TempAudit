@@ -91,68 +91,10 @@ def run_sales_purchase_reconciliation(
     ledger_rows = conn.execute(ledger_query + " ORDER BY date ASC, id ASC", tuple(ledger_params)).fetchall()
     ledger_txs = [dict(r) for r in ledger_rows]
 
-    # If both are empty or user hasn't uploaded a separate register file yet,
-    # generate a realistic simulated register from engagement transactions with standard test exceptions
-    if not register_txs and not ledger_txs:
-        all_tx_rows = conn.execute("SELECT * FROM transactions WHERE engagement_id = ? ORDER BY date ASC, id ASC", (engagement_id,)).fetchall()
-        ledger_txs = [dict(r) for r in all_tx_rows]
-
-    if not register_txs and ledger_txs:
-        # Build register from ledger with intentional exceptions to audit
-        sim_reg = []
-        for idx, t in enumerate(ledger_txs):
-            dr = float(t.get("debit") or 0.0)
-            cr = float(t.get("credit") or 0.0)
-            amt = float(t.get("amount") or max(dr, cr))
-            inv = t.get("invoice_no") or t.get("voucher_no") or f"INV-2024-{100 + idx}"
-            pty = t.get("party_name") or "Apex Client Corp"
-            tax_amt = float(t.get("tax_amount") or round(amt * 0.18, 2))
-            gst = t.get("gstin") or "27AABCU9603R1ZM"
-
-            # Create simulated register record
-            reg_item = {
-                "id": 8000 + t["id"],
-                "date": t.get("date"),
-                "invoice_no": inv,
-                "voucher_no": inv,
-                "party_name": pty,
-                "description": t.get("description") or f"Invoice {inv}",
-                "amount": amt,
-                "debit": dr,
-                "credit": cr,
-                "tax_amount": tax_amt,
-                "gstin": gst,
-                "ledger": "Register Line"
-            }
-            sim_reg.append(reg_item)
-
-        # Inject standard audit exceptions into Register:
-        # Exception 1: Missing invoice in ledger (Unrecorded invoice in register)
-        sim_reg.append({
-            "id": 8991,
-            "date": "2024-05-18",
-            "invoice_no": "INV/2024/099",
-            "voucher_no": "INV/2024/099",
-            "party_name": "Zenith Infotech Ltd",
-            "description": "Custom software license billing",
-            "amount": 145000.0,
-            "debit": 0.0 if is_sales else 145000.0,
-            "credit": 145000.0 if is_sales else 0.0,
-            "tax_amount": 26100.0,
-            "gstin": "27AAACZ1234F1Z8",
-            "ledger": "Register Line"
-        })
-
-        # Exception 2: Duplicate invoice in register
-        if sim_reg:
-            dup_item = dict(sim_reg[0])
-            dup_item["id"] = 8992
-            sim_reg.append(dup_item)
-
-        register_txs = sim_reg
-
     if not title:
-        title = f"{recon_type} FY {conn.execute('SELECT financial_year FROM engagements WHERE id = ?', (engagement_id,)).fetchone()['financial_year'] or '2024-25'}"
+        eng_fy = conn.execute('SELECT financial_year FROM engagements WHERE id = ?', (engagement_id,)).fetchone()
+        fy_val = eng_fy['financial_year'] if eng_fy and eng_fy['financial_year'] else '2024-25'
+        title = f"{recon_type} FY {fy_val}"
 
     # 3. Comprehensive 11-Point Cross-Reconciliation Matching Engine
     exceptions_list: List[Dict[str, Any]] = []

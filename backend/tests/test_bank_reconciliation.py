@@ -41,12 +41,14 @@ class TestBankReconciliationModule(unittest.TestCase):
         # 2. High confidence payment (Rs 24,500)
         # 3. Unpresented cheque (Rs 80,000)
         cur.execute("""
-        INSERT INTO transactions (engagement_id, date, ledger, party_name, debit, credit, amount, voucher_no, description)
+        INSERT INTO transactions (engagement_id, date, ledger, party_name, debit, credit, amount, voucher_no, description, transaction_type)
         VALUES 
-        (?, '2024-05-10', 'HDFC Bank Account', 'Tech Supplies Ltd', 0.0, 50000.0, 50000.0, 'V-CHQ-1', 'Payment via Cheque 102450'),
-        (?, '2024-05-15', 'HDFC Bank Account', 'Reliance Digital', 0.0, 24500.0, 24500.0, 'V-NEFT-2', 'Office equipment purchase'),
-        (?, '2024-05-28', 'HDFC Bank Account', 'Vendor Unpresented', 0.0, 80000.0, 80000.0, 'V-CHQ-3', 'Cheque issued unpresented')
-        """, (eng_id, eng_id, eng_id))
+        (?, '2024-05-10', 'HDFC Bank Account', 'Tech Supplies Ltd', 0.0, 50000.0, 50000.0, 'V-CHQ-1', 'Payment via Cheque 102450', 'BOOK'),
+        (?, '2024-05-15', 'HDFC Bank Account', 'Reliance Digital', 0.0, 24500.0, 24500.0, 'V-NEFT-2', 'Office equipment purchase', 'BOOK'),
+        (?, '2024-05-28', 'HDFC Bank Account', 'Vendor Unpresented', 0.0, 80000.0, 80000.0, 'V-CHQ-3', 'Cheque issued unpresented', 'BOOK'),
+        (?, '2024-05-11', 'HDFC Bank Account', 'Tech Supplies Ltd', 50000.0, 0.0, 50000.0, 'CHQ 102450', 'CHQ 102450 Tech Supplies Ltd', 'BANK_STATEMENT'),
+        (?, '2024-05-16', 'HDFC Bank Account', 'Reliance Digital', 24500.0, 0.0, 24500.0, 'NEFT-REL-99', 'NEFT Reliance Digital', 'BANK_STATEMENT')
+        """, (eng_id, eng_id, eng_id, eng_id, eng_id))
         conn.commit()
         conn.close()
 

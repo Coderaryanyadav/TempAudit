@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from typing import Optional, Dict, Any
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.schemas import AnomalyReviewRequest
 from backend.app.services.anomaly_detection_engine import (
     detect_all_anomalies,
@@ -25,6 +25,7 @@ def get_engagement_anomalies(
     Executes and returns the 3-Tier Hybrid Anomaly Detection Engine results
     with deterministic rules, statistical z-scores/IQR/Benford, and ML models.
     """
+    require_engagement_access(engagement_id, current_user)
     try:
         data = detect_all_anomalies(engagement_id)
         anomalies = data["anomalies"]
@@ -59,6 +60,7 @@ def get_engagement_anomalies(
 @router.post("/{engagement_id}/detect")
 def trigger_anomaly_detection(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """Triggers fresh execution of the 3-Tier Hybrid Anomaly Detection Engine."""
+    require_engagement_access(engagement_id, current_user)
     try:
         return detect_all_anomalies(engagement_id)
     except ValueError as e:
@@ -74,6 +76,7 @@ def review_anomaly(
     current_user: dict = Depends(get_current_user)
 ):
     """Updates auditor review status (Confirmed Anomaly, Marked Normal, Ignored) and comments."""
+    require_engagement_access(engagement_id, current_user)
     try:
         user_name = current_user.get("username", "admin")
         return update_anomaly_review(
@@ -95,6 +98,7 @@ def get_ai_anomaly_explanation(
     current_user: dict = Depends(get_current_user)
 ):
     """Generates an in-depth CA-oriented AI Working Paper Memorandum explaining the anomaly."""
+    require_engagement_access(engagement_id, current_user)
     try:
         return generate_ai_anomaly_explanation(engagement_id, anomaly_id)
     except ValueError as e:
@@ -108,6 +112,7 @@ def download_anomaly_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Downloads full Anomaly Detection Audit Report in CSV format."""
+    require_engagement_access(engagement_id, current_user)
     try:
         csv_content = generate_anomaly_csv_report(engagement_id)
         filename = f"AI_Anomaly_Detection_Report_Engagement_{engagement_id}.csv"

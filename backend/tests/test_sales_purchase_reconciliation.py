@@ -43,6 +43,24 @@ class TestSalesPurchaseReconciliation(unittest.TestCase):
         """Test sales reconciliation engine execution with simulated register & standard exceptions."""
         conn = get_db_connection()
         cur = conn.cursor()
+        # Insert Sales Register File
+        cur.execute("""
+            INSERT INTO uploaded_files (engagement_id, file_name, file_type, file_path, data_category, row_count, uploaded_at)
+            VALUES (?, 'Sales_Register_Q1.xlsx', 'xlsx', 'Sales_Register_Q1.xlsx', 'Sales Register', 4, datetime('now'))
+        """, (self.eng_id,))
+        file_id = cur.lastrowid
+
+        # Insert Sales Register transactions (Source A)
+        cur.execute("""
+            INSERT INTO transactions (engagement_id, file_id, date, ledger, party_name, credit, amount, voucher_no, invoice_no, gstin, tax_amount)
+            VALUES 
+            (?, ?, '2024-04-10', 'Sales Register', 'Apex Retail Ltd', 50000.0, 50000.0, 'V-SAL-001', 'INV-2024-001', '27AAACA1234A1Z1', 9000.0),
+            (?, ?, '2024-04-15', 'Sales Register', 'Zenith Logistics', 125000.0, 125000.0, 'V-SAL-002', 'INV-2024-002', '27BBBCA5678B1Z2', 22500.0),
+            (?, ?, '2024-04-20', 'Sales Register', 'Global Traders', 75000.0, 75000.0, 'V-SAL-003', 'INV-2024-003', '27CCCCA9999C1Z3', 13500.0),
+            (?, ?, '2024-04-20', 'Sales Register', 'Global Traders', 75000.0, 75000.0, 'V-SAL-003', 'INV-2024-003', '27CCCCA9999C1Z3', 13500.0)
+        """, (self.eng_id, file_id, self.eng_id, file_id, self.eng_id, file_id, self.eng_id, file_id))
+
+        # Insert General Ledger transactions (Source B)
         cur.execute("""
             INSERT INTO transactions (engagement_id, date, ledger, party_name, credit, amount, voucher_no, invoice_no, gstin, tax_amount)
             VALUES 
@@ -56,6 +74,7 @@ class TestSalesPurchaseReconciliation(unittest.TestCase):
         result = run_sales_purchase_reconciliation(
             engagement_id=self.eng_id,
             recon_type="Sales Reconciliation",
+            register_file_id=file_id,
             title="Sales Register vs Revenue Ledger Recon"
         )
 

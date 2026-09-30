@@ -1,17 +1,19 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from backend.app.schemas import AssistantQuery
 from backend.app.database import get_db_connection
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.services.local_ai_assistant_engine import LocalAIAssistantEngine, MANDATORY_DISCLAIMER
 from backend.app.audit_engine.local_ai import LocalAIAuditAssistant
 
 router = APIRouter(prefix="/api/assistant", tags=["Local AI Assistant"])
 
 @router.post("/query")
-def query_assistant(req: AssistantQuery):
+def query_assistant(req: AssistantQuery, current_user: dict = Depends(get_current_user)):
     """
     Executes an offline AI query against the selected audit engagement.
     Performs intent detection, deterministic calculations, evidence retrieval, and returns inspectable records.
     """
+    require_engagement_access(req.engagement_id, current_user)
     try:
         engine = LocalAIAssistantEngine(req.engagement_id)
         result = engine.process_query(
@@ -27,10 +29,11 @@ def query_assistant(req: AssistantQuery):
         raise HTTPException(status_code=500, detail=f"AI Assistant Error: {str(e)}")
 
 @router.get("/summary/{engagement_id}")
-def get_ai_summary(engagement_id: int):
+def get_ai_summary(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns executive audit summary narrative and risk metrics for the engagement.
     """
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     eng_row = conn.execute("SELECT * FROM engagements WHERE id = ?", (engagement_id,)).fetchone()
     if not eng_row:
@@ -51,10 +54,11 @@ def get_ai_summary(engagement_id: int):
     return summary_data
 
 @router.get("/suggested-prompts/{engagement_id}")
-def get_suggested_prompts(engagement_id: int):
+def get_suggested_prompts(engagement_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns prompt suggestions for the auditor.
     """
+    require_engagement_access(engagement_id, current_user)
     return {
         "prompts": [
             {

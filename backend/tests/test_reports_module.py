@@ -67,13 +67,13 @@ def test_generate_all_10_pdf_report_types():
         assert data["report_type"] == r_type
 
         # Verify download endpoint
-        dl_res = client.get(f"/api/reports/download/{data['report_id']}")
+        dl_res = client.get(f"/api/reports/download/{data['report_id']}", headers=headers)
         assert dl_res.status_code == 200
         assert dl_res.headers["content-type"] == "application/pdf"
         assert len(dl_res.content) > 1000  # Valid PDF binary
 
     # Verify reports history list
-    list_res = client.get(f"/api/reports/{engagement_id}")
+    list_res = client.get(f"/api/reports/{engagement_id}", headers=headers)
     assert list_res.status_code == 200
     reports_history = list_res.json()
     assert len(reports_history) >= 10

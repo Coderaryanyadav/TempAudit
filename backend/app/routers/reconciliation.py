@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.services.bank_reconciliation_engine import run_bank_reconciliation
 
@@ -23,7 +23,8 @@ class ManualMatchRequest(BaseModel):
     auditor_notes: Optional[str] = None
 
 @router.get("/{engagement_id}")
-def list_reconciliations(engagement_id: int):
+def list_reconciliations(engagement_id: int, current_user: dict = Depends(get_current_user)):
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute(
         "SELECT * FROM reconciliations WHERE engagement_id = ? ORDER BY id DESC",
@@ -34,7 +35,8 @@ def list_reconciliations(engagement_id: int):
     return recons
 
 @router.get("/bank-ledgers/{engagement_id}")
-def get_bank_ledgers(engagement_id: int):
+def get_bank_ledgers(engagement_id: int, current_user: dict = Depends(get_current_user)):
+    require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
     rows = conn.execute("""
         SELECT DISTINCT ledger FROM transactions 
@@ -56,7 +58,8 @@ def get_reconciliation_details(
     match_level: Optional[str] = None,
     item_type: Optional[str] = None,
     status: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
 ):
     conn = get_db_connection()
     recon_row = conn.execute("SELECT * FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
@@ -65,6 +68,7 @@ def get_reconciliation_details(
         raise HTTPException(status_code=404, detail="Reconciliation not found")
     
     recon = dict(recon_row)
+    require_engagement_access(recon["engagement_id"], current_user)
     
     query = "SELECT * FROM reconciliation_items WHERE recon_id = ?"
     params = [recon_id]
@@ -95,6 +99,7 @@ def execute_reconciliation_endpoint(
     req: ExecuteBRSRequest,
     current_user: dict = Depends(get_current_user)
 ):
+    require_engagement_access(req.engagement_id, current_user)
     try:
         res = run_bank_reconciliation(
             engagement_id=req.engagement_id,
@@ -114,6 +119,12 @@ def confirm_match_item(
     current_user: dict = Depends(get_current_user)
 ):
     conn = get_db_connection()
+    recon_row = conn.execute("SELECT engagement_id FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
+    if not recon_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Reconciliation not found")
+    require_engagement_access(recon_row["engagement_id"], current_user)
+
     row = conn.execute("SELECT * FROM reconciliation_items WHERE id = ? AND recon_id = ?", (item_id, recon_id)).fetchone()
     if not row:
         conn.close()
@@ -139,6 +150,12 @@ def reject_match_item(
     current_user: dict = Depends(get_current_user)
 ):
     conn = get_db_connection()
+    recon_row = conn.execute("SELECT engagement_id FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
+    if not recon_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Reconciliation not found")
+    require_engagement_access(recon_row["engagement_id"], current_user)
+
     row = conn.execute("SELECT * FROM reconciliation_items WHERE id = ? AND recon_id = ?", (item_id, recon_id)).fetchone()
     if not row:
         conn.close()
@@ -157,6 +174,12 @@ def manual_match_items(
     current_user: dict = Depends(get_current_user)
 ):
     conn = get_db_connection()
+    recon_row = conn.execute("SELECT engagement_id FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
+    if not recon_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Reconciliation not found")
+    require_engagement_access(recon_row["engagement_id"], current_user)
+
     book_item = conn.execute("SELECT * FROM reconciliation_items WHERE id = ? AND recon_id = ?", (req.book_item_id, recon_id)).fetchone()
     bank_item = conn.execute("SELECT * FROM reconciliation_items WHERE id = ? AND recon_id = ?", (req.bank_item_id, recon_id)).fetchone()
     
@@ -200,7 +223,7 @@ def manual_match_items(
     return {"success": True, "message": "Manual match created successfully."}
 
 @router.get("/{recon_id}/report/download")
-def download_brs_report(recon_id: int):
+def download_brs_report(recon_id: int, current_user: dict = Depends(get_current_user)):
     conn = get_db_connection()
     recon_row = conn.execute("SELECT * FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
     if not recon_row:
@@ -208,6 +231,8 @@ def download_brs_report(recon_id: int):
         raise HTTPException(status_code=404, detail="Reconciliation not found")
     
     recon = dict(recon_row)
+    require_engagement_access(recon["engagement_id"], current_user)
+
     items = [dict(r) for r in conn.execute("SELECT * FROM reconciliation_items WHERE recon_id = ? ORDER BY status ASC, id ASC", (recon_id,)).fetchall()]
     conn.close()
 
@@ -306,6 +331,7 @@ def execute_sales_purchase_recon(
     req: ExecuteSalesPurchaseRequest,
     current_user: dict = Depends(get_current_user)
 ):
+    require_engagement_access(req.engagement_id, current_user)
     try:
         from backend.app.services.sales_purchase_reconciliation_engine import run_sales_purchase_reconciliation
         res = run_sales_purchase_reconciliation(
@@ -325,7 +351,8 @@ def get_sales_purchase_details(
     recon_id: int,
     exception_type: Optional[str] = None,
     status: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
 ):
     conn = get_db_connection()
     recon_row = conn.execute("SELECT * FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
@@ -334,6 +361,7 @@ def get_sales_purchase_details(
         raise HTTPException(status_code=404, detail="Reconciliation session not found")
     
     recon = dict(recon_row)
+    require_engagement_access(recon["engagement_id"], current_user)
 
     query = "SELECT * FROM reconciliation_items WHERE recon_id = ?"
     params = [recon_id]
@@ -364,6 +392,12 @@ def update_sales_purchase_item_action(
     current_user: dict = Depends(get_current_user)
 ):
     conn = get_db_connection()
+    recon_row = conn.execute("SELECT engagement_id FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
+    if not recon_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Reconciliation session not found")
+    require_engagement_access(recon_row["engagement_id"], current_user)
+
     row = conn.execute("SELECT * FROM reconciliation_items WHERE id = ? AND recon_id = ?", (item_id, recon_id)).fetchone()
     if not row:
         conn.close()
@@ -384,7 +418,7 @@ def update_sales_purchase_item_action(
     return {"success": True, "message": f"Item updated to '{new_status}'."}
 
 @router.get("/sales-purchase/{recon_id}/report/download")
-def download_sales_purchase_report(recon_id: int):
+def download_sales_purchase_report(recon_id: int, current_user: dict = Depends(get_current_user)):
     conn = get_db_connection()
     recon_row = conn.execute("SELECT * FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
     if not recon_row:
@@ -392,6 +426,8 @@ def download_sales_purchase_report(recon_id: int):
         raise HTTPException(status_code=404, detail="Reconciliation not found")
     
     recon = dict(recon_row)
+    require_engagement_access(recon["engagement_id"], current_user)
+
     items = [dict(r) for r in conn.execute("SELECT * FROM reconciliation_items WHERE recon_id = ? ORDER BY status ASC, id ASC", (recon_id,)).fetchall()]
     conn.close()
 

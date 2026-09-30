@@ -4,7 +4,7 @@ import json
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel
-from backend.app.auth import get_current_user
+from backend.app.auth import get_current_user, require_role, require_engagement_access
 from backend.app.database import get_db_connection
 from backend.app.services.gst_rule_config import (
     get_all_gst_rules, get_gst_rule, update_gst_rule, reset_gst_rules_to_default
@@ -38,7 +38,7 @@ def list_gst_rules(current_user: dict = Depends(get_current_user)):
 def update_gst_rule_endpoint(
     rule_key: str,
     req: UpdateGSTRuleRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_role(["Admin", "Auditor"]))
 ):
     """Updates the parameter configuration for a specific GST rule."""
     try:
@@ -49,7 +49,7 @@ def update_gst_rule_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/rules/reset")
-def reset_gst_rules_endpoint(current_user: dict = Depends(get_current_user)):
+def reset_gst_rules_endpoint(current_user: dict = Depends(require_role(["Admin"]))):
     """Resets all configurable GST rules to factory standard."""
     try:
         username = current_user.get("username", "admin")
@@ -64,6 +64,7 @@ def execute_gst_reconciliation_endpoint(
     current_user: dict = Depends(get_current_user)
 ):
     """Executes configurable GST reconciliation across selected datasets."""
+    require_engagement_access(req.engagement_id, current_user)
     try:
         username = current_user.get("username", "admin")
         res = run_gst_reconciliation(
@@ -85,7 +86,8 @@ def get_gst_reconciliation_details(
     recon_id: int,
     match_category: Optional[str] = None,
     status: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
 ):
     """Fetches details and items for a specific GST reconciliation session."""
     conn = get_db_connection()
@@ -95,6 +97,7 @@ def get_gst_reconciliation_details(
         raise HTTPException(status_code=404, detail="GST Reconciliation session not found")
 
     recon = dict(recon_row)
+    require_engagement_access(recon["engagement_id"], current_user)
 
     query = "SELECT * FROM reconciliation_items WHERE recon_id = ?"
     params = [recon_id]
@@ -126,6 +129,12 @@ def update_gst_item_action(
 ):
     """Applies auditor review status and working-paper comments."""
     conn = get_db_connection()
+    recon_row = conn.execute("SELECT engagement_id FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
+    if not recon_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Reconciliation not found")
+    require_engagement_access(recon_row["engagement_id"], current_user)
+
     row = conn.execute("SELECT * FROM reconciliation_items WHERE id = ? AND recon_id = ?", (item_id, recon_id)).fetchone()
     if not row:
         conn.close()
@@ -146,7 +155,10 @@ def update_gst_item_action(
     return {"success": True, "message": f"GST Item status updated to '{new_status}'."}
 
 @router.get("/{recon_id}/report/download")
-def download_gst_reconciliation_report(recon_id: int):
+def download_gst_reconciliation_report(
+    recon_id: int,
+    current_user: dict = Depends(get_current_user)
+):
     """Generates and downloads a detailed CSV GST Reconciliation report with both source values."""
     conn = get_db_connection()
     recon_row = conn.execute("SELECT * FROM reconciliations WHERE id = ?", (recon_id,)).fetchone()
@@ -155,6 +167,8 @@ def download_gst_reconciliation_report(recon_id: int):
         raise HTTPException(status_code=404, detail="Reconciliation not found")
 
     recon = dict(recon_row)
+    require_engagement_access(recon["engagement_id"], current_user)
+
     items = [dict(r) for r in conn.execute("SELECT * FROM reconciliation_items WHERE recon_id = ? ORDER BY id ASC", (recon_id,)).fetchall()]
     conn.close()
 
