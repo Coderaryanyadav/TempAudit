@@ -177,12 +177,14 @@ def normalize_monetary_amount(raw_val: Any) -> Tuple[float, str, str, int, float
     clean_numeric = raw.replace(",", "").strip()
 
     try:
-        val = float(clean_numeric)
-        if is_negative and val > 0:
-            val = -val
-        formatted = f"{val:,.2f}"
+        from decimal import Decimal, ROUND_HALF_UP
+        d = Decimal(clean_numeric).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if is_negative and d > 0:
+            d = -d
+        val = float(d)
+        formatted = f"{d:,.2f}"
         return val, formatted, rule, is_quest, conf
-    except ValueError:
+    except Exception:
         return 0.0, orig_clean, "INVALID_NUMERIC_FORMAT", 1, 0.0
 
 def normalize_entity_name(raw_val: Any) -> Tuple[str, str, int, float]:

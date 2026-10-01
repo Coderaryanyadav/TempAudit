@@ -1143,7 +1143,7 @@ async function renderUserManagement() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading users: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Firm Users");
   }
 }
 
@@ -1531,7 +1531,7 @@ async function renderClients(searchQuery = null, entityFilter = null) {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading clients: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Client Directory");
   }
 }
 
@@ -2059,7 +2059,7 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading engagements: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Audit Engagements");
   }
 }
 
@@ -2639,7 +2639,7 @@ async function renderImportData() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading data import view: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Data Import View");
   }
 }
 
@@ -3255,7 +3255,7 @@ async function renderDataCleaningLogs() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading data cleaning logs: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Data Cleaning Logs");
   }
 }
 
@@ -3520,7 +3520,7 @@ async function handleSandboxPreviewSubmit(event) {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 10px; color: #dc2626; font-size: 12px;">Error: ${err.message}</div>`;
+    container.innerHTML = `<div style="padding: 10px; color: #dc2626; font-size: 12px;">Error: ${escapeHTML(err.message)}</div>`;
   }
 }
 
@@ -4150,7 +4150,7 @@ async function renderDashboard() {
     container.innerHTML = `
       <div style="padding: 30px; text-align: center; color: #dc2626;">
         <div style="font-size: 16px; font-weight: 700;">Failed to load dashboard metrics</div>
-        <div style="font-size: 12.5px; margin-top: 6px; color: #64748b;">${err.message}</div>
+        <div style="font-size: 12.5px; margin-top: 6px; color: #64748b;">${escapeHTML(err.message)}</div>
         <button class="btn btn-primary" style="margin-top: 14px;" onclick="renderDashboard()">Retry</button>
       </div>
     `;
@@ -4654,7 +4654,7 @@ async function triggerRunHybridEngine() {
 
   try {
     const res = await FinAuditAPI.runHybridEngine(state.currentEngagementId);
-    notifyError(`Hybrid Audit Completed! Found ${res.findings_count} audit exceptions across ${res.total_transactions} transactions.`);
+    notifySuccess(`Hybrid Audit Completed! Found ${res.findings_count} audit exceptions across ${res.total_transactions} transactions.`);
     await updateActiveEngagement();
     navigateTo("anomaly_detection");
   } catch (err) {
@@ -5147,7 +5147,7 @@ async function renderTrialBalance() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading Trial Balance Analysis: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Trial Balance");
   }
 }
 
@@ -5234,7 +5234,7 @@ async function openTBExceptionAIExplanation(exJsonStr) {
       </div>
     `;
   } catch (err) {
-    drawerBody.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error retrieving explanation: ${err.message}</div>`;
+    drawerBody.innerHTML = renderErrorBanner(err, "Unable to Retrieve AI Explanation");
   }
 }
 
@@ -5693,7 +5693,7 @@ async function renderGeneralLedger() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading General Ledger Analysis: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load General Ledger");
   }
 }
 
@@ -5855,7 +5855,7 @@ async function openGLTransactionDrawer(txId) {
       </div>
     `;
   } catch (err) {
-    drawerBody.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error retrieving transaction: ${err.message}</div>`;
+    drawerBody.innerHTML = renderErrorBanner(err, "Unable to Retrieve Transaction Details");
   }
 }
 
@@ -5973,7 +5973,7 @@ async function renderReconciliation() {
       ${reconActiveSubTab === 'gst' ? renderGSTListView(gstRecons) : (reconActiveSubTab === 'sales_purchase' ? renderSalesPurchaseListView(spRecons) : renderBRSListView(brsRecons))}
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading reconciliations: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Reconciliations");
   }
 }
 
@@ -6562,7 +6562,7 @@ async function viewGSTReconciliationDetails(reconId) {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading GST Workbench: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load GST Workbench");
   }
 }
 
@@ -7195,7 +7195,7 @@ async function viewSalesPurchaseReconDetails(reconId) {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading Reconciliation Workbench: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Reconciliation Workbench");
   }
 }
 
@@ -7643,7 +7643,7 @@ async function viewReconciliationDetails(reconId) {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading BRS Workbench: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Bank Reconciliation Workbench");
   }
 }
 
@@ -7888,7 +7888,7 @@ async function renderFinancialStatements() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error: ${err.message}</div>`;
+    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error: ${escapeHTML(err.message)}</div>`;
   }
 }
 
@@ -7980,7 +7980,7 @@ async function submitChatMessage() {
   } catch (err) {
     const loadingElem = document.getElementById(loadingId);
     if (loadingElem) {
-      loadingElem.innerHTML = `<span style="color: #dc2626;">Error: ${err.message}</span>`;
+      loadingElem.innerHTML = `<span style="color: #dc2626;">Error: ${escapeHTML(err.message)}</span>`;
     }
   }
 }
@@ -8085,7 +8085,7 @@ async function handleFileSelected(event) {
       </div>
     `;
   } catch (err) {
-    mappingContainer.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error parsing file: ${err.message}</div>`;
+    mappingContainer.innerHTML = renderErrorBanner(err, "File Ingestion Failed");
   }
 }
 
@@ -10781,7 +10781,7 @@ async function renderClients() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading clients: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Client Directory");
   }
 }
 
@@ -11205,7 +11205,7 @@ async function renderEngagements() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 20px; color: #dc2626;">Error loading engagements: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Audit Engagements");
   }
 }
 
@@ -13016,7 +13016,7 @@ async function renderAnomalyDetection() {
     container.innerHTML = `
       <div class="card" style="padding: 30px; border-left: 4px solid #dc2626;">
         <h3 style="color: #dc2626;">Anomaly Detection Engine Error</h3>
-        <p style="margin-top: 8px; color: #475569;">${err.message}</p>
+        <p style="margin-top: 8px; color: #475569;">${escapeHTML(err.message)}</p>
         <button class="btn btn-primary" style="margin-top: 16px;" onclick="renderAnomalyDetection()">Retry Execution</button>
       </div>
     `;
@@ -13465,7 +13465,7 @@ async function renderYoYComparison() {
     container.innerHTML = `
       <div class="card" style="padding: 30px; border-left: 4px solid #dc2626;">
         <h3 style="color: #dc2626;">YoY Comparison Engine Error</h3>
-        <p style="margin-top: 8px; color: #475569;">${err.message}</p>
+        <p style="margin-top: 8px; color: #475569;">${escapeHTML(err.message)}</p>
         <button class="btn btn-primary" style="margin-top: 16px;" onclick="renderYoYComparison()">Retry</button>
       </div>
     `;
@@ -14158,7 +14158,7 @@ async function handleAssistantSend() {
   } catch (err) {
     state.assistantState.messages.push({
       role: "assistant",
-      content: `⚠️ **AI Engine Notice:** An error occurred while evaluating the query: ${err.message}`,
+      content: `⚠️ **AI Engine Notice:** An error occurred while evaluating the query: ${escapeHTML(err.message)}`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       disclaimer: "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: [],
@@ -14518,7 +14518,7 @@ async function renderFindings() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="padding: 24px; color: #dc2626;">Error loading audit findings: ${err.message}</div>`;
+    container.innerHTML = renderErrorBanner(err, "Unable to Load Audit Findings");
   }
 }
 
@@ -15208,7 +15208,7 @@ async function refreshAuditTrailTable() {
     }
 
   } catch (err) {
-    tableWrap.innerHTML = `<div style="padding: 30px; text-align: center; color: #ef4444;">Failed loading audit logs: ${err.message}</div>`;
+    tableWrap.innerHTML = renderErrorBanner(err, "Unable to Load Audit Logs");
   }
 }
 
@@ -15528,7 +15528,7 @@ async function loadSystemInfo() {
       </div>
     `;
   } catch (err) {
-    wrap.innerHTML = `<div style="color: #ef4444;">Failed to load system info: ${err.message}</div>`;
+    wrap.innerHTML = renderErrorBanner(err, "Unable to Load System Diagnostics");
   }
 }
 
@@ -15606,7 +15606,7 @@ async function loadBackupsList() {
       </div>
     `;
   } catch (err) {
-    wrap.innerHTML = `<div style="color: #ef4444;">Failed to load backups list: ${err.message}</div>`;
+    wrap.innerHTML = renderErrorBanner(err, "Unable to Load Backups");
   }
 }
 
@@ -16014,7 +16014,7 @@ async function renderAIManager() {
     container.innerHTML = `
       <div style="padding: 40px; text-align: center; color: #dc2626;">
         <div style="font-size: 16px; font-weight: 700;">Failed to load LM Studio AI Settings</div>
-        <div style="font-size: 13px; color: #64748b; margin-top: 6px;">${err.message}</div>
+        <div style="font-size: 13px; color: #64748b; margin-top: 6px;">${escapeHTML(err.message)}</div>
         <button class="btn btn-primary" style="margin-top: 14px;" onclick="renderAIManager()">Retry</button>
       </div>
     `;
@@ -16049,7 +16049,7 @@ async function handleRefreshLMStudioModels() {
       notifyWarning("No models detected in LM Studio. Please open LM Studio, load a model, and click Start Server.");
     }
   } catch (err) {
-    if (hintEl) hintEl.innerHTML = `<span style="color: #dc2626;">Failed to query LM Studio: ${err.message}</span>`;
+    if (hintEl) hintEl.innerHTML = `<span style="color: #dc2626;">Failed to query LM Studio: ${escapeHTML(err.message)}</span>`;
     notifyError("Could not reach LM Studio at configured URL: " + err.message);
   }
 }
@@ -16140,7 +16140,7 @@ async function testAIGenerationPrompt() {
     }
   } catch (err) {
     if (box && textBox) {
-      textBox.innerText = `LM Studio generation test error: ${err.message}`;
+      textBox.innerText = `LM Studio generation test error: ${escapeHTML(err.message)}`;
     }
   } finally {
     if (testBtn) {
@@ -16169,7 +16169,7 @@ async function handleSanitizePreviewTest() {
       </div>
     `;
   } catch (err) {
-    resultBox.innerHTML = `<span style="color: #dc2626;">Error: ${err.message}</span>`;
+    resultBox.innerHTML = `<span style="color: #dc2626;">Error: ${escapeHTML(err.message)}</span>`;
   }
 }
 

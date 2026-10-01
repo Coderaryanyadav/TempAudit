@@ -155,9 +155,28 @@ def parse_raw_dataframe(file_path: str, file_type: str, limit: Optional[int] = N
         return df
 
     elif ext in [".xlsx", ".xls"]:
-        xl = pd.ExcelFile(file_path)
-        if len(xl.sheet_names) > MAX_EXCEL_SHEETS:
-            raise ValueError(f"Excel file exceeds maximum allowable sheets ({len(xl.sheet_names)} > {MAX_EXCEL_SHEETS}). Please upload a workbook with fewer sheets.")
+        if ext == ".xlsx":
+            import openpyxl
+            try:
+                wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                if len(wb.sheetnames) > MAX_EXCEL_SHEETS:
+                    wb.close()
+                    raise ValueError(f"Excel file exceeds maximum allowable sheets ({len(wb.sheetnames)} > {MAX_EXCEL_SHEETS}). Please upload a workbook with fewer sheets.")
+                
+                sheet = wb.active
+                if sheet:
+                    if sheet.max_column and sheet.max_column > MAX_EXCEL_COLS:
+                        wb.close()
+                        raise ValueError(f"Excel sheet exceeds maximum column limit ({sheet.max_column} > {MAX_EXCEL_COLS} columns).")
+                    if sheet.max_row and sheet.max_row > MAX_EXCEL_ROWS:
+                        wb.close()
+                        raise ValueError(f"Excel sheet exceeds maximum row limit ({sheet.max_row} > {MAX_EXCEL_ROWS} rows).")
+                wb.close()
+            except Exception as e:
+                if isinstance(e, ValueError):
+                    raise e
+                # Fallback to pandas if openpyxl read_only metadata read encounters formulaic edge case
+                pass
 
         df = pd.read_excel(file_path, nrows=limit or MAX_EXCEL_ROWS)
         if len(df.columns) > MAX_EXCEL_COLS:
@@ -270,8 +289,13 @@ def read_file_preview(file_path: str, file_type: str, data_category: Optional[st
     estimated_total = len(df)
     try:
         if ext == ".csv":
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                estimated_total = max(0, sum(1 for _ in f) - 1)
+            for enc in ['utf-8-sig', 'utf-8', 'latin1', 'cp1252']:
+                try:
+                    with open(file_path, "r", encoding=enc, errors="strict") as f:
+                        estimated_total = max(0, sum(1 for _ in f) - 1)
+                    break
+                except UnicodeDecodeError:
+                    continue
         elif ext in [".xlsx", ".xls"]:
             xl = pd.ExcelFile(file_path)
             if xl.sheet_names:
