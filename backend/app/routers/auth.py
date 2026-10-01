@@ -29,8 +29,18 @@ COMMON_WEAK_PASSWORDS = {
     "passwordpassword", "welcome123456", "qwertyuiop12"
 }
 
+def _ensure_rate_limit_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS rate_limits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT NOT NULL,
+            timestamp REAL NOT NULL
+        )
+    """)
+
 def _check_setup_rate_limit():
     conn = get_db_connection()
+    _ensure_rate_limit_table(conn)
     now = time.time()
     cutoff = now - 60
     conn.execute("DELETE FROM rate_limits WHERE key = 'setup' AND timestamp < ?", (cutoff,))
@@ -45,6 +55,7 @@ def _check_setup_rate_limit():
 
 def _check_login_rate_limit(key: str):
     conn = get_db_connection()
+    _ensure_rate_limit_table(conn)
     now = time.time()
     cutoff = now - 300 # 5 minute window
     db_key = f"login_{key}"
@@ -59,12 +70,14 @@ def _check_login_rate_limit(key: str):
 
 def _record_login_failure(key: str):
     conn = get_db_connection()
+    _ensure_rate_limit_table(conn)
     now = time.time()
     db_key = f"login_{key}"
     conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES (?, ?)", (db_key, now))
 
 def _clear_login_failures(key: str):
     conn = get_db_connection()
+    _ensure_rate_limit_table(conn)
     db_key = f"login_{key}"
     conn.execute("DELETE FROM rate_limits WHERE key = ?", (db_key,))
 
