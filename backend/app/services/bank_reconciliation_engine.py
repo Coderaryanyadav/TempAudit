@@ -558,10 +558,17 @@ def run_bank_reconciliation(
         ))
 
     # Log in audit trail
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, 'RUN_BANK_RECONCILIATION', 'reconciliation', ?, ?, ?)
-    """, (created_by, recon_id, f"Executed BRS for '{bank_ledger_name}': {len(matched_items)} matched, {len(ambiguous_items)} ambiguous, {len(unmatched_book_items)} unpresented/outstanding, {len(unmatched_bank_items)} bank exceptions", now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="RUN_BANK_RECONCILIATION",
+        module="RECONCILIATION",
+        record_id=recon_id,
+        user=created_by,
+        engagement_id=engagement_id,
+        details=f"Executed BRS for '{bank_ledger_name}': {len(matched_items)} matched, {len(ambiguous_items)} ambiguous, {len(unmatched_book_items)} unpresented/outstanding, {len(unmatched_bank_items)} bank exceptions",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

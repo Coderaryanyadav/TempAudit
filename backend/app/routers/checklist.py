@@ -109,15 +109,17 @@ def generate_checklist(
 
         now_str = datetime.now().isoformat()
         conn = get_db_connection()
-        conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, 'GENERATE_CHECKLIST', 'engagement', ?, ?, ?)
-        """, (
-            current_user.get("username", "admin"),
-            engagement_id,
-            f"Generated audit checklist ({result['total_items']} items, {result['risk_finding_procedures_count']} risk-linked)",
-            now_str
-        ))
+        from backend.app.utils.audit_logger import log_audit_event
+        log_audit_event(
+            conn=conn,
+            action="GENERATE_CHECKLIST",
+            module="CHECKLIST",
+            record_id=engagement_id,
+            user=current_user,
+            engagement_id=engagement_id,
+            details=f"Generated audit checklist ({result['total_items']} items, {result['risk_finding_procedures_count']} risk-linked)",
+            timestamp=now_str
+        )
         conn.commit()
         conn.close()
 
@@ -180,15 +182,17 @@ def create_custom_checklist_item(
     ))
     new_id = cursor.lastrowid
 
-    conn.execute("""
-    INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, 'CREATE_CUSTOM_CHECKLIST', 'checklist_item', ?, ?, ?)
-    """, (
-        current_user.get("username", "admin"),
-        new_id,
-        f"Created custom checklist item {item_code} in category '{item_in.category}'",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="CREATE_CUSTOM_CHECKLIST",
+        module="CHECKLIST",
+        record_id=new_id,
+        user=current_user,
+        engagement_id=engagement_id,
+        details=f"Created custom checklist item {item_code} in category '{item_in.category}'",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

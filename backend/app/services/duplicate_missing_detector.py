@@ -3,6 +3,7 @@ import difflib
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple, Set
 from backend.app.database import get_db_connection
+from backend.app.utils.audit_logger import log_audit_event
 
 def normalize_text(text: Optional[str]) -> str:
     if not text:
@@ -497,13 +498,17 @@ def update_duplicate_group_review(engagement_id: int, group_code: str, status: s
     ))
 
     # Also log to audit trail
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        user_name, f"Duplicate Group #{group_code} marked as '{status}'", "duplicate_group", engagement_id,
-        f"Auditor marked Group #{group_code} as '{status}'. Comment: {comment or 'None'}", now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action=f"Duplicate Group #{group_code} marked as '{status}'",
+        module="DUPLICATES",
+        record_id=group_code,
+        user=user_name,
+        engagement_id=engagement_id,
+        details=f"Auditor marked Group #{group_code} as '{status}'. Comment: {comment or 'None'}",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -544,13 +549,16 @@ def update_sequence_gap_review(
     ))
 
     # Audit Trail
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        user_name, f"Sequence Gap {sequence_type} ({expected_from} to {expected_to}) updated", "sequence_gap", engagement_id,
-        f"Auditor status: '{status}'. Reason: {comment or 'None'}", now_str
-    ))
+    log_audit_event(
+        conn=conn,
+        action=f"Sequence Gap {sequence_type} ({expected_from} to {expected_to}) updated",
+        module="SEQUENCE_GAPS",
+        record_id=f"{sequence_type}:{prefix}:{expected_from}-{expected_to}",
+        user=user_name,
+        engagement_id=engagement_id,
+        details=f"Auditor status: '{status}'. Reason: {comment or 'None'}",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

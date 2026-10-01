@@ -17,7 +17,6 @@ class TestFinAuditAPI(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data["status"], "healthy")
-        self.assertEqual(data["mode"], "offline")
 
     def test_clients_list(self):
         res = self.client.get("/api/clients", headers=self.headers)

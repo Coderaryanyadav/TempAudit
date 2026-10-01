@@ -487,17 +487,17 @@ def duplicate_engagement_structure(req: DuplicateEngagementRequest, current_user
             cloned_wps += 1
 
     # Log action
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, module, record_id, engagement_id, details, timestamp)
-    VALUES (?, ?, 'DUPLICATE_ENGAGEMENT', 'ENGAGEMENTS', ?, ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username"),
-        new_engagement_id,
-        new_engagement_id,
-        f"Duplicated structure from Engagement #{req.source_engagement_id} (FY {src_eng['financial_year']}) to FY {target_fy}: {cloned_checklists} checklists, {cloned_wps} WPs.",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="DUPLICATE_ENGAGEMENT",
+        module="ENGAGEMENTS",
+        record_id=new_engagement_id,
+        user=current_user,
+        engagement_id=new_engagement_id,
+        details=f"Duplicated structure from Engagement #{req.source_engagement_id} (FY {src_eng['financial_year']}) to FY {target_fy}: {cloned_checklists} checklists, {cloned_wps} WPs.",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

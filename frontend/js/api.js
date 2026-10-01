@@ -79,6 +79,17 @@ class FinAuditAPI {
     this.setToken(null);
   }
 
+  static getSetupStatus() {
+    return this.request("/api/auth/setup-status");
+  }
+
+  static initialSetup(userData) {
+    return this.request("/api/auth/initial-setup", {
+      method: "POST",
+      body: JSON.stringify(userData)
+    });
+  }
+
   static getMe() {
     return this.request("/api/auth/me");
   }

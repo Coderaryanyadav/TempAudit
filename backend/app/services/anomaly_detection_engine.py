@@ -786,13 +786,17 @@ def update_anomaly_review(engagement_id: int, anomaly_id: str, status: str, comm
     ))
 
     # Audit log
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        user_name, f"Anomaly {anomaly_id} review status updated to '{status}'", "anomaly", engagement_id,
-        f"Auditor marked {anomaly_id} ({target['pattern_type']}) as '{status}'. Comment: {comment or 'None'}", now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action=f"Anomaly {anomaly_id} review status updated to '{status}'",
+        module="ANOMALIES",
+        record_id=anomaly_id,
+        user=user_name,
+        engagement_id=engagement_id,
+        details=f"Auditor marked {anomaly_id} ({target['pattern_type']}) as '{status}'. Comment: {comment or 'None'}",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

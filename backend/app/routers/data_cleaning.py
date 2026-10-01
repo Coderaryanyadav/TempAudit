@@ -188,16 +188,17 @@ def review_cleaning_log(
                 conn.execute(f"UPDATE transactions SET {field} = ? WHERE id = ?", (new_normalized_val, tx_id))
 
     # Audit log
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'REVIEW_NORMALIZATION', 'cleaning_log', ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username", "auditor"),
-        log_id,
-        f"Auditor reviewed transformation #{log_id} ({log['field_name']}): {req.action}. Value set to '{new_normalized_val}'.",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="REVIEW_NORMALIZATION",
+        module="DATA_CLEANING",
+        record_id=log_id,
+        user=current_user,
+        engagement_id=log.get("engagement_id"),
+        details=f"Auditor reviewed transformation #{log_id} ({log['field_name']}): {req.action}. Value set to '{new_normalized_val}'.",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

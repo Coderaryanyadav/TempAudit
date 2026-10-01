@@ -211,10 +211,11 @@ def get_working_paper_detail(wp_id: int, current_user: dict = Depends(get_curren
     # 4. Fetch specific audit trail logs for this WP
     log_rows = conn.execute("""
         SELECT * FROM audit_logs 
-        WHERE (entity_type = 'working_paper' AND entity_id = ?)
-           OR (entity_type = 'working_paper' AND details LIKE ?)
+        WHERE (entity_type LIKE 'working_paper%' AND (entity_id = ? OR record_id = ?))
+           OR (module LIKE 'WORKING_PAPER%' AND record_id = ?)
+           OR details LIKE ?
         ORDER BY id DESC LIMIT 50
-    """, (wp_id, f"%{wp['wp_reference']}%")).fetchall()
+    """, (wp_id, str(wp_id), str(wp_id), f"%{wp['wp_reference']}%")).fetchall()
     audit_trail = [dict(l) for l in log_rows]
 
     conn.close()
@@ -459,6 +460,23 @@ def update_working_paper(
     return {"status": "success", "message": "Working paper updated successfully."}
 
 
+from pathlib import Path
+
+def resolve_safe_evidence_path(wp_id: int, file_ref: str) -> Path:
+    """
+    Safely resolves and verifies that the file is strictly contained within the intended WP directory.
+    Prevents path traversal attacks.
+    """
+    clean_name = os.path.basename(file_ref)
+    target_dir = (Path(BASE_UPLOAD_DIR) / f"wp_{wp_id}").resolve()
+    target_path = (target_dir / clean_name).resolve()
+    base_resolved = Path(BASE_UPLOAD_DIR).resolve()
+
+    if not target_path.is_relative_to(base_resolved):
+        raise HTTPException(status_code=400, detail="Invalid evidence file path traversal detected.")
+    return target_path
+
+
 @router.post("/{wp_id}/upload-document")
 async def upload_supporting_document(
     wp_id: int,
@@ -487,24 +505,23 @@ async def upload_supporting_document(
         conn.close()
         raise HTTPException(status_code=413, detail="File size exceeds maximum limit of 50 MB.")
 
-    # Create destination directory
-    wp_folder = os.path.join(BASE_UPLOAD_DIR, f"wp_{wp_id}")
-    os.makedirs(wp_folder, exist_ok=True)
+    original_name = os.path.basename(file.filename or "evidence.bin")
+    file_ext = Path(original_name).suffix.lower()
+    stored_filename = f"{uuid.uuid4().hex}{file_ext}"
 
-    file_ext = os.path.splitext(file.filename)[1]
-    safe_filename = f"{uuid.uuid4().hex[:8]}_{file.filename.replace(' ', '_')}"
-    dest_path = os.path.join(wp_folder, safe_filename)
+    dest_path = resolve_safe_evidence_path(wp_id, stored_filename)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(dest_path, "wb") as f:
         f.write(content)
 
-    rel_path = f"uploaded_files/working_papers/wp_{wp_id}/{safe_filename}"
+    rel_path = f"uploaded_files/working_papers/wp_{wp_id}/{stored_filename}"
     doc_id = str(uuid.uuid4())[:8]
 
     new_doc = {
         "id": doc_id,
-        "name": file.filename,
-        "file_name": safe_filename,
+        "name": original_name,
+        "file_name": stored_filename,
         "file_path": rel_path,
         "size_bytes": file_size,
         "size_display": f"{file_size / 1024:.1f} KB" if file_size < 1024 * 1024 else f"{file_size / (1024 * 1024):.2f} MB",
@@ -523,16 +540,17 @@ async def upload_supporting_document(
     )
 
     # Audit log
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'UPLOAD_WP_EVIDENCE', 'working_paper', ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username", "admin"),
-        wp_id,
-        f"Uploaded supporting document '{file.filename}' ({new_doc['size_display']}) to WP [{wp['wp_reference']}]",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="UPLOAD_WP_EVIDENCE",
+        module="WORKING_PAPERS",
+        record_id=wp_id,
+        user=current_user,
+        engagement_id=wp["engagement_id"],
+        details=f"Uploaded supporting document '{original_name}' ({new_doc['size_display']}) to WP [{wp['wp_reference']}]",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -540,7 +558,7 @@ async def upload_supporting_document(
     return {
         "status": "success",
         "document": new_doc,
-        "message": f"Document '{file.filename}' uploaded successfully."
+        "message": f"Document '{original_name}' uploaded successfully."
     }
 
 
@@ -577,12 +595,12 @@ def delete_supporting_document(
         conn.close()
         raise HTTPException(status_code=404, detail="Document not found on this working paper.")
 
-    # Remove file from disk if present
+    # Remove file from disk if present using safe resolved path
     try:
-        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        full_path = os.path.join(backend_dir, removed_doc.get("file_path", ""))
-        if os.path.exists(full_path):
-            os.remove(full_path)
+        stored_name = removed_doc.get("file_name") or os.path.basename(removed_doc.get("file_path", ""))
+        full_path = resolve_safe_evidence_path(wp_id, stored_name)
+        if full_path.exists():
+            full_path.unlink()
     except Exception:
         pass
 
@@ -592,16 +610,17 @@ def delete_supporting_document(
     )
 
     # Audit log
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'REMOVE_WP_EVIDENCE', 'working_paper', ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username", "admin"),
-        wp_id,
-        f"Removed supporting document '{removed_doc.get('name')}' from WP [{wp['wp_reference']}]",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="REMOVE_WP_EVIDENCE",
+        module="WORKING_PAPERS",
+        record_id=wp_id,
+        user=current_user,
+        engagement_id=wp["engagement_id"],
+        details=f"Removed supporting document '{removed_doc.get('name')}' from WP [{wp['wp_reference']}]",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -612,7 +631,7 @@ def delete_supporting_document(
 @router.get("/download-file/{wp_id}/{doc_id}")
 def download_working_paper_document(wp_id: int, doc_id: str, current_user: dict = Depends(get_current_user)):
     """
-    Downloads or streams an attached supporting document.
+    Downloads or streams an attached supporting document with path traversal protection.
     """
     conn = get_db_connection()
     row = conn.execute("SELECT * FROM working_papers WHERE id = ?", (wp_id,)).fetchone()
@@ -632,14 +651,15 @@ def download_working_paper_document(wp_id: int, doc_id: str, current_user: dict 
     if not target_doc:
         raise HTTPException(status_code=404, detail="Document file not found.")
 
-    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    full_path = os.path.join(backend_dir, target_doc["file_path"])
-    if not os.path.exists(full_path):
+    stored_name = target_doc.get("file_name") or os.path.basename(target_doc.get("file_path", ""))
+    full_path = resolve_safe_evidence_path(wp_id, stored_name)
+
+    if not full_path.exists():
         raise HTTPException(status_code=404, detail="File content not found on server disk.")
 
     return FileResponse(
-        path=full_path,
-        filename=target_doc.get("name", os.path.basename(full_path)),
+        path=str(full_path),
+        filename=target_doc.get("name", full_path.name),
         media_type=target_doc.get("content_type", "application/octet-stream")
     )
 
@@ -682,16 +702,17 @@ def add_reviewer_comment(
     )
 
     # Audit log
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'ADD_WP_COMMENT', 'working_paper', ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username", "admin"),
-        wp_id,
-        f"Added reviewer comment to WP [{wp['wp_reference']}]: \"{comment_data.comment.strip()[:60]}...\"",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="ADD_WP_COMMENT",
+        module="WORKING_PAPERS",
+        record_id=wp_id,
+        user=current_user,
+        engagement_id=wp["engagement_id"],
+        details=f"Added reviewer comment to WP [{wp['wp_reference']}]: \"{comment_data.comment.strip()[:60]}...\"",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -723,16 +744,17 @@ def update_working_paper_notes(
         (notes_data.notes, now_str, wp_id)
     )
 
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'UPDATE_WP_NOTES', 'working_paper', ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username", "admin"),
-        wp_id,
-        f"Updated working notes on WP [{wp['wp_reference']}]",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="UPDATE_WP_NOTES",
+        module="WORKING_PAPERS",
+        record_id=wp_id,
+        user=current_user,
+        engagement_id=wp["engagement_id"],
+        details=f"Updated working notes on WP [{wp['wp_reference']}]",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -802,17 +824,17 @@ def update_working_paper_status(
 
     # Audit log
     action_name = "MARK_WP_REVIEWED" if new_status == "Reviewed" else "CHANGE_WP_STATUS"
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, ?, 'working_paper', ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username", "admin"),
-        action_name,
-        wp_id,
-        f"Status changed from '{old_status}' to '{new_status}' on WP [{wp['wp_reference']}] (Reviewer: {reviewer}, Date: {rev_date})",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action=action_name,
+        module="WORKING_PAPERS",
+        record_id=wp_id,
+        user=current_user,
+        engagement_id=wp["engagement_id"],
+        details=f"Status changed from '{old_status}' to '{new_status}' on WP [{wp['wp_reference']}] (Reviewer: {reviewer}, Date: {rev_date})",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -906,17 +928,17 @@ def update_working_paper_link(
 
     # Audit log
     audit_action = "LINK_WP_ITEM" if action == "link" else "UNLINK_WP_ITEM"
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, ?, 'working_paper', ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username", "admin"),
-        audit_action,
-        wp_id,
-        f"{action.capitalize()}ed {item_label} to WP [{wp['wp_reference']}]",
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action=audit_action,
+        module="WORKING_PAPERS",
+        record_id=wp_id,
+        user=current_user,
+        engagement_id=wp["engagement_id"],
+        details=f"{action.capitalize()}ed {item_label} to WP [{wp['wp_reference']}]",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -972,17 +994,17 @@ def delete_working_paper(
         f"Reason / Justification: {deletion_reason or 'Direct deletion requested'}"
     )
 
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, ?, 'working_paper', ?, ?, ?)
-    """, (
-        current_user.get("id"),
-        current_user.get("username", "admin"),
-        log_action,
-        wp_id,
-        log_details,
-        now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action=log_action,
+        module="WORKING_PAPERS",
+        record_id=wp_id,
+        user=current_user,
+        engagement_id=wp["engagement_id"],
+        details=log_details,
+        timestamp=now_str
+    )
 
     # Delete row
     conn.execute("DELETE FROM working_papers WHERE id = ?", (wp_id,))

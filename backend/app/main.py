@@ -15,7 +15,7 @@ from backend.app.routers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initializes database tables, indexes, immutable triggers, and initial admin account if empty
+    # Initializes database tables, indexes, and immutable triggers
     init_db()
     yield
 
@@ -82,8 +82,5 @@ def serve_index():
 @app.get("/api/health")
 def health_check():
     return {
-        "status": "healthy",
-        "app": "FinAuditPro",
-        "mode": "offline",
-        "architecture": "Hybrid (Deterministic + Statistical ML + Local AI)"
+        "status": "healthy"
     }

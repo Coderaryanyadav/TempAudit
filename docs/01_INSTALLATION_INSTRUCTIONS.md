@@ -73,11 +73,13 @@ Navigate to: `http://127.0.0.1:8000`
 
 ---
 
-## 5. Default Credentials
+## 5. First-Run Administrator Setup Wizard
 
-| Username | Password | Full Name & Role |
-| :--- | :--- | :--- |
-| `admin` | `admin123` | **System Administrator (Partner, FCA)** |
+Upon navigating to `http://127.0.0.1:8000` on a fresh installation, the system launches the **First-Run Administrator Setup Wizard**:
+- **Full Name:** Enter your name (e.g., *Partner / Senior FCA*).
+- **Username:** Master administrator username.
+- **Email:** Notification / recovery email.
+- **Password:** Strong master password (minimum 8 characters with letters and digits).
 
 ---
 

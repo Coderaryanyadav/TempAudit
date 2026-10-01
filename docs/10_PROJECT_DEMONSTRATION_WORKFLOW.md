@@ -6,9 +6,8 @@ Follow this 10-step auditor walkthrough to conduct an end-to-end statutory and t
 
 ## 1. Step 1: Login & Role Selection
 1. Open the application at `http://127.0.0.1:8000` (or `frontend/index.html`).
-2. Log in with Engagement Partner credentials:
-   - **Username:** `admin` | **Password:** `admin123`
-3. Point out the top navigation bar showing active user (`Aaliya Kherani, FCA`), Role (`Admin`), and the **Offline AI Status** badge.
+2. Log in with your Administrator / Auditor credentials created during setup (or run `python scripts/seed_test_data.py` if setting up an automated test environment).
+3. Point out the top navigation bar showing active user name, Role, and the **Offline AI Status** badge.
 
 ---
 

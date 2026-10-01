@@ -61,10 +61,17 @@ def save_auditor_explanation(
     ))
 
     # Log in audit trail
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, 'SAVE_FS_EXPLANATION', 'financial_statement_explanations', ?, ?, ?)
-    """, (username, engagement_id, f"Saved explanation for '{req.item_key}': {req.auditor_explanation[:80]}...", now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="SAVE_FS_EXPLANATION",
+        module="FINANCIAL_STATEMENTS",
+        record_id=req.item_key,
+        user=username,
+        engagement_id=engagement_id,
+        details=f"Saved explanation for '{req.item_key}': {req.auditor_explanation[:80]}...",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

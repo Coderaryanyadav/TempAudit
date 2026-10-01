@@ -85,18 +85,17 @@ class HybridAuditEngine:
             saved_findings.append(f_copy)
 
         # Log audit action
-        conn.execute("""
-        INSERT INTO audit_logs (username, action, module, entity_type, entity_id, details, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            "system_engine",
-            "RUN_HYBRID_AUDIT",
-            "Hybrid Audit Engine",
-            "engagement",
-            self.engagement_id,
-            f"Executed hybrid audit engine on {len(transactions)} transactions. Generated {len(saved_findings)} findings.",
-            now_str
-        ))
+        from backend.app.utils.audit_logger import log_audit_event
+        log_audit_event(
+            conn=conn,
+            action="RUN_HYBRID_AUDIT",
+            module="Hybrid Audit Engine",
+            record_id=self.engagement_id,
+            user="system_engine",
+            engagement_id=self.engagement_id,
+            details=f"Executed hybrid audit engine on {len(transactions)} transactions. Generated {len(saved_findings)} findings.",
+            timestamp=now_str
+        )
 
         conn.commit()
 

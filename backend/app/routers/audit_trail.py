@@ -30,7 +30,40 @@ def calculate_file_hash(filepath: str) -> str:
     return sha256.hexdigest()
 
 
+def _get_user_scoped_engagement_condition(current_user: dict, conn) -> tuple:
+    """
+    If current user is an Admin, returns no extra scoping condition.
+    If current user is an Auditor/Staff, restricts queries to engagements assigned to them.
+    """
+    role = current_user.get("role", "Staff")
+    if role == "Admin":
+        return "", []
+
+    user_id = current_user.get("id")
+    rows = conn.execute("""
+        SELECT id as engagement_id FROM engagements 
+        WHERE lead_auditor_id = ? OR assigned_staff_id = ?
+    """, (user_id, user_id)).fetchall()
+
+    assigned_ids = [r["engagement_id"] for r in rows]
+    if not assigned_ids:
+        return "(engagement_id IS NULL AND user_id = ?)", [user_id]
+
+    placeholders = ",".join("?" * len(assigned_ids))
+    return f"(engagement_id IN ({placeholders}) OR (engagement_id IS NULL AND user_id = ?))", assigned_ids + [user_id]
+
+
 # ----------------- AUDIT LOGS SEARCH & FILTERING -----------------
+
+@router.post("/verify")
+def verify_audit_trail_endpoint(current_user: dict = Depends(get_current_user)):
+    """
+    Verifies the end-to-end cryptographic SHA-256 hash chain of the immutable audit trail.
+    Ensures zero tampering, no broken links, and continuous mathematical integrity.
+    """
+    from backend.app.utils.audit_logger import verify_audit_trail_integrity
+    return verify_audit_trail_integrity()
+
 
 @router.get("")
 def get_audit_trail(
@@ -49,6 +82,7 @@ def get_audit_trail(
     """
     Search and filter append-oriented immutable audit logs with multi-parameter criteria.
     Supports full-text search, action/module/user/date filtering, and pagination.
+    Automatically scopes visibility for non-admin users to assigned engagements.
     """
     if engagement_id:
         require_engagement_access(engagement_id, current_user)
@@ -56,6 +90,12 @@ def get_audit_trail(
     conn = get_db_connection()
     conditions = ["1=1"]
     params = []
+
+    if not engagement_id:
+        scope_cond, scope_params = _get_user_scoped_engagement_condition(current_user, conn)
+        if scope_cond:
+            conditions.append(scope_cond)
+            params.extend(scope_params)
 
     if search and search.strip():
         term = f"%{search.strip()}%"
@@ -133,11 +173,14 @@ def get_audit_trail(
 
 @router.get("/metadata")
 def get_audit_trail_metadata(current_user: dict = Depends(get_current_user)):
-    """Retrieve distinct actions, modules, and users for populating filter controls."""
+    """Retrieve distinct actions, modules, and users for populating filter controls with user engagement scoping."""
     conn = get_db_connection()
-    actions = [r["action"] for r in conn.execute("SELECT DISTINCT action FROM audit_logs WHERE action IS NOT NULL ORDER BY action ASC").fetchall()]
-    modules = [r["module"] for r in conn.execute("SELECT DISTINCT module FROM audit_logs WHERE module IS NOT NULL ORDER BY module ASC").fetchall()]
-    users = [r["username"] for r in conn.execute("SELECT DISTINCT username FROM audit_logs WHERE username IS NOT NULL ORDER BY username ASC").fetchall()]
+    scope_cond, scope_params = _get_user_scoped_engagement_condition(current_user, conn)
+    where_clause = f"WHERE {scope_cond}" if scope_cond else ""
+
+    actions = [r["action"] for r in conn.execute(f"SELECT DISTINCT action FROM audit_logs {where_clause} {'AND' if where_clause else 'WHERE'} action IS NOT NULL ORDER BY action ASC", tuple(scope_params)).fetchall()]
+    modules = [r["module"] for r in conn.execute(f"SELECT DISTINCT module FROM audit_logs {where_clause} {'AND' if where_clause else 'WHERE'} module IS NOT NULL ORDER BY module ASC", tuple(scope_params)).fetchall()]
+    users = [r["username"] for r in conn.execute(f"SELECT DISTINCT username FROM audit_logs {where_clause} {'AND' if where_clause else 'WHERE'} username IS NOT NULL ORDER BY username ASC", tuple(scope_params)).fetchall()]
     conn.close()
 
     # Prepend standard recommended values if empty
@@ -166,34 +209,42 @@ def get_audit_trail_metadata(current_user: dict = Depends(get_current_user)):
 
 @router.get("/statistics")
 def get_audit_trail_statistics(current_user: dict = Depends(get_current_user)):
-    """Provide dashboard metrics on audit trail events, immutability health, and frequency."""
+    """Provide dashboard metrics on audit trail events, immutability health, and frequency scoped to user assignments."""
     conn = get_db_connection()
-    total_logs = conn.execute("SELECT COUNT(*) as c FROM audit_logs").fetchone()["c"]
+    scope_cond, scope_params = _get_user_scoped_engagement_condition(current_user, conn)
+    where_clause = f"WHERE {scope_cond}" if scope_cond else ""
+
+    total_logs = conn.execute(f"SELECT COUNT(*) as c FROM audit_logs {where_clause}", tuple(scope_params)).fetchone()["c"]
 
     today_str = datetime.now().strftime("%Y-%m-%d")
-    today_logs = conn.execute("SELECT COUNT(*) as c FROM audit_logs WHERE timestamp LIKE ?", (f"{today_str}%",)).fetchone()["c"]
+    today_cond = f"{where_clause} {'AND' if where_clause else 'WHERE'} timestamp LIKE ?"
+    today_params = scope_params + [f"{today_str}%"]
+    today_logs = conn.execute(f"SELECT COUNT(*) as c FROM audit_logs {today_cond}", tuple(today_params)).fetchone()["c"]
 
-    module_breakdown = conn.execute("""
+    module_breakdown = conn.execute(f"""
         SELECT module, COUNT(*) as count 
         FROM audit_logs 
+        {where_clause}
         GROUP BY module 
         ORDER BY count DESC
-    """).fetchall()
+    """, tuple(scope_params)).fetchall()
 
-    action_breakdown = conn.execute("""
+    action_breakdown = conn.execute(f"""
         SELECT action, COUNT(*) as count 
         FROM audit_logs 
+        {where_clause}
         GROUP BY action 
         ORDER BY count DESC 
         LIMIT 10
-    """).fetchall()
+    """, tuple(scope_params)).fetchall()
 
-    recent_events = conn.execute("""
+    recent_events = conn.execute(f"""
         SELECT id, timestamp, username, action, module, details 
         FROM audit_logs 
+        {where_clause}
         ORDER BY id DESC 
         LIMIT 8
-    """).fetchall()
+    """, tuple(scope_params)).fetchall()
 
     conn.close()
 
@@ -224,6 +275,11 @@ def export_audit_trail_csv(
     conn = get_db_connection()
     conditions = ["1=1"]
     params = []
+
+    scope_cond, scope_params = _get_user_scoped_engagement_condition(current_user, conn)
+    if scope_cond:
+        conditions.append(scope_cond)
+        params.extend(scope_params)
 
     if search and search.strip():
         term = f"%{search.strip()}%"
@@ -317,10 +373,15 @@ def export_audit_trail_json(
     to_date: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Export filtered audit trail records as a downloadable JSON document."""
+    """Export filtered audit trail records as a downloadable JSON document with user engagement scoping."""
     conn = get_db_connection()
     conditions = ["1=1"]
     params = []
+
+    scope_cond, scope_params = _get_user_scoped_engagement_condition(current_user, conn)
+    if scope_cond:
+        conditions.append(scope_cond)
+        params.extend(scope_params)
 
     if search and search.strip():
         term = f"%{search.strip()}%"

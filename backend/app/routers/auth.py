@@ -269,10 +269,16 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
     # Increment token_version so all older tokens become invalid (Flaw 28)
     new_version = (user["token_version"] or 1) + 1
     conn.execute("UPDATE users SET password_hash = ?, token_version = ? WHERE id = ?", (new_hash, new_version, user["id"]))
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'CHANGE_PASSWORD', 'user', ?, 'User updated account password', ?)
-    """, (user["id"], user["username"], user["id"], now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="CHANGE_PASSWORD",
+        module="AUTH",
+        record_id=user["id"],
+        user=user,
+        details="User updated account password",
+        timestamp=now_str
+    )
     
     conn.commit()
     conn.close()
@@ -328,10 +334,16 @@ def create_user(user_data: UserCreate, current_user: dict = Depends(require_role
 
     new_id = cursor.lastrowid
 
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'CREATE_USER', 'user', ?, ?, ?)
-    """, (current_user["id"], current_user["username"], new_id, f"Created user {username} with role {role}", now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="CREATE_USER",
+        module="USER_MANAGEMENT",
+        record_id=new_id,
+        user=current_user,
+        details=f"Created user {username} with role {role}",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -380,10 +392,16 @@ def update_user(user_id: int, update_data: UserUpdate, current_user: dict = Depe
         params.append(user_id)
         conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", tuple(params))
         now_str = datetime.now().isoformat()
-        conn.execute("""
-        INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, ?, 'UPDATE_USER', 'user', ?, ?, ?)
-        """, (current_user["id"], current_user["username"], user_id, f"Updated user profile for {user['username']}", now_str))
+        from backend.app.utils.audit_logger import log_audit_event
+        log_audit_event(
+            conn=conn,
+            action="UPDATE_USER",
+            module="USER_MANAGEMENT",
+            record_id=user_id,
+            user=current_user,
+            details=f"Updated user profile for {user['username']}",
+            timestamp=now_str
+        )
         conn.commit()
 
     conn.close()
@@ -406,10 +424,16 @@ def toggle_user_status(user_id: int, status_req: UserStatusUpdate, current_user:
 
     conn.execute("UPDATE users SET is_active = ?, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (new_status, user_id))
     action_desc = "Enabled" if new_status else "Disabled"
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'TOGGLE_USER_STATUS', 'user', ?, ?, ?)
-    """, (current_user["id"], current_user["username"], user_id, f"{action_desc} user account {user['username']}", now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="TOGGLE_USER_STATUS",
+        module="USER_MANAGEMENT",
+        record_id=user_id,
+        user=current_user,
+        details=f"{action_desc} user account {user['username']}",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -431,10 +455,16 @@ def admin_reset_password(user_id: int, req: AdminResetPasswordRequest, current_u
     now_str = datetime.now().isoformat()
 
     conn.execute("UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (new_hash, user_id))
-    conn.execute("""
-    INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-    VALUES (?, ?, 'ADMIN_RESET_PASSWORD', 'user', ?, ?, ?)
-    """, (current_user["id"], current_user["username"], user_id, f"Admin reset password for {user['username']}", now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="ADMIN_RESET_PASSWORD",
+        module="USER_MANAGEMENT",
+        record_id=user_id,
+        user=current_user,
+        details=f"Admin reset password for {user['username']}",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

@@ -522,10 +522,17 @@ def run_sales_purchase_reconciliation(
         ))
 
     # Log in audit trail
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, 'EXECUTE_SALES_PURCHASE_RECON', 'reconciliation', ?, ?, ?)
-    """, (created_by, recon_id, f"Executed {recon_type}: {matched_count} matched, {discrepancy_count} discrepancies (Net Diff: ₹{net_amt_diff:,.2f})", now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="EXECUTE_SALES_PURCHASE_RECON",
+        module="RECONCILIATION",
+        record_id=recon_id,
+        user=created_by,
+        engagement_id=engagement_id,
+        details=f"Executed {recon_type}: {matched_count} matched, {discrepancy_count} discrepancies (Net Diff: ₹{net_amt_diff:,.2f})",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

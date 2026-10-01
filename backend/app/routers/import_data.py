@@ -354,16 +354,17 @@ def delete_uploaded_file(
         conn.execute("DELETE FROM uploaded_files WHERE id = ?", (file_id,))
 
         # Audit log
-        conn.execute("""
-        INSERT INTO audit_logs (user_id, username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, ?, 'DELETE_FILE', 'engagement', ?, ?, ?)
-        """, (
-            current_user.get("id"),
-            current_user.get("username", "auditor"),
-            file_info["engagement_id"],
-            f"Deleted imported file '{file_info['file_name']}' and its associated transactions.",
-            now_str
-        ))
+        from backend.app.utils.audit_logger import log_audit_event
+        log_audit_event(
+            conn=conn,
+            action="DELETE_FILE",
+            module="IMPORT",
+            record_id=file_id,
+            user=current_user,
+            engagement_id=file_info["engagement_id"],
+            details=f"Deleted imported file '{file_info['file_name']}' and its associated transactions.",
+            timestamp=now_str
+        )
 
         conn.commit()
 

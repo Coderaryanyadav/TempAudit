@@ -189,10 +189,16 @@ def update_gst_rule(rule_key: str, new_config: Dict[str, Any], updated_by: str =
     """, (config_str, new_version, updated_by, now_str, rule_key))
 
     # Log in audit trail
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, 'UPDATE_GST_RULE', 'gst_rule_configurations', ?, ?, ?)
-    """, (updated_by, row["id"], f"Updated configurable GST rule '{rule_key}' to version {new_version}", now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="UPDATE_GST_RULE",
+        module="GST_RULES",
+        record_id=row["id"],
+        user=updated_by,
+        details=f"Updated configurable GST rule '{rule_key}' to version {new_version}",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()
@@ -215,10 +221,16 @@ def reset_gst_rules_to_default(updated_by: str = "admin") -> bool:
             VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
         """, (rule["rule_key"], rule["category"], rule["title"], rule["description"], rule["config_json"], rule["version"], updated_by, now_str))
 
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, 'RESET_GST_RULES', 'gst_rule_configurations', 0, 'Reset all GST rules to default baseline', ?)
-    """, (updated_by, now_str))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action="RESET_GST_RULES",
+        module="GST_RULES",
+        record_id=0,
+        user=updated_by,
+        details="Reset all GST rules to default baseline",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

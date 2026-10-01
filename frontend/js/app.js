@@ -51,6 +51,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Authentication & Session Bootstrap
 async function checkAuthSession() {
+  try {
+    const status = await FinAuditAPI.getSetupStatus();
+    if (!status.is_setup_completed || status.user_count === 0) {
+      showFirstRunSetupScreen();
+      return;
+    }
+  } catch (e) {
+    console.warn("Could not check setup status:", e);
+  }
+
   const token = FinAuditAPI.getToken();
   if (!token) {
     showLoginScreen();
@@ -73,6 +83,136 @@ async function checkAuthSession() {
   }
 }
 
+function showFirstRunSetupScreen(errorMsg = null) {
+  state.isAuthenticated = false;
+  let overlay = document.getElementById("login-screen-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "login-screen-overlay";
+    document.body.appendChild(overlay);
+  }
+
+  overlay.style.display = "flex";
+  overlay.innerHTML = `
+    <div class="login-card" style="max-width: 480px;">
+      <div class="login-header">
+        <div class="login-logo">F</div>
+        <div class="login-title">FinAuditPro Setup</div>
+        <div class="login-subtitle">First-Time Deployment — Create Master Administrator</div>
+      </div>
+
+      <div class="login-body">
+        <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 12px; color: #0284c7; line-height: 1.5;">
+          <strong>🚀 Welcome to FinAuditPro!</strong><br/>
+          No users exist in this local database. Please create the primary System Administrator (Partner/Lead Auditor) account to activate your firm workspace.
+        </div>
+
+        <div id="setup-alert" class="login-alert-box ${errorMsg ? 'error' : ''}">
+          ${errorMsg || ''}
+        </div>
+
+        <form id="setup-form" onsubmit="handleInitialSetupSubmit(event)">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" id="setup-fullname" class="form-control" placeholder="e.g., CA Rajesh Sharma, FCA" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Admin Username</label>
+            <input type="text" id="setup-username" class="form-control" placeholder="e.g., admin" value="admin" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="setup-email" class="form-control" placeholder="partner@cafirm.in" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Master Password <span style="font-size: 11px; color: #64748b;">(min. 12 characters)</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="setup-password" class="form-control" placeholder="Enter secure passphrase" minlength="12" required>
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('setup-password')">👁️</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Confirm Master Password</label>
+            <div class="password-input-wrap">
+              <input type="password" id="setup-confirm-password" class="form-control" placeholder="Re-enter password" minlength="12" required>
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('setup-confirm-password')">👁️</button>
+            </div>
+          </div>
+
+          <button type="submit" id="setup-submit-btn" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; margin-top: 8px;">
+            Initialize Workspace & Log In
+          </button>
+        </form>
+
+        <div class="login-footer-security">
+          <span class="offline-pill" style="font-size: 10px;"><span class="offline-dot"></span> 100% Offline SQLite</span>
+          <span>• SHA-256 PBKDF2 Encrypted</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.showFirstRunSetupScreen = showFirstRunSetupScreen;
+
+async function handleInitialSetupSubmit(event) {
+  event.preventDefault();
+  const fullName = document.getElementById("setup-fullname").value.trim();
+  const username = document.getElementById("setup-username").value.trim();
+  const email = document.getElementById("setup-email").value.trim();
+  const password = document.getElementById("setup-password").value;
+  const confirmPassword = document.getElementById("setup-confirm-password").value;
+  const alertBox = document.getElementById("setup-alert");
+  const submitBtn = document.getElementById("setup-submit-btn");
+
+  if (password !== confirmPassword) {
+    alertBox.className = "login-alert-box error";
+    alertBox.innerText = "Passwords do not match. Please re-enter.";
+    return;
+  }
+
+  if (password.length < 12) {
+    alertBox.className = "login-alert-box error";
+    alertBox.innerText = "Password must be at least 12 characters long.";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerText = "Initializing Database...";
+
+  try {
+    await FinAuditAPI.initialSetup({
+      username: username,
+      email: email,
+      full_name: fullName,
+      role: "Admin",
+      password: password
+    });
+
+    // Auto login
+    submitBtn.innerText = "Logging in...";
+    await FinAuditAPI.login(username, password);
+    const user = await FinAuditAPI.getMe();
+    state.currentUser = user;
+    state.isAuthenticated = true;
+    hideLoginScreen();
+    updateUserTopBar();
+    applyRoleNavigationPermissions();
+    await loadEngagements();
+    await refreshTopBarAIStatus();
+    navigateTo("dashboard");
+  } catch (err) {
+    alertBox.className = "login-alert-box error";
+    alertBox.innerText = err.message || "Failed to initialize setup.";
+    submitBtn.disabled = false;
+    submitBtn.innerText = "Initialize Workspace & Log In";
+  }
+}
+
 function showLoginScreen(errorMsg = null) {
   state.isAuthenticated = false;
   let overlay = document.getElementById("login-screen-overlay");
@@ -92,24 +232,6 @@ function showLoginScreen(errorMsg = null) {
       </div>
 
       <div class="login-body">
-        <div class="quick-demo-section">
-          <div class="quick-demo-title">
-            <span>⚡ Quick Demo Switcher</span>
-            <span style="font-size: 10px; color: #10b981; font-weight: 600;">100% Offline</span>
-          </div>
-          <div class="quick-demo-chips">
-            <div class="demo-chip" onclick="quickFillLogin('admin', 'admin123')">
-              👑 Partner (Admin)
-            </div>
-            <div class="demo-chip" onclick="quickFillLogin('auditor', 'audit123')">
-              🔍 Senior Auditor
-            </div>
-            <div class="demo-chip" onclick="quickFillLogin('staff', 'staff123')">
-              📝 Audit Assistant
-            </div>
-          </div>
-        </div>
-
         <div id="login-alert" class="login-alert-box ${errorMsg ? 'error' : ''}">
           ${errorMsg || ''}
         </div>
@@ -117,7 +239,7 @@ function showLoginScreen(errorMsg = null) {
         <form id="login-form" onsubmit="handleLoginFormSubmit(event)">
           <div class="form-group">
             <label class="form-label">Username</label>
-            <input type="text" id="login-username" class="form-control" placeholder="Enter username (e.g., admin)" required autofocus>
+            <input type="text" id="login-username" class="form-control" placeholder="Enter your username" required autofocus>
           </div>
 
           <div class="form-group">
@@ -153,12 +275,6 @@ window.showLoginScreen = showLoginScreen;
 function hideLoginScreen() {
   const overlay = document.getElementById("login-screen-overlay");
   if (overlay) overlay.style.display = "none";
-}
-
-function quickFillLogin(username, password) {
-  document.getElementById("login-username").value = username;
-  document.getElementById("login-password").value = password;
-  document.getElementById("login-form").requestSubmit();
 }
 
 function togglePasswordVisibility(inputId) {

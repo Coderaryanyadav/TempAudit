@@ -25,7 +25,7 @@
    - Create a Python virtual environment in `.\venv`.
    - Install all required dependencies from `requirements.txt`.
    - Create runtime storage folders (`backups/`, `uploaded_files/`, `reports_generated/`, `logs/`).
-   - Initialize a clean SQLite database at `backend\finauditpro.db` with default administrator credentials (0 demo data records).
+   - Initialize a clean SQLite database at `backend\finauditpro.db` (0 demo data records, 0 pre-populated users).
    - Check local LM Studio server status at `http://localhost:1234`.
 3. To start the application, double-click **`start.bat`** or run:
    ```cmd
@@ -61,7 +61,7 @@ pip install -r requirements.txt
 ```bash
 python -m backend.app.database
 ```
-*Note: This creates all database tables, triggers, and creates the initial administrator user (`admin` / `admin123`). No demo financial records are inserted.*
+*Note: This creates all database tables, triggers, and cryptographic schemas. The database starts with zero users for strict security.*
 
 ### Step 5: Start FinAuditPro Desktop Server
 ```bash
@@ -71,13 +71,15 @@ Open your browser and navigate to: `http://127.0.0.1:8000`
 
 ---
 
-## 4. Default Credentials
+## 4. First-Run Administrator Setup Wizard
 
-| Username | Password | Full Name & Role |
-| :--- | :--- | :--- |
-| `admin` | `admin123` | **System Administrator (Partner, FCA)** |
+Upon opening `http://127.0.0.1:8000` for the first time, FinAuditPro automatically detects that no administrative account exists and launches the **First-Run Administrator Setup Wizard**:
 
-*You can change your password at any time via the User Menu -> Change My Password modal.*
+1. Enter your Full Name (e.g. *Partner / FCA*).
+2. Set your master Administrator Username.
+3. Enter your contact email.
+4. Choose a strong master password (minimum 8 characters with letters and numbers).
+5. Complete setup and log in securely.
 
 ---
 

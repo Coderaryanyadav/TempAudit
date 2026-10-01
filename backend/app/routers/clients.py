@@ -57,6 +57,24 @@ def list_clients(
             query += " AND c.industry = ?"
             params.append(industry)
 
+        # Scoping for non-Admin users:
+        # Staff: only clients with assigned engagements
+        # Auditor: clients with assigned engagements + unassigned new clients awaiting engagement setup
+        role = current_user.get("role")
+        if role != "Admin":
+            user_id = current_user.get("id")
+            if role == "Auditor":
+                query += """ AND (
+                    c.id IN (SELECT DISTINCT client_id FROM engagements WHERE lead_auditor_id = ? OR assigned_staff_id = ?)
+                    OR NOT EXISTS (SELECT 1 FROM engagements e3 WHERE e3.client_id = c.id)
+                )"""
+                params.extend([user_id, user_id])
+            else: # Audit Staff
+                query += """ AND c.id IN (
+                    SELECT DISTINCT client_id FROM engagements WHERE lead_auditor_id = ? OR assigned_staff_id = ?
+                )"""
+                params.extend([user_id, user_id])
+
         query += " GROUP BY c.id ORDER BY c.id DESC"
         rows = conn.execute(query, tuple(params)).fetchall()
 
@@ -85,8 +103,32 @@ def get_client(
         if not row:
             raise HTTPException(status_code=404, detail="Client not found")
 
+        # Confidentiality check for non-Admin users
+        role = current_user.get("role")
+        if role != "Admin":
+            user_id = current_user.get("id")
+            if role == "Auditor":
+                has_access = conn.execute("""
+                    SELECT 1 FROM clients c
+                    WHERE c.id = ? AND (
+                        c.id IN (SELECT client_id FROM engagements WHERE lead_auditor_id = ? OR assigned_staff_id = ?)
+                        OR NOT EXISTS (SELECT 1 FROM engagements WHERE client_id = ?)
+                    )
+                    LIMIT 1
+                """, (client_id, user_id, user_id, client_id)).fetchone()
+            else:
+                has_access = conn.execute("""
+                    SELECT 1 FROM engagements e
+                    WHERE e.client_id = ? AND (e.lead_auditor_id = ? OR e.assigned_staff_id = ?)
+                    LIMIT 1
+                """, (client_id, user_id, user_id)).fetchone()
+
+            if not has_access:
+                raise HTTPException(status_code=403, detail="Access denied: You are not assigned to any engagements for this client.")
+
         client = dict(row)
-        eng_rows = conn.execute("""
+        
+        eng_query = """
             SELECT e.*, 
                    u.full_name as lead_auditor_name, 
                    s.full_name as assigned_staff_name,
@@ -97,8 +139,15 @@ def get_client(
             LEFT JOIN users u ON e.lead_auditor_id = u.id
             LEFT JOIN users s ON e.assigned_staff_id = s.id
             WHERE e.client_id = ?
-            ORDER BY e.financial_year DESC, e.id DESC
-        """, (client_id,)).fetchall()
+        """
+        eng_params = [client_id]
+        if role != "Admin":
+            user_id = current_user.get("id")
+            eng_query += " AND (e.lead_auditor_id = ? OR e.assigned_staff_id = ?)"
+            eng_params.extend([user_id, user_id])
+            
+        eng_query += " ORDER BY e.financial_year DESC, e.id DESC"
+        eng_rows = conn.execute(eng_query, tuple(eng_params)).fetchall()
 
         client["engagements"] = [dict(e) for e in eng_rows]
         return client

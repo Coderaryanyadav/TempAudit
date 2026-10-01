@@ -15,7 +15,7 @@ if __name__ == "__main__":
     print("  Standalone Desktop Server starting on http://127.0.0.1:8000     ")
     print("==================================================================")
 
-    # Initialize database tables and initial admin if not exists
+    # Initialize database schema
     from backend.app.database import init_db
     init_db()
 

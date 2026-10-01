@@ -886,13 +886,17 @@ def save_yoy_auditor_comment(
     ))
 
     # Log to audit trail
-    conn.execute("""
-        INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        user_name, f"YoY Comparative item '{account_name}' updated to '{status}'", "yoy_comparison", engagement_id,
-        f"Auditor marked '{account_name}' ({item_key}) as '{status}'. Comment: {comment or 'None'}", now_str
-    ))
+    from backend.app.utils.audit_logger import log_audit_event
+    log_audit_event(
+        conn=conn,
+        action=f"YoY Comparative item '{account_name}' updated to '{status}'",
+        module="YOY_COMPARISON",
+        record_id=item_key,
+        user=user_name,
+        engagement_id=engagement_id,
+        details=f"Auditor marked '{account_name}' ({item_key}) as '{status}'. Comment: {comment or 'None'}",
+        timestamp=now_str
+    )
 
     conn.commit()
     conn.close()

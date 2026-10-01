@@ -85,9 +85,8 @@ echo ===========================================================================
 echo.
 echo   To launch the application, run:
 echo     start.bat   OR   python run.py
-echo.
-echo   Default Administrator Credentials:
-echo     Username: admin
-echo     Password: admin123
+echo   First-Run Setup:
+echo     Open http://127.0.0.1:8000 in your browser to complete the
+echo     First-Run Administrator Setup Wizard and create your master credentials.
 echo.
 pause
