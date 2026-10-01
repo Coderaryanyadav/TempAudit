@@ -205,39 +205,47 @@ body {
   flex: 1;
 }
 
+#sidebar .nav-item,
+#sidebar button.nav-item,
 .nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  margin: 2px 12px;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  outline: none;
-  box-shadow: none;
-  width: calc(100% - 24px);
-  box-sizing: border-box;
-  text-align: left;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  appearance: none;
-  -webkit-appearance: none;
-  transition: all 0.12s ease;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 8px 12px !important;
+  margin: 2px 12px !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-secondary) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  width: calc(100% - 24px) !important;
+  box-sizing: border-box !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  font-family: inherit !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  transition: all 0.12s ease !important;
 }
 
+#sidebar .nav-item:hover,
+#sidebar button.nav-item:hover,
 .nav-item:hover {
-  background-color: var(--sidebar-hover);
-  color: var(--text-main);
+  background-color: var(--sidebar-hover, rgba(255, 255, 255, 0.05)) !important;
+  color: var(--text-main, #ffffff) !important;
+  border-color: transparent !important;
 }
 
+#sidebar .nav-item.active,
+#sidebar button.nav-item.active,
 .nav-item.active {
-  background-color: var(--sidebar-active);
-  color: var(--text-main);
-  font-weight: 600;
+  background-color: var(--sidebar-active, rgba(2, 132, 199, 0.15)) !important;
+  color: var(--primary, #38bdf8) !important;
+  font-weight: 600 !important;
+  border-color: transparent !important;
 }
 
 .nav-item svg {
