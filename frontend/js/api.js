@@ -482,6 +482,10 @@ class FinAuditAPI {
     return this.request(`/api/reconciliation/${engagementId}`);
   }
 
+  static listReconciliations(engagementId) {
+    return this.getReconciliations(engagementId);
+  }
+
   static getBankLedgers(engagementId) {
     return this.request(`/api/reconciliation/bank-ledgers/${engagementId}`);
   }
@@ -1017,6 +1021,12 @@ class FinAuditAPI {
   // --- Offline Local AI Model Manager ---
   static getAIStatus() {
     return this.request("/api/ai-manager/status");
+  }
+
+  static testAIConnection() {
+    return this.request("/api/ai-manager/test-connection", {
+      method: "POST"
+    });
   }
 
   static updateAISettings(data) {
