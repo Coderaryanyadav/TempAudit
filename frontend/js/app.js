@@ -1262,20 +1262,40 @@ function setupSidebarControls() {
 
   if (mobileToggle && sidebar) {
     mobileToggle.addEventListener("click", () => {
-      sidebar.classList.toggle("mobile-open");
-      if (backdrop) {
-        backdrop.style.display = sidebar.classList.contains("mobile-open") ? "block" : "none";
-      }
+      toggleMobileSidebar();
     });
   }
 
   if (backdrop && sidebar) {
     backdrop.addEventListener("click", () => {
-      sidebar.classList.remove("mobile-open");
-      backdrop.style.display = "none";
+      toggleMobileSidebar(false);
     });
   }
 }
+
+function toggleMobileSidebar(forceState) {
+  const sidebar = document.getElementById("sidebar");
+  const backdrop = document.getElementById("mobile-sidebar-backdrop");
+  if (!sidebar) return;
+
+  const isOpen = typeof forceState === "boolean" ? forceState : !sidebar.classList.contains("mobile-open");
+  sidebar.classList.toggle("mobile-open", isOpen);
+  if (backdrop) {
+    backdrop.style.display = isOpen ? "block" : "none";
+  }
+}
+window.toggleMobileSidebar = toggleMobileSidebar;
+
+window.closeDrawer = function() {
+  if (typeof closeEvidenceDrawer === "function") {
+    closeEvidenceDrawer();
+  } else {
+    const overlay = document.getElementById("drawer-overlay");
+    const drawer = document.getElementById("evidence-drawer");
+    if (overlay) overlay.style.display = "none";
+    if (drawer) drawer.classList.remove("open");
+  }
+};
 
 function setupKeyboardShortcuts() {
   document.addEventListener("keydown", (e) => {
