@@ -4,14 +4,274 @@ const state = {
   currentUser: null,
   isAuthenticated: false,
   currentTab: "dashboard",
-  currentEngagementId: 1,
+  currentEngagementId: null,
   engagements: [],
   activeEngagement: null,
   activeFinding: null,
-  uploadPreview: null
+  uploadPreview: null,
+  isSidebarCollapsed: false,
+  isFormDirty: false
 };
 
+// ==========================================
+// UNIFIED NOTIFICATION SYSTEM (FinNotify)
+// ==========================================
+const FinNotify = {
+  container: null,
+  
+  init() {
+    if (!this.container) {
+      this.container = document.getElementById("notification-toast-container");
+      if (!this.container) {
+        this.container = document.createElement("div");
+        this.container.id = "notification-toast-container";
+        this.container.className = "toast-container";
+        document.body.appendChild(this.container);
+      }
+    }
+  },
+
+  show({ type = "info", title = "", message = "", duration = 4000 }) {
+    this.init();
+    const toast = document.createElement("div");
+    toast.className = `toast-item toast-${type}`;
+    toast.setAttribute("role", "alert");
+    toast.setAttribute("aria-live", "polite");
+
+    const icons = {
+      success: "✓",
+      error: "✕",
+      warning: "⚠",
+      info: "ℹ"
+    };
+
+    const defaultTitles = {
+      success: "Operation Successful",
+      error: "Action Failed",
+      warning: "Attention Required",
+      info: "Information"
+    };
+
+    const displayTitle = title || defaultTitles[type] || "Notice";
+    const icon = icons[type] || "ℹ";
+
+    toast.innerHTML = `
+      <div class="toast-icon-wrap">${icon}</div>
+      <div class="toast-content-wrap">
+        <div class="toast-title">${escapeHTML(displayTitle)}</div>
+        ${message ? `<div class="toast-message">${escapeHTML(message)}</div>` : ""}
+      </div>
+      <button type="button" class="toast-close-btn" aria-label="Dismiss notification">✕</button>
+      <div class="toast-progress" style="animation-duration: ${duration}ms;"></div>
+    `;
+
+    const closeBtn = toast.querySelector(".toast-close-btn");
+    const removeToast = () => {
+      toast.classList.add("fade-out");
+      setTimeout(() => {
+        if (toast.parentElement) toast.parentElement.removeChild(toast);
+      }, 250);
+    };
+
+    closeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeToast();
+    });
+
+    this.container.appendChild(toast);
+
+    if (duration > 0) {
+      setTimeout(removeToast, duration);
+    }
+    return toast;
+  },
+
+  success(message, title = "Success") {
+    return this.show({ type: "success", title, message, duration: 4500 });
+  },
+
+  error(message, title = "Error") {
+    return this.show({ type: "error", title, message, duration: 6000 });
+  },
+
+  warning(message, title = "Warning") {
+    return this.show({ type: "warning", title, message, duration: 5000 });
+  },
+
+  info(message, title = "Notice") {
+    return this.show({ type: "info", title, message, duration: 4000 });
+  }
+};
+
+// Global toast / alert redirection
+window.FinNotify = FinNotify;
+window.showToast = (msg, type = "info") => FinNotify[type] ? FinNotify[type](msg) : FinNotify.info(msg);
+window.alert = (msg) => {
+  if (typeof msg !== "string") msg = String(msg);
+  if (msg.toLowerCase().includes("fail") || msg.toLowerCase().includes("error")) {
+    FinNotify.error(msg);
+  } else if (msg.toLowerCase().includes("success") || msg.toLowerCase().includes("complete") || msg.toLowerCase().includes("saved")) {
+    FinNotify.success(msg);
+  } else if (msg.toLowerCase().includes("warn") || msg.toLowerCase().includes("required")) {
+    FinNotify.warning(msg);
+  } else {
+    FinNotify.info(msg);
+  }
+};
+
+// ==========================================
+// UNIFIED CONFIRMATION MODAL SYSTEM (FinConfirm)
+// ==========================================
+function FinConfirm({
+  title = "Confirm Action",
+  message = "Are you sure you want to proceed?",
+  consequences = [],
+  confirmText = "Confirm",
+  cancelText = "Cancel",
+  isDanger = false
+}) {
+  return new Promise((resolve) => {
+    let container = document.getElementById("fin-confirm-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "fin-confirm-container";
+      document.body.appendChild(container);
+    }
+
+    const consequenceListHtml = consequences && consequences.length > 0
+      ? `<div class="fin-confirm-consequences">
+           <div class="consequence-label">Affected items:</div>
+           <ul>${consequences.map(c => `<li>${escapeHTML(c)}</li>`).join("")}</ul>
+         </div>`
+      : "";
+
+    container.innerHTML = `
+      <div class="fin-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="fin-confirm-card ${isDanger ? 'confirm-danger' : ''}">
+          <div class="fin-confirm-header">
+            <div class="fin-confirm-icon">${isDanger ? '⚠️' : '❓'}</div>
+            <h3 id="confirm-modal-title" class="fin-confirm-title">${escapeHTML(title)}</h3>
+          </div>
+          <div class="fin-confirm-body">
+            <p class="fin-confirm-msg">${escapeHTML(message)}</p>
+            ${consequenceListHtml}
+          </div>
+          <div class="fin-confirm-actions">
+            <button type="button" class="btn btn-secondary" id="fin-confirm-cancel-btn">${escapeHTML(cancelText)}</button>
+            <button type="button" class="btn ${isDanger ? 'btn-danger' : 'btn-primary'}" id="fin-confirm-ok-btn">${escapeHTML(confirmText)}</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const overlay = container.querySelector(".fin-confirm-overlay");
+    const cancelBtn = document.getElementById("fin-confirm-cancel-btn");
+    const okBtn = document.getElementById("fin-confirm-ok-btn");
+
+    const cleanup = (result) => {
+      container.innerHTML = "";
+      document.removeEventListener("keydown", handleKey);
+      resolve(result);
+    };
+
+    const handleKey = (e) => {
+      if (e.key === "Escape") cleanup(false);
+      if (e.key === "Enter") cleanup(true);
+    };
+
+    cancelBtn.addEventListener("click", () => cleanup(false));
+    okBtn.addEventListener("click", () => cleanup(true));
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) cleanup(false);
+    });
+
+    document.addEventListener("keydown", handleKey);
+    okBtn.focus();
+  });
+}
+window.FinConfirm = FinConfirm;
+
+// ==========================================
+// ERROR TRANSLATOR & DIAGNOSTIC RENDERER
+// ==========================================
+function translateError(err, contextTitle = "Action Failed") {
+  const rawMsg = (typeof err === "string" ? err : err?.message || "An unexpected error occurred").trim();
+  let friendlyTitle = contextTitle;
+  let friendlyMessage = rawMsg;
+  let suggestion = "Please review your input or try again.";
+
+  if (rawMsg.includes("UNIQUE constraint failed: engagements.title") || rawMsg.includes("UNIQUE constraint failed: engagements.reference")) {
+    friendlyTitle = "Duplicate Engagement Reference";
+    friendlyMessage = "An audit engagement with this title or reference already exists in your workspace.";
+    suggestion = "Please change the engagement title or financial year and try again.";
+  } else if (rawMsg.includes("UNIQUE constraint failed: clients.pan")) {
+    friendlyTitle = "Duplicate Client PAN";
+    friendlyMessage = "A client record with this Permanent Account Number (PAN) is already registered.";
+    suggestion = "Check the Client Directory to view or edit the existing client record.";
+  } else if (rawMsg.includes("UNIQUE constraint failed: users.username")) {
+    friendlyTitle = "Username Already Taken";
+    friendlyMessage = "A user account with this username already exists.";
+    suggestion = "Please choose a different username.";
+  } else if (rawMsg.includes("401") || rawMsg.toLowerCase().includes("unauthorized") || rawMsg.toLowerCase().includes("token expired")) {
+    friendlyTitle = "Session Expired";
+    friendlyMessage = "Your local authentication session has timed out or is no longer valid.";
+    suggestion = "Please log in again to continue working.";
+  } else if (rawMsg.includes("403") || rawMsg.toLowerCase().includes("forbidden") || rawMsg.toLowerCase().includes("permission")) {
+    friendlyTitle = "Access Restricted";
+    friendlyMessage = "You do not have the required administrative permissions for this operation.";
+    suggestion = "Contact your firm's Lead Partner or Administrator to adjust your role privileges.";
+  } else if (rawMsg.toLowerCase().includes("failed to fetch") || rawMsg.toLowerCase().includes("networkerror")) {
+    friendlyTitle = "Local Service Unavailable";
+    friendlyMessage = "Could not communicate with the local FinAuditPro backend server.";
+    suggestion = "Ensure the local server process is running on port 8000 and try again.";
+  }
+
+  return {
+    title: friendlyTitle,
+    friendlyMessage,
+    suggestion,
+    rawError: rawMsg
+  };
+}
+
+function renderErrorBanner(err, contextTitle = "Action Failed") {
+  const translated = translateError(err, contextTitle);
+  return `
+    <div class="error-banner-card">
+      <div class="error-banner-header">
+        <div class="error-banner-icon">⚠️</div>
+        <div>
+          <h4 class="error-banner-title">${escapeHTML(translated.title)}</h4>
+          <p class="error-banner-message">${escapeHTML(translated.friendlyMessage)}</p>
+        </div>
+      </div>
+      <div class="error-banner-suggestion">
+        <strong>What you can do:</strong> ${escapeHTML(translated.suggestion)}
+      </div>
+      <details class="error-diagnostic-details">
+        <summary>Technical Details & Diagnostics</summary>
+        <div class="error-diagnostic-body">
+          <code>${escapeHTML(translated.rawError)}</code>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${escapeHTML(translated.rawError).replace(/'/g, "\\'")}'); FinNotify.info('Diagnostic details copied to clipboard');" style="margin-top: 8px;">
+            📋 Copy Diagnostic Info
+          </button>
+        </div>
+      </details>
+    </div>
+  `;
+}
+
 // Formatting helpers
+function escapeHTML(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function formatINR(val) {
   const num = Number(val) || 0;
   return "₹" + num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -45,6 +305,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupNavigation();
   setupDrawer();
   setupUserMenu();
+  setupSidebarControls();
+  setupGlobalSearch();
+  setupKeyboardShortcuts();
   refreshTopBarAIStatus().catch(() => {});
   await checkAuthSession();
 });
@@ -317,7 +580,19 @@ async function handleLoginFormSubmit(event) {
 }
 
 async function handleLogout() {
-  if (confirm("Are you sure you want to sign out of FinAuditPro?")) {
+  const confirmed = await FinConfirm({
+    title: "Sign Out of FinAuditPro",
+    message: "Are you sure you want to end your current local session?",
+    consequences: [
+      "Any unsaved form entries in active tabs may be cleared",
+      "Local cached session tokens will be removed"
+    ],
+    confirmText: "Sign Out",
+    cancelText: "Stay Signed In",
+    isDanger: false
+  });
+
+  if (confirmed) {
     await FinAuditAPI.logout();
     state.currentUser = null;
     state.isAuthenticated = false;
@@ -325,66 +600,302 @@ async function handleLogout() {
   }
 }
 
-function updateUserTopBar() {
-  const user = state.currentUser || { username: "admin", full_name: "Audit User", role: "Admin" };
-  const userAvatar = document.getElementById("top-user-avatar");
-  const userName = document.getElementById("top-user-name");
-  const userRoleBadge = document.getElementById("top-user-role-badge");
+function setupSidebarControls() {
+  const collapseToggle = document.getElementById("sidebar-collapse-toggle");
+  const mobileToggle = document.getElementById("mobile-sidebar-toggle");
+  const backdrop = document.getElementById("mobile-sidebar-backdrop");
+  const sidebar = document.getElementById("sidebar");
+  const mainContent = document.getElementById("main-content");
+  const topBar = document.getElementById("top-bar");
 
-  const initials = user.full_name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
-  
-  if (userAvatar) {
-    userAvatar.innerText = initials || "CA";
-    userAvatar.className = "user-avatar " + user.role.toLowerCase().replace(" ", "");
+  if (collapseToggle && sidebar) {
+    collapseToggle.addEventListener("click", () => {
+      state.isSidebarCollapsed = !state.isSidebarCollapsed;
+      sidebar.classList.toggle("sidebar-collapsed", state.isSidebarCollapsed);
+      if (mainContent) mainContent.classList.toggle("sidebar-collapsed", state.isSidebarCollapsed);
+      if (topBar) topBar.classList.toggle("sidebar-collapsed", state.isSidebarCollapsed);
+    });
   }
-  if (userName) {
-    userName.innerText = user.full_name;
+
+  if (mobileToggle && sidebar) {
+    mobileToggle.addEventListener("click", () => {
+      sidebar.classList.toggle("mobile-open");
+      if (backdrop) {
+        backdrop.style.display = sidebar.classList.contains("mobile-open") ? "block" : "none";
+      }
+    });
   }
-  if (userRoleBadge) {
-    userRoleBadge.innerHTML = getRoleBadge(user.role);
+
+  if (backdrop && sidebar) {
+    backdrop.addEventListener("click", () => {
+      sidebar.classList.remove("mobile-open");
+      backdrop.style.display = "none";
+    });
   }
-  refreshTopBarAIStatus();
 }
 
-async function refreshTopBarAIStatus() {
-  const statusEl = document.getElementById("top-ai-status-text");
-  if (!statusEl) return;
-  try {
-    const aiStatus = await FinAuditAPI.getAIStatus();
-    if (!aiStatus.is_enabled) {
-      statusEl.innerHTML = `<span style="color: #94a3b8;">🤖 AI: Disabled</span>`;
-    } else if (aiStatus.is_available) {
-      statusEl.innerHTML = `<span style="color: #10b981; font-weight: 600;">🤖 AI: Ready (${aiStatus.engine.split(' ')[0]})</span>`;
-    } else {
-      statusEl.innerHTML = `<span style="color: #f59e0b; font-weight: 600;">🤖 AI: Offline (Deterministic Mode)</span>`;
+function setupKeyboardShortcuts() {
+  document.addEventListener("keydown", (e) => {
+    // Cmd+K or Ctrl+K for Global Search
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      openGlobalSearchModal();
     }
-  } catch (err) {
-    statusEl.innerHTML = `<span style="color: #94a3b8;">🤖 AI: Offline Mode</span>`;
+    // Escape to close drawers and modals
+    if (e.key === "Escape") {
+      closeGlobalSearchModal();
+      if (typeof closeDrawer === "function") closeDrawer();
+      const userMenu = document.getElementById("user-dropdown-menu");
+      if (userMenu) userMenu.classList.remove("show");
+    }
+  });
+}
+
+function setupGlobalSearch() {
+  const searchBtn = document.getElementById("global-search-btn");
+  if (searchBtn) {
+    searchBtn.addEventListener("click", () => {
+      openGlobalSearchModal();
+    });
   }
 }
 
-function applyRoleNavigationPermissions() {
-  const role = state.currentUser?.role || "Auditor";
-  const usersNavItem = document.getElementById("nav-users-item");
-  if (usersNavItem) {
-    usersNavItem.style.display = role === "Admin" ? "flex" : "none";
+function openGlobalSearchModal() {
+  let container = document.getElementById("global-search-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "global-search-container";
+    document.body.appendChild(container);
+  }
+
+  container.innerHTML = `
+    <div class="global-search-overlay" id="global-search-modal-overlay">
+      <div class="global-search-dialog">
+        <div class="global-search-header">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="global-search-input" class="global-search-input" placeholder="Search engagements, clients, findings, working papers, or navigation tabs..." autofocus />
+          <button type="button" class="global-search-close-btn" onclick="closeGlobalSearchModal()" aria-label="Close search">✕</button>
+        </div>
+        <div class="global-search-body" id="global-search-results">
+          <div class="search-empty-hint">Type to start searching across your workspace or use navigation shortcuts below.</div>
+          <div class="search-quick-nav-section">
+            <div class="search-section-title">Quick Navigation</div>
+            <div class="search-quick-grid">
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('dashboard')">📊 Dashboard</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('import')">📥 Import Data</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('trial_balance')">⚖️ Trial Balance</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('general_ledger')">📖 General Ledger</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('findings')">🚩 Audit Findings</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('working_papers')">📝 Working Papers</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('clients')">🏢 Clients</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('engagements')">📁 Engagements</button>
+            </div>
+          </div>
+        </div>
+        <div class="global-search-footer">
+          <span>Navigate with <kbd>Tab</kbd> or <kbd>Enter</kbd></span>
+          <span>Close with <kbd>Esc</kbd></span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const input = document.getElementById("global-search-input");
+  const overlay = document.getElementById("global-search-modal-overlay");
+
+  if (overlay) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeGlobalSearchModal();
+    });
+  }
+
+  if (input) {
+    input.focus();
+    input.addEventListener("input", debounce(handleGlobalSearchQuery, 200));
   }
 }
 
-function setupUserMenu() {
-  const badge = document.getElementById("top-user-badge");
-  const menu = document.getElementById("user-dropdown-menu");
+function closeGlobalSearchModal() {
+  const container = document.getElementById("global-search-container");
+  if (container) container.innerHTML = "";
+}
 
-  if (badge && menu) {
-    badge.addEventListener("click", (e) => {
-      e.stopPropagation();
-      menu.classList.toggle("show");
-    });
+window.closeGlobalSearchModal = closeGlobalSearchModal;
 
-    document.addEventListener("click", () => {
-      menu.classList.remove("show");
+function navigateToTabFromSearch(tab) {
+  closeGlobalSearchModal();
+  navigateTo(tab);
+}
+window.navigateToTabFromSearch = navigateToTabFromSearch;
+
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
+async function handleGlobalSearchQuery(e) {
+  const query = e.target.value.trim().toLowerCase();
+  const resultsContainer = document.getElementById("global-search-results");
+  if (!resultsContainer) return;
+
+  if (!query) {
+    resultsContainer.innerHTML = `
+      <div class="search-empty-hint">Type to start searching across your workspace or use navigation shortcuts below.</div>
+      <div class="search-quick-nav-section">
+        <div class="search-section-title">Quick Navigation</div>
+        <div class="search-quick-grid">
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('dashboard')">📊 Dashboard</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('import')">📥 Import Data</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('trial_balance')">⚖️ Trial Balance</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('general_ledger')">📖 General Ledger</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('findings')">🚩 Audit Findings</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('working_papers')">📝 Working Papers</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('clients')">🏢 Clients</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('engagements')">📁 Engagements</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // Filter engagements & clients
+  const matchedEngagements = (state.engagements || []).filter(eng => 
+    (eng.title && eng.title.toLowerCase().includes(query)) ||
+    (eng.client_name && eng.client_name.toLowerCase().includes(query)) ||
+    (eng.financial_year && eng.financial_year.toLowerCase().includes(query))
+  );
+
+  let html = "";
+  if (matchedEngagements.length > 0) {
+    html += `<div class="search-section-title">Audit Engagements (${matchedEngagements.length})</div>`;
+    matchedEngagements.forEach(eng => {
+      html += `
+        <div class="search-result-row" onclick="selectEngagementFromSearch(${eng.id})">
+          <div class="search-result-icon">📁</div>
+          <div class="search-result-details">
+            <div class="search-result-title">${escapeHTML(eng.client_name)} — ${escapeHTML(eng.title)}</div>
+            <div class="search-result-sub">FY ${escapeHTML(eng.financial_year)} • ${escapeHTML(eng.audit_type || 'Statutory Audit')}</div>
+          </div>
+          <span class="badge badge-medium">Switch & View</span>
+        </div>
+      `;
     });
   }
+
+  // Navigation tab matches
+  const navTabs = [
+    { id: "dashboard", label: "Executive Dashboard", desc: "Overview of findings, risks and KPIs" },
+    { id: "import", label: "Import Financial Data", desc: "Upload Trial Balance, GL, GSTR, Bank Statements" },
+    { id: "cleaning_logs", label: "Data Quality & Cleaning", desc: "Ingestion and validation logs" },
+    { id: "trial_balance", label: "Trial Balance", desc: "Interactive TB review with drill-down" },
+    { id: "general_ledger", label: "General Ledger Explorer", desc: "Search transactions and ledger accounts" },
+    { id: "reconciliation", label: "Reconciliation Statements", desc: "GST 2B vs Purchase, Bank Reconciliation" },
+    { id: "financial_statements", label: "Financial Statements", desc: "Balance sheet, P&L, Notes to Accounts" },
+    { id: "yoy_comparison", label: "Year-over-Year Analysis", desc: "Variance and ratio trends" },
+    { id: "findings", label: "Audit Findings & Exceptions", desc: "Review, waive, or flag high-risk anomalies" },
+    { id: "checklist", label: "CARO & Standards Checklist", desc: "Statutory compliance workflows" },
+    { id: "working_papers", label: "Working Papers & ISA Documentation", desc: "Auditor working papers and evidence" },
+    { id: "reports", label: "Audit Report Generation", desc: "Draft and export statutory audit reports" },
+    { id: "clients", label: "Client Directory", desc: "Manage client organizations, PANs and GSTINs" },
+    { id: "engagements", label: "Engagement Hub", desc: "Manage audit engagements and scopes" },
+    { id: "users", label: "Firm User Management", desc: "Manage auditor accounts and permissions" },
+    { id: "audit_trail", label: "Cryptographic Audit Trail", desc: "Tamper-evident SHA-256 event log" },
+    { id: "settings", label: "Workspace Settings", desc: "Firm preferences and configuration" }
+  ];
+
+  const matchedTabs = navTabs.filter(t => 
+    t.label.toLowerCase().includes(query) || 
+    t.desc.toLowerCase().includes(query) || 
+    t.id.toLowerCase().includes(query)
+  );
+
+  if (matchedTabs.length > 0) {
+    html += `<div class="search-section-title">Navigation & Modules (${matchedTabs.length})</div>`;
+    matchedTabs.forEach(t => {
+      html += `
+        <div class="search-result-row" onclick="navigateToTabFromSearch('${t.id}')">
+          <div class="search-result-icon">⚡</div>
+          <div class="search-result-details">
+            <div class="search-result-title">${escapeHTML(t.label)}</div>
+            <div class="search-result-sub">${escapeHTML(t.desc)}</div>
+          </div>
+          <span class="badge badge-low">Go to tab</span>
+        </div>
+      `;
+    });
+  }
+
+  if (!html) {
+    html = `<div class="search-empty-hint">No results found matching "<strong>${escapeHTML(query)}</strong>". Try searching for clients, engagements, or navigation tabs.</div>`;
+  }
+
+  resultsContainer.innerHTML = html;
+}
+
+window.selectEngagementFromSearch = async function(engId) {
+  closeGlobalSearchModal();
+  state.currentEngagementId = engId;
+  const select = document.getElementById("engagement-select");
+  if (select) select.value = String(engId);
+  await updateActiveEngagement();
+  navigateTo(state.currentTab);
+  FinNotify.success("Switched active engagement context");
+};
+
+// ==========================================
+// EMPTY ENGAGEMENT ONBOARDING RENDERER
+// ==========================================
+function renderEmptyEngagementGuide(container, tabName = "dashboard") {
+  container.innerHTML = `
+    <div class="onboarding-hero-card">
+      <div class="onboarding-hero-icon">🚀</div>
+      <h2 class="onboarding-hero-title">Welcome to FinAuditPro!</h2>
+      <p class="onboarding-hero-desc">
+        You don't have any audit engagements configured yet. To begin auditing, create a client record and initialize your first audit engagement.
+      </p>
+
+      <div class="onboarding-step-grid">
+        <div class="onboarding-step-box active-step">
+          <div class="step-badge">Step 1</div>
+          <div class="step-title">Register Client</div>
+          <div class="step-desc">Add client details, PAN, GSTIN, and company type in the Client Directory.</div>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="navigateTo('clients')" style="margin-top: 10px;">
+            Go to Clients →
+          </button>
+        </div>
+
+        <div class="onboarding-step-box">
+          <div class="step-badge">Step 2</div>
+          <div class="step-title">Create Engagement</div>
+          <div class="step-desc">Define financial year (e.g., 2025-26), audit scope, and assigned team members.</div>
+          <button type="button" class="btn btn-sm btn-primary" onclick="navigateTo('engagements')" style="margin-top: 10px;">
+            Create Engagement →
+          </button>
+        </div>
+
+        <div class="onboarding-step-box">
+          <div class="step-badge">Step 3</div>
+          <div class="step-title">Import & Audit</div>
+          <div class="step-desc">Upload Trial Balance, GL, GSTR data to run automated checks & generate papers.</div>
+          <button type="button" class="btn btn-sm btn-secondary" disabled style="margin-top: 10px; opacity: 0.6;">
+            Pending Engagement
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center;">
+        <button type="button" class="btn btn-primary" onclick="navigateTo('engagements')" style="padding: 10px 20px; font-weight: 600;">
+          + Create First Engagement
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="navigateTo('clients')" style="padding: 10px 20px;">
+          View Client Directory
+        </button>
+      </div>
+    </div>
+  `;
 }
 
 // Navigation
@@ -394,13 +905,27 @@ function setupNavigation() {
       const tab = item.dataset.tab;
       if (tab) navigateTo(tab);
     });
+    // Keyboard accessibility (Enter / Space)
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        const tab = item.dataset.tab;
+        if (tab) navigateTo(tab);
+      }
+    });
   });
 
   const engSelect = document.getElementById("engagement-select");
   if (engSelect) {
     engSelect.addEventListener("change", async (e) => {
-      state.currentEngagementId = parseInt(e.target.value);
-      await updateActiveEngagement();
+      const val = e.target.value;
+      if (!val) {
+        state.currentEngagementId = null;
+        state.activeEngagement = null;
+      } else {
+        state.currentEngagementId = parseInt(val);
+        await updateActiveEngagement();
+      }
       navigateTo(state.currentTab);
     });
   }
@@ -409,14 +934,24 @@ function setupNavigation() {
 async function loadEngagements() {
   try {
     const list = await FinAuditAPI.getEngagements();
-    state.engagements = list;
+    state.engagements = list || [];
     const select = document.getElementById("engagement-select");
     if (select) {
-      select.innerHTML = list.map(e => `
-        <option value="${e.id}" ${e.id === state.currentEngagementId ? 'selected' : ''}>
-          ${e.client_name} (${e.financial_year}) — ${e.title}
-        </option>
-      `).join("");
+      if (state.engagements.length === 0) {
+        select.innerHTML = `<option value="">No Active Engagement</option>`;
+        state.currentEngagementId = null;
+        state.activeEngagement = null;
+      } else {
+        // If current engagement is null or no longer valid, select first one
+        if (!state.currentEngagementId || !state.engagements.some(e => e.id === state.currentEngagementId)) {
+          state.currentEngagementId = state.engagements[0].id;
+        }
+        select.innerHTML = state.engagements.map(e => `
+          <option value="${e.id}" ${e.id === state.currentEngagementId ? 'selected' : ''}>
+            ${escapeHTML(e.client_name)} (${escapeHTML(e.financial_year)}) — ${escapeHTML(e.title)}
+          </option>
+        `).join("");
+      }
     }
     await updateActiveEngagement();
   } catch (err) {
@@ -426,14 +961,14 @@ async function loadEngagements() {
 
 async function updateActiveEngagement() {
   try {
-    if (!state.currentEngagementId && state.engagements.length > 0) {
-      state.currentEngagementId = state.engagements[0].id;
-    }
     if (state.currentEngagementId) {
       state.activeEngagement = await FinAuditAPI.getEngagementDetails(state.currentEngagementId);
+    } else {
+      state.activeEngagement = null;
     }
   } catch (err) {
     console.error("Error updating engagement details:", err);
+    state.activeEngagement = null;
   }
 }
 
@@ -441,10 +976,39 @@ function navigateTo(tab) {
   state.currentTab = tab;
   document.querySelectorAll(".nav-item").forEach(item => {
     item.classList.toggle("active", item.dataset.tab === tab);
+    item.setAttribute("aria-selected", item.dataset.tab === tab ? "true" : "false");
   });
 
+  // Close mobile sidebar on navigation
+  const sidebar = document.getElementById("sidebar");
+  const backdrop = document.getElementById("mobile-sidebar-backdrop");
+  if (sidebar && sidebar.classList.contains("mobile-open")) {
+    sidebar.classList.remove("mobile-open");
+    if (backdrop) backdrop.style.display = "none";
+  }
+
   const container = document.getElementById("content-container");
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading ${tab}...</div>`;
+
+  // Check if this tab requires an active engagement
+  const engagementRequiredTabs = [
+    "dashboard", "import", "cleaning_logs", "trial_balance", "general_ledger", 
+    "ledgers", "reconciliation", "financial_statements", "yoy_comparison", 
+    "duplicate_missing", "anomaly_detection", "findings", "checklist", 
+    "working_papers", "reports"
+  ];
+
+  if (engagementRequiredTabs.includes(tab) && (!state.currentEngagementId || !state.engagements || state.engagements.length === 0)) {
+    renderEmptyEngagementGuide(container, tab);
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="padding: 24px;">
+      <div class="skeleton-shimmer skeleton-box" style="height: 38px; width: 280px; margin-bottom: 20px;"></div>
+      <div class="skeleton-shimmer skeleton-card" style="height: 140px; margin-bottom: 20px;"></div>
+      <div class="skeleton-shimmer skeleton-box" style="height: 220px; width: 100%;"></div>
+    </div>
+  `;
 
   switch (tab) {
     case "dashboard": renderDashboard(); break;
