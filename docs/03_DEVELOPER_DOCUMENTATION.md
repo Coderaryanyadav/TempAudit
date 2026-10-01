@@ -83,7 +83,7 @@ Before any prompt or query context is passed to LM Studio, the `sanitize_audit_t
 
 ## 3. Pluggable Local AI Provider Interface
 
-FinAuditPro communicates with local LLMs via `LMStudioProvider` in [backend/app/services/local_ai_provider.py](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/backend/app/services/local_ai_provider.py):
+FinAuditPro communicates with local LLMs via `LMStudioProvider` in [`backend/app/services/local_ai_provider.py`](../backend/app/services/local_ai_provider.py):
 
 ```python
 class LMStudioProvider(BaseLocalAIProvider):

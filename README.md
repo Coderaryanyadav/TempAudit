@@ -10,16 +10,16 @@ audit seniors, and audit practitioners in India.
 
 | Document                             | Purpose                                                 | File Link                                                                                                                               |
 | :----------------------------------- | :------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. Installation Instructions**     | System requirements, offline prerequisites, setup steps | [01_INSTALLATION_INSTRUCTIONS.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/01_INSTALLATION_INSTRUCTIONS.md)           |
-| **2. User Manual**                   | Complete 16-step auditor workflow and module guide      | [02_USER_MANUAL.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/02_USER_MANUAL.md)                                       |
-| **3. Developer Documentation**       | Codebase architecture, service extensions, AI interface | [03_DEVELOPER_DOCUMENTATION.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/03_DEVELOPER_DOCUMENTATION.md)               |
-| **4. Database Schema Documentation** | Complete SQLite table specifications & triggers         | [04_DATABASE_SCHEMA.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/04_DATABASE_SCHEMA.md)                               |
-| **5. Architecture Diagram**          | Mermaid architecture of frontend, backend, AI & DB      | [05_ARCHITECTURE_DIAGRAM.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/05_ARCHITECTURE_DIAGRAM.md)                     |
-| **6. API Documentation**             | Full REST API endpoints, methods, and descriptions      | [06_API_DOCUMENTATION.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/06_API_DOCUMENTATION.md)                           |
-| **7. Test Report**                   | 118 unit tests report and intentional exceptions matrix | [07_TEST_REPORT.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/07_TEST_REPORT.md)                                       |
-| **8. Sample Datasets Guide**         | Details of all 4 sample test files in `sample_files/`   | [08_SAMPLE_DATASETS_GUIDE.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/08_SAMPLE_DATASETS_GUIDE.md)                   |
-| **9. Offline AI Setup**              | Ollama, llama.cpp, GGUF setup and Built-in engine       | [09_OFFLINE_AI_SETUP.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/09_OFFLINE_AI_SETUP.md)                             |
-| **10. Demonstration Workflow**       | 10-step statutory audit demo script for stakeholders    | [10_PROJECT_DEMONSTRATION_WORKFLOW.md](file:///c:/Users/sbmpc.student/Desktop/TempAudit-main/docs/10_PROJECT_DEMONSTRATION_WORKFLOW.md) |
+| **1. Installation Instructions**     | System requirements, offline prerequisites, setup steps | [01_INSTALLATION_INSTRUCTIONS.md](docs/01_INSTALLATION_INSTRUCTIONS.md)           |
+| **2. User Manual**                   | Complete 16-step auditor workflow and module guide      | [02_USER_MANUAL.md](docs/02_USER_MANUAL.md)                                       |
+| **3. Developer Documentation**       | Codebase architecture, service extensions, AI interface | [03_DEVELOPER_DOCUMENTATION.md](docs/03_DEVELOPER_DOCUMENTATION.md)               |
+| **4. Database Schema Documentation** | Complete SQLite table specifications & triggers         | [04_DATABASE_SCHEMA.md](docs/04_DATABASE_SCHEMA.md)                               |
+| **5. Architecture Diagram**          | Mermaid architecture of frontend, backend, AI & DB      | [05_ARCHITECTURE_DIAGRAM.md](docs/05_ARCHITECTURE_DIAGRAM.md)                     |
+| **6. API Documentation**             | Full REST API endpoints, methods, and descriptions      | [06_API_DOCUMENTATION.md](docs/06_API_DOCUMENTATION.md)                           |
+| **7. Test Report**                   | 118 unit tests report and intentional exceptions matrix | [07_TEST_REPORT.md](docs/07_TEST_REPORT.md)                                       |
+| **8. Sample Datasets Guide**         | Details of all 4 sample test files in `sample_files/`   | [08_SAMPLE_DATASETS_GUIDE.md](docs/08_SAMPLE_DATASETS_GUIDE.md)                   |
+| **9. Offline AI Setup**              | Ollama, llama.cpp, GGUF setup and Built-in engine       | [09_OFFLINE_AI_SETUP.md](docs/09_OFFLINE_AI_SETUP.md)                             |
+| **10. Demonstration Workflow**       | 10-step statutory audit demo script for stakeholders    | [10_PROJECT_DEMONSTRATION_WORKFLOW.md](docs/10_PROJECT_DEMONSTRATION_WORKFLOW.md) |
 
 ---
 
