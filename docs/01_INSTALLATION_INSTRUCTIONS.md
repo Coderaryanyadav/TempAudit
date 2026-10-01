@@ -73,13 +73,43 @@ Navigate to: `http://127.0.0.1:8000`
 
 ---
 
-## 5. First-Run Administrator Setup Wizard
+## 5. First-Run Setup, Onboarding & User Activation
 
-Upon navigating to `http://127.0.0.1:8000` on a fresh installation, the system launches the **First-Run Administrator Setup Wizard**:
-- **Full Name:** Enter your name (e.g., *Partner / Senior FCA*).
-- **Username:** Master administrator username.
-- **Email:** Notification / recovery email.
-- **Password:** Strong master password (minimum 8 characters with letters and digits).
+Upon navigating to `http://127.0.0.1:8000` on a fresh installation, the system automatically detects an uninitialized workspace and presents the **Welcome & Practice Setup Wizard**:
+
+### Step 1: Master Administrator Creation
+- **Full Name:** Lead Partner / Practitioner Name (e.g., *CA Rajeshwar Sharma, FCA*).
+- **Username & Email:** Master credentials.
+- **Professional Designation:** e.g., *Senior Partner, FCA*.
+- **Password:** Strong password (minimum 8 characters with letters, numbers, and special symbols).
+
+### Step 2: Firm / Practice Profile Setup
+- **Firm Name:** Registered CA Firm or Professional Practice Name.
+- **ICAI Registration / FRN:** (e.g., *123456N*).
+- **Practice Address, City, State, PIN:** Official practice location for report generation.
+- **Contact Details:** Email, Phone, Website.
+
+### Step 3: Session Security & Local AI Shield
+- **Session Timeout:** Select idle logout threshold (15, 30, 60, or 120 minutes).
+- **AI Privacy Mode:** 
+  - *Local AI Only (Maximum Privacy):* Air-gapped compliance; audit data never leaves your computer.
+  - *Allow Configured Providers:* Allows connections to local or custom LLM endpoints.
+
+### Step 4: Backup Storage Location
+- **Backup Directory:** Specify path on local or external drive for automated snapshots.
+- **Snapshot Frequency:** Daily on exit, manual, or custom intervals.
+
+### Step 5: Setup Completion & Workspace Launch
+- Verify summary checklist and click **Open FinAuditPro Workspace** to enter the main dashboard.
+
+---
+
+### 👥 Adding Team Members (Offline Activation)
+1. Navigate to **Administration → Users** and click **Add User**.
+2. Enter staff details (Name, Username, Role: *Partner*, *Auditor*, or *Audit Staff*).
+3. The system generates a single-use 32-character activation code valid for 48 hours.
+4. Share the activation code with the staff member.
+5. On their browser/desktop, the staff member clicks **"Have an activation code?"**, enters the code, sets their private permanent password, and immediately accesses their assigned audit engagements.
 
 ---
 

@@ -317,11 +317,45 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // Authentication & Session Bootstrap
+// Global setup wizard transient state
+let _wizardState = {
+  admin: null,
+  firm: {
+    firm_name: "",
+    address: "",
+    city: "",
+    state: "",
+    country: "India",
+    pin_code: "",
+    email: "",
+    phone: "",
+    website: "",
+    icai_reg_number: ""
+  },
+  security: {
+    session_timeout_minutes: 60,
+    local_ai_mode: "LOCAL_ONLY"
+  },
+  backup: {
+    backup_location: "backups",
+    auto_backup_enabled: true,
+    backup_retention_days: 30
+  }
+};
+
+// Authentication & Session Bootstrap
 async function checkAuthSession() {
   try {
     const status = await FinAuditAPI.getSetupStatus();
-    if (!status.is_setup_completed || status.user_count === 0) {
-      showFirstRunSetupScreen();
+    if (status.state === "UNINITIALIZED" || status.user_count === 0) {
+      FinAuditAPI.setToken(null);
+      showWelcomeSplash();
+      return;
+    } else if (status.state === "SETUP_REQUIRED") {
+      showSetupWizard(2);
+      return;
+    } else if (status.state === "DATABASE_ERROR") {
+      showSystemDatabaseError(status.error);
       return;
     }
   } catch (e) {
@@ -346,11 +380,13 @@ async function checkAuthSession() {
     navigateTo("dashboard");
   } catch (err) {
     console.warn("Auth check failed:", err.message);
-    showLoginScreen(err.message.includes("disabled") ? err.message : null);
+    FinAuditAPI.setToken(null);
+    showLoginScreen(err.message && err.message.includes("disabled") ? err.message : null);
   }
 }
 
-function showFirstRunSetupScreen(errorMsg = null) {
+// ----------------- STATE A: FRESH LAUNCH WELCOME SPLASH -----------------
+function showWelcomeSplash() {
   state.isAuthenticated = false;
   let overlay = document.getElementById("login-screen-overlay");
   if (!overlay) {
@@ -361,108 +397,612 @@ function showFirstRunSetupScreen(errorMsg = null) {
 
   overlay.style.display = "flex";
   overlay.innerHTML = `
-    <div class="login-card" style="max-width: 480px;">
-      <div class="login-header">
+    <div class="welcome-splash-card">
+      <div class="welcome-splash-hero">
         <div class="login-logo">F</div>
-        <div class="login-title">FinAuditPro Setup</div>
-        <div class="login-subtitle">First-Time Deployment — Create Master Administrator</div>
+        <h1>Welcome to FinAuditPro</h1>
+        <p>Your offline-first, professional audit workspace built for statutory auditors and tax professionals.</p>
+
+        <div class="splash-actions">
+          <button class="btn btn-primary" onclick="showSetupWizard(1)">Get Started (First-Time Setup)</button>
+          <button class="btn btn-secondary" onclick="showActivationModal()">Have an Activation Code?</button>
+        </div>
       </div>
 
-      <div class="login-body">
-        <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 12px; color: #0284c7; line-height: 1.5;">
-          <strong>🚀 Welcome to FinAuditPro!</strong><br/>
-          No users exist in this local database. Please create the primary System Administrator (Partner/Lead Auditor) account to activate your firm workspace.
+      <div class="welcome-features-grid">
+        <div class="welcome-feature-card">
+          <div class="welcome-feature-icon">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+          </div>
+          <div class="feature-content">
+            <h4>100% Offline & Private</h4>
+            <p>Zero cloud transmission. All client transactions, working papers, and audit ledgers reside safely in your local SQLite engine.</p>
+          </div>
         </div>
 
-        <div id="setup-alert" class="login-alert-box ${errorMsg ? 'error' : ''}">
+        <div class="welcome-feature-card">
+          <div class="welcome-feature-icon">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
+          </div>
+          <div class="feature-content">
+            <h4>Statutory Compliance</h4>
+            <p>Built-in deterministic rules for Section 40A(3), 269ST, GST 2B ITC matching, BRS reconciliation, and CARO 2020 reporting.</p>
+          </div>
+        </div>
+
+        <div class="welcome-feature-card">
+          <div class="welcome-feature-icon">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+          </div>
+          <div class="feature-content">
+            <h4>Cryptographic Immutability</h4>
+            <p>Sequential SHA-256 hash chaining on all audit trail entries and evidence artifacts guarantees tamper-evident provenance.</p>
+          </div>
+        </div>
+
+        <div class="welcome-feature-card">
+          <div class="welcome-feature-icon">
+             <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+          </div>
+          <div class="feature-content">
+            <h4>Local AI Assistant</h4>
+            <p>Privacy-shielded local inference (LM Studio / Ollama) that redacts PANs, GSTINs, and accounts before evaluation.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="splash-footer">
+        <span>FinAuditPro v1.0.0</span>
+        <button class="btn btn-secondary btn-sm" onclick="showLoginScreen()">Already have an account? Sign In</button>
+      </div>
+    </div>
+  `;
+}window.showWelcomeSplash = showWelcomeSplash;
+
+
+// ----------------- STATE B: FIRST-RUN SETUP WIZARD (STEPS 1 TO 5) -----------------
+function showSetupWizard(step = 1, errorMsg = null) {
+  state.isAuthenticated = false;
+  let overlay = document.getElementById("login-screen-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "login-screen-overlay";
+    document.body.appendChild(overlay);
+  }
+
+  overlay.style.display = "flex";
+
+  const renderStepper = (activeStep) => `
+    <div class="wizard-stepper">
+      <div class="wizard-step-item ${activeStep === 1 ? 'active' : activeStep > 1 ? 'completed' : ''}">
+        <span class="wizard-step-num">${activeStep > 1 ? '✓' : '1'}</span>
+        <span>Administrator</span>
+      </div>
+      <div style="color: var(--text-secondary);">→</div>
+      <div class="wizard-step-item ${activeStep === 2 ? 'active' : activeStep > 2 ? 'completed' : ''}">
+        <span class="wizard-step-num">${activeStep > 2 ? '✓' : '2'}</span>
+        <span>Firm Profile</span>
+      </div>
+      <div style="color: var(--text-secondary);">→</div>
+      <div class="wizard-step-item ${activeStep === 3 ? 'active' : activeStep > 3 ? 'completed' : ''}">
+        <span class="wizard-step-num">${activeStep > 3 ? '✓' : '3'}</span>
+        <span>Security & AI</span>
+      </div>
+      <div style="color: var(--text-secondary);">→</div>
+      <div class="wizard-step-item ${activeStep === 4 ? 'active' : activeStep > 4 ? 'completed' : ''}">
+        <span class="wizard-step-num">${activeStep > 4 ? '✓' : '4'}</span>
+        <span>Backups</span>
+      </div>
+      <div style="color: var(--text-secondary);">→</div>
+      <div class="wizard-step-item ${activeStep === 5 ? 'active' : ''}">
+        <span class="wizard-step-num">5</span>
+        <span>Complete</span>
+      </div>
+    </div>
+  `;
+
+  let bodyContent = "";
+
+  if (step === 1) {
+    // STEP 1: CREATE MASTER ADMINISTRATOR
+    bodyContent = `
+      <div class="login-header" style="background: #0f172a; padding: 20px 24px; text-align: left; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div class="login-title" style="font-size: 18px;">Step 1: Create Master Administrator</div>
+          <div class="login-subtitle" style="margin-top: 2px;">Primary Engagement Partner account with full system governance</div>
+        </div>
+        <div class="login-logo" style="margin: 0; width: 36px; height: 36px; font-size: 18px;">1</div>
+      </div>
+      ${renderStepper(1)}
+      <div style="padding: 24px;">
+        <div id="setup-alert" class="login-alert-box ${errorMsg ? 'error' : ''}" style="${errorMsg ? 'display:block;' : 'display:none;'}">
           ${errorMsg || ''}
         </div>
 
-        <form id="setup-form" onsubmit="handleInitialSetupSubmit(event)">
-          <div class="form-group">
-            <label class="form-label">Full Name</label>
-            <input type="text" id="setup-fullname" class="form-control" placeholder="e.g., CA Rajesh Sharma, FCA" required autofocus>
+        <form id="wizard-step1-form" onsubmit="handleWizardStep1(event)">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Full Name <span style="color: #ef4444;">*</span></label>
+              <input type="text" id="wz-fullname" class="form-control" placeholder="e.g., CA Rajesh Sharma" required autofocus>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Professional Designation</label>
+              <input type="text" id="wz-designation" class="form-control" placeholder="e.g., Senior Partner (FCA)">
+            </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Admin Username</label>
-            <input type="text" id="setup-username" class="form-control" placeholder="Enter administrator username" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Email Address</label>
-            <input type="email" id="setup-email" class="form-control" placeholder="partner@cafirm.in" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Master Password <span style="font-size: 11px; color: #64748b;">(min. 12 characters)</span></label>
-            <div class="password-input-wrap">
-              <input type="password" id="setup-password" class="form-control" placeholder="Enter secure passphrase" minlength="12" required>
-              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('setup-password')">👁️</button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Username <span style="color: #ef4444;">*</span></label>
+              <input type="text" id="wz-username" class="form-control" placeholder="e.g., admin or rajesh.ca" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Official Email <span style="color: #ef4444;">*</span></label>
+              <input type="email" id="wz-email" class="form-control" placeholder="e.g., partner@cafirm.in" required>
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Confirm Master Password</label>
-            <div class="password-input-wrap">
-              <input type="password" id="setup-confirm-password" class="form-control" placeholder="Re-enter password" minlength="12" required>
-              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('setup-confirm-password')">👁️</button>
+            <label class="form-label">Phone Number <span style="color: var(--text-muted); font-size: 11px;">(Optional)</span></label>
+            <input type="text" id="wz-phone" class="form-control" placeholder="+91 98765 43210">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Master Password <span style="color: #ef4444;">*</span></label>
+              <div class="password-input-wrap">
+                <input type="password" id="wz-password" class="form-control" placeholder="Min. 10 characters" minlength="10" required>
+                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('wz-password')">👁️</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm Password <span style="color: #ef4444;">*</span></label>
+              <div class="password-input-wrap">
+                <input type="password" id="wz-confirm-password" class="form-control" placeholder="Re-enter password" minlength="10" required>
+                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('wz-confirm-password')">👁️</button>
+              </div>
             </div>
           </div>
 
-          <button type="submit" id="setup-submit-btn" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; margin-top: 8px;">
-            Initialize Workspace & Log In
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 16px; font-size: 11px; color: var(--text-secondary);">
+            🔒 Passwords are cryptographically salted and hashed using PBKDF2-HMAC-SHA256 (100,000 rounds).
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="btn btn-secondary" onclick="showWelcomeSplash()">Back</button>
+            <button type="submit" id="wz-step1-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
+              Save & Continue to Firm Profile →
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+  } else if (step === 2) {
+    // STEP 2: FIRM PROFILE
+    const f = _wizardState.firm;
+    bodyContent = `
+      <div class="login-header" style="background: #0f172a; padding: 20px 24px; text-align: left; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div class="login-title" style="font-size: 18px;">Step 2: CA Firm / Practice Profile</div>
+          <div class="login-subtitle" style="margin-top: 2px;">Organizational metadata used in audit working papers and formal reports</div>
+        </div>
+        <div class="login-logo" style="margin: 0; width: 36px; height: 36px; font-size: 18px;">2</div>
+      </div>
+      ${renderStepper(2)}
+      <div style="padding: 24px;">
+        <form id="wizard-step2-form" onsubmit="handleWizardStep2(event)">
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Firm / Practice Name <span style="color: #ef4444;">*</span></label>
+              <input type="text" id="wz-firm-name" class="form-control" value="${f.firm_name}" required autofocus>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ICAI Firm Reg No (FRN)</label>
+              <input type="text" id="wz-firm-icai" class="form-control" value="${f.icai_reg_number}" placeholder="FRN-XXXXXX">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Office Address</label>
+            <input type="text" id="wz-firm-address" class="form-control" value="${f.address}" placeholder="Office / Chamber address">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">City</label>
+              <input type="text" id="wz-firm-city" class="form-control" value="${f.city}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">State</label>
+              <input type="text" id="wz-firm-state" class="form-control" value="${f.state}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">PIN Code</label>
+              <input type="text" id="wz-firm-pin" class="form-control" value="${f.pin_code}">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Practice Email</label>
+              <input type="email" id="wz-firm-email" class="form-control" value="${f.email}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Contact Phone</label>
+              <input type="text" id="wz-firm-phone" class="form-control" value="${f.phone}">
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+            <button type="button" class="btn btn-secondary" onclick="showSetupWizard(1)">← Back</button>
+            <button type="submit" id="wz-step2-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
+              Save & Continue to Security →
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+  } else if (step === 3) {
+    // STEP 3: SECURITY & LOCAL AI PRIVACY
+    bodyContent = `
+      <div class="login-header" style="background: #0f172a; padding: 20px 24px; text-align: left; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div class="login-title" style="font-size: 18px;">Step 3: Session Security & Local AI Privacy</div>
+          <div class="login-subtitle" style="margin-top: 2px;">Configure session timeouts and data privacy boundaries</div>
+        </div>
+        <div class="login-logo" style="margin: 0; width: 36px; height: 36px; font-size: 18px;">3</div>
+      </div>
+      ${renderStepper(3)}
+      <div style="padding: 24px;">
+        <form id="wizard-step3-form" onsubmit="handleWizardStep3(event)">
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
+            <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 6px;">⏱️ Session Inactivity Timeout</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Automatically locks the workstation session after a period of inactivity to prevent unauthorized physical access.</div>
+            <select id="wz-session-timeout" class="form-control" style="max-width: 240px;">
+              <option value="15">15 Minutes</option>
+              <option value="30">30 Minutes</option>
+              <option value="60" selected>60 Minutes (Recommended)</option>
+              <option value="120">2 Hours</option>
+            </select>
+          </div>
+
+          <div style="background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
+            <div style="font-weight: 700; font-size: 14px; color: #0284c7; margin-bottom: 6px;">🤖 Local AI Inference Privacy Shield</div>
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+              FinAuditPro connects strictly to offline local LLMs (LM Studio / Ollama / Built-in Reasoner). All prompts automatically sanitize client PANs, GSTINs, bank accounts, and entity names.
+            </div>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-main); cursor: pointer;">
+              <input type="checkbox" id="wz-local-ai-only" checked> Enforce strict offline local-only AI policy (No cloud external URLs)
+            </label>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+            <button type="button" class="btn btn-secondary" onclick="showSetupWizard(2)">← Back</button>
+            <button type="submit" id="wz-step3-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
+              Save & Continue to Backup →
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+  } else if (step === 4) {
+    // STEP 4: BACKUP CONFIGURATION
+    bodyContent = `
+      <div class="login-header" style="background: #0f172a; padding: 20px 24px; text-align: left; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div class="login-title" style="font-size: 18px;">Step 4: Audit Evidence & Database Backups</div>
+          <div class="login-subtitle" style="margin-top: 2px;">Ensure point-in-time recovery and cryptographic backup verification</div>
+        </div>
+        <div class="login-logo" style="margin: 0; width: 36px; height: 36px; font-size: 18px;">4</div>
+      </div>
+      ${renderStepper(4)}
+      <div style="padding: 24px;">
+        <form id="wizard-step4-form" onsubmit="handleWizardStep4(event)">
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
+            <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 4px;">💾 Local Backup Directory</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Backups include full SQLite database, uploaded evidence artifacts, and SHA-256 verification manifest.</div>
+            <input type="text" id="wz-backup-dir" class="form-control" value="backups" placeholder="Folder path or external drive folder">
+          </div>
+
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 8px; cursor: pointer;">
+              <input type="checkbox" id="wz-auto-backup" checked> Enable automatic database snapshot before major operations
+            </label>
+            <div style="font-size: 12px; color: var(--text-muted);">Snapshots will be automatically retained locally for 30 days.</div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+            <button type="button" class="btn btn-secondary" onclick="showSetupWizard(3)">← Back</button>
+            <div style="display: flex; gap: 10px;">
+              <button type="button" class="btn btn-outline" onclick="skipWizardStep4()">Skip for now</button>
+              <button type="submit" id="wz-step4-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
+                Finish Configuration →
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    `;
+  } else if (step === 5) {
+    // STEP 5: SETUP SUMMARY & OPEN FINIPRO
+    bodyContent = `
+      <div class="login-header" style="background: #0f172a; padding: 24px; text-align: center;">
+        <div class="login-logo" style="width: 48px; height: 48px; font-size: 24px; margin: 0 auto 10px auto; background: linear-gradient(135deg, #10b981, #059669);">✓</div>
+        <div class="login-title" style="font-size: 22px;">You're Ready to Audit!</div>
+        <div class="login-subtitle" style="margin-top: 4px;">FinAuditPro has been successfully initialized and configured.</div>
+      </div>
+      ${renderStepper(5)}
+      <div style="padding: 24px;">
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 20px;">
+          <div style="padding: 12px 16px; background: var(--bg-app); border-bottom: 1px solid #e2e8f0; font-weight: 700; font-size: 13px; color: var(--text-secondary);">
+            SYSTEM CONFIGURATION SUMMARY
+          </div>
+          <div style="padding: 16px; font-size: 13px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>👤 Master Administrator</span>
+              <strong style="color: #059669;">✓ Created & Authenticated</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>🏢 Audit Firm Profile</span>
+              <strong style="color: #059669;">✓ ${_wizardState.firm.firm_name || 'Configured'}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>🔒 Session Security & Offline AI</span>
+              <strong style="color: #059669;">✓ Enforced (100% Offline)</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>💾 Backup Storage</span>
+              <strong style="color: #059669;">✓ ${_wizardState.backup.backup_location || 'Configured'}</strong>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="handleFinishSetupAndOpen()" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 10px;">
+          Open FinAuditPro Workspace →
+        </button>
+      </div>
+    `;
+  }
+
+  overlay.innerHTML = `<div class="wizard-card">${bodyContent}</div>`;
+}
+window.showSetupWizard = showSetupWizard;
+
+
+async function handleWizardStep1(event) {
+  event.preventDefault();
+  const fullName = document.getElementById("wz-fullname").value.trim();
+  const username = document.getElementById("wz-username").value.trim();
+  const email = document.getElementById("wz-email").value.trim();
+  const designation = document.getElementById("wz-designation").value.trim();
+  const phone = document.getElementById("wz-phone").value.trim();
+  const password = document.getElementById("wz-password").value;
+  const confirmPassword = document.getElementById("wz-confirm-password").value;
+  const alertBox = document.getElementById("setup-alert");
+  const btn = document.getElementById("wz-step1-btn");
+
+  if (password !== confirmPassword) {
+    alertBox.style.display = "block";
+    alertBox.className = "login-alert-box error";
+    alertBox.innerText = "Passwords do not match. Please re-enter.";
+    return;
+  }
+  if (password.length < 10) {
+    alertBox.style.display = "block";
+    alertBox.className = "login-alert-box error";
+    alertBox.innerText = "Password must be at least 10 characters long.";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = "Creating Master Admin...";
+
+  try {
+    const res = await FinAuditAPI.initialSetup({
+      username,
+      email,
+      full_name: fullName,
+      designation,
+      phone,
+      password
+    });
+
+    _wizardState.admin = res.user;
+    if (res.access_token) {
+      FinAuditAPI.setToken(res.access_token);
+    }
+    showSetupWizard(2);
+  } catch (err) {
+    alertBox.style.display = "block";
+    alertBox.innerText = err.message || "Failed to create administrator.";
+    btn.disabled = false;
+    btn.innerText = "Save & Continue to Firm Profile →";
+  }
+}
+
+async function handleWizardStep2(event) {
+  event.preventDefault();
+  const firmName = document.getElementById("wz-firm-name").value.trim();
+  const icai = document.getElementById("wz-firm-icai").value.trim();
+  const address = document.getElementById("wz-firm-address").value.trim();
+  const city = document.getElementById("wz-firm-city").value.trim();
+  const stateVal = document.getElementById("wz-firm-state").value.trim();
+  const pin = document.getElementById("wz-firm-pin").value.trim();
+  const email = document.getElementById("wz-firm-email").value.trim();
+  const phone = document.getElementById("wz-firm-phone").value.trim();
+
+  _wizardState.firm = {
+    firm_name: firmName,
+    icai_reg_number: icai,
+    address,
+    city,
+    state: stateVal,
+    country: "India",
+    pin_code: pin,
+    email,
+    phone
+  };
+
+  try {
+    await FinAuditAPI.setupFirmProfile(_wizardState.firm);
+  } catch (e) {
+    console.warn("Firm profile save warning:", e);
+  }
+
+  showSetupWizard(3);
+}
+
+async function handleWizardStep3(event) {
+  event.preventDefault();
+  const timeout = parseInt(document.getElementById("wz-session-timeout").value) || 60;
+  const localOnly = document.getElementById("wz-local-ai-only").checked;
+
+  _wizardState.security = {
+    session_timeout_minutes: timeout,
+    local_ai_mode: localOnly ? "LOCAL_ONLY" : "ALLOW_CONFIGURED"
+  };
+
+  try {
+    await FinAuditAPI.setupSecurityConfig(_wizardState.security);
+  } catch (e) {
+    console.warn("Security save warning:", e);
+  }
+
+  showSetupWizard(4);
+}
+
+async function handleWizardStep4(event) {
+  event.preventDefault();
+  const backupDir = document.getElementById("wz-backup-dir").value.trim() || "backups";
+  const autoBackup = document.getElementById("wz-auto-backup").checked;
+
+  _wizardState.backup = {
+    backup_location: backupDir,
+    auto_backup_enabled: autoBackup,
+    backup_retention_days: 30
+  };
+
+  try {
+    await FinAuditAPI.setupBackupConfig(_wizardState.backup);
+  } catch (e) {
+    console.warn("Backup save warning:", e);
+  }
+
+  showSetupWizard(5);
+}
+
+function skipWizardStep4() {
+  _wizardState.backup.backup_location = "backups";
+  showSetupWizard(5);
+}
+
+async function handleFinishSetupAndOpen() {
+  try {
+    await FinAuditAPI.setupComplete();
+  } catch (e) {}
+
+  hideLoginScreen();
+  try {
+    const user = await FinAuditAPI.getMe();
+    state.currentUser = user;
+    state.isAuthenticated = true;
+    updateUserTopBar();
+    applyRoleNavigationPermissions();
+    await loadEngagements();
+    await refreshTopBarAIStatus();
+    navigateTo("dashboard");
+    FinNotify.success("FinAuditPro setup complete! Welcome to your offline audit workspace.");
+  } catch (err) {
+    showLoginScreen();
+  }
+}
+
+
+// ----------------- LOCAL USER ACTIVATION MODAL -----------------
+function showActivationModal(initialToken = "") {
+  let overlay = document.getElementById("login-screen-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "login-screen-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = "flex";
+
+  overlay.innerHTML = `
+    <div class="login-card" style="max-width: 460px;">
+      <div class="login-header" style="background: #0f172a; padding: 22px 24px; text-align: center;">
+        <div class="login-logo" style="margin: 0 auto 10px auto;">🔑</div>
+        <div class="login-title" style="font-size: 19px;">Activate User Account</div>
+        <div class="login-subtitle">Enter your activation code to join this audit workspace</div>
+      </div>
+
+      <div class="login-body">
+        <div id="activation-alert" class="login-alert-box" style="display: none;"></div>
+
+        <form id="activation-form" onsubmit="handleActivationSubmit(event)">
+          <div class="form-group">
+            <label class="form-label">Activation Code / Token <span style="color: #ef4444;">*</span></label>
+            <input type="text" id="act-token" class="form-control" placeholder="Paste 32-character activation code" value="${initialToken}" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Create Your Permanent Password <span style="color: #ef4444;">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="act-password" class="form-control" placeholder="Min. 8 characters" minlength="8" required>
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('act-password')">👁️</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Confirm Password <span style="color: #ef4444;">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="act-confirm-password" class="form-control" placeholder="Re-enter password" minlength="8" required>
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('act-confirm-password')">👁️</button>
+            </div>
+          </div>
+
+          <button type="submit" id="act-submit-btn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 700; margin-top: 8px;">
+            Activate Account & Log In →
           </button>
         </form>
 
-        <div class="login-footer-security">
-          <span class="offline-pill" style="font-size: 10px;"><span class="offline-dot"></span> 100% Offline SQLite</span>
-          <span>• Passwords protected using PBKDF2-HMAC-SHA256</span>
+        <div style="display: flex; justify-content: center; gap: 8px; margin-top: 14px;">
+          <button class="btn btn-secondary btn-sm" onclick="checkAuthSession()">← Back to Setup / Login</button>
+          <button class="btn btn-outline btn-sm" onclick="showSetupWizard(1)" style="color: #0284c7; border-color: #0284c7;">🚀 First-Time Setup</button>
         </div>
       </div>
     </div>
   `;
 }
+window.showActivationModal = showActivationModal;
 
-window.showFirstRunSetupScreen = showFirstRunSetupScreen;
-
-async function handleInitialSetupSubmit(event) {
+async function handleActivationSubmit(event) {
   event.preventDefault();
-  const fullName = document.getElementById("setup-fullname").value.trim();
-  const username = document.getElementById("setup-username").value.trim();
-  const email = document.getElementById("setup-email").value.trim();
-  const password = document.getElementById("setup-password").value;
-  const confirmPassword = document.getElementById("setup-confirm-password").value;
-  const alertBox = document.getElementById("setup-alert");
-  const submitBtn = document.getElementById("setup-submit-btn");
+  const token = document.getElementById("act-token").value.trim();
+  const password = document.getElementById("act-password").value;
+  const confirmPassword = document.getElementById("act-confirm-password").value;
+  const alertBox = document.getElementById("activation-alert");
+  const btn = document.getElementById("act-submit-btn");
 
   if (password !== confirmPassword) {
     alertBox.className = "login-alert-box error";
-    alertBox.innerText = "Passwords do not match. Please re-enter.";
+    alertBox.style.display = "block";
+    alertBox.innerText = "Passwords do not match.";
     return;
   }
 
-  if (password.length < 12) {
-    alertBox.className = "login-alert-box error";
-    alertBox.innerText = "Password must be at least 12 characters long.";
-    return;
-  }
-
-  submitBtn.disabled = true;
-  submitBtn.innerText = "Initializing Database...";
+  btn.disabled = true;
+  btn.innerText = "Activating account...";
 
   try {
-    await FinAuditAPI.initialSetup({
-      username: username,
-      email: email,
-      full_name: fullName,
-      role: "Admin",
+    const res = await FinAuditAPI.activateUser({
+      activation_token: token,
       password: password
     });
 
-    // Auto login
-    submitBtn.innerText = "Logging in...";
-    await FinAuditAPI.login(username, password);
+    if (res.access_token) {
+      FinAuditAPI.setToken(res.access_token);
+    }
     const user = await FinAuditAPI.getMe();
     state.currentUser = user;
     state.isAuthenticated = true;
@@ -470,16 +1010,62 @@ async function handleInitialSetupSubmit(event) {
     updateUserTopBar();
     applyRoleNavigationPermissions();
     await loadEngagements();
-    await refreshTopBarAIStatus();
     navigateTo("dashboard");
+    FinNotify.success(`Account activated! Welcome to FinAuditPro, ${user.full_name}.`);
   } catch (err) {
     alertBox.className = "login-alert-box error";
-    alertBox.innerText = err.message || "Failed to initialize setup.";
-    submitBtn.disabled = false;
-    submitBtn.innerText = "Initialize Workspace & Log In";
+    alertBox.style.display = "block";
+    alertBox.innerText = err.message || "Failed to activate account.";
+    btn.disabled = false;
+    btn.innerText = "Activate Account & Log In →";
   }
 }
 
+
+// ----------------- STATE D: DATABASE INTEGRITY / INSTALLATION PROBLEM -----------------
+function showSystemDatabaseError(errorMsg) {
+  let overlay = document.getElementById("login-screen-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "login-screen-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = "flex";
+
+  overlay.innerHTML = `
+    <div class="login-card" style="max-width: 500px; border-top: 4px solid #ef4444;">
+      <div class="login-header" style="background: #0f172a; padding: 24px; text-align: center;">
+        <div style="font-size: 36px; margin-bottom: 8px;">⚠️</div>
+        <div class="login-title" style="font-size: 20px; color: #f87171;">Installation Diagnostic Alert</div>
+        <div class="login-subtitle">FinAuditPro could not safely open this installation</div>
+      </div>
+
+      <div class="login-body">
+        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; font-size: 13px; color: #b91c1c; line-height: 1.5;">
+          ${errorMsg || 'The local SQLite database or file storage could not be verified.'}
+        </div>
+
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 18px;">
+          <strong>Recommended Resolution:</strong>
+          <ul style="margin: 6px 0 0 18px;">
+            <li>Verify file system permissions for the <code>finauditpro.db</code> file.</li>
+            <li>Ensure no conflicting background locks are active on the database.</li>
+            <li>Restore from your latest verified <code>.finpkg</code> backup snapshot if necessary.</li>
+          </ul>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-primary" onclick="checkAuthSession()" style="flex: 1; padding: 12px;">
+            🔄 Retry Connection
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+
+// ----------------- STATE C: NORMAL LOGIN SCREEN -----------------
 function showLoginScreen(errorMsg = null) {
   state.isAuthenticated = false;
   let overlay = document.getElementById("login-screen-overlay");
@@ -491,52 +1077,48 @@ function showLoginScreen(errorMsg = null) {
 
   overlay.style.display = "flex";
   overlay.innerHTML = `
-    <div class="login-card">
-      <div class="login-header">
-        <div class="login-logo">F</div>
-        <div class="login-title">FinAuditPro</div>
-        <div class="login-subtitle">Standalone Offline AI Audit Assistant for Indian CAs</div>
+    <div class="welcome-splash-card" style="width: 440px; padding: 40px;">
+      <div class="login-header" style="background: transparent; border: none; padding: 0 0 24px;">
+        <div class="login-logo" style="width: 40px; height: 40px; font-size: 20px;">F</div>
+        <div class="login-title" style="color: var(--text-main); font-size: 20px;">Sign in to FinAuditPro</div>
+        <div class="login-subtitle" style="color: var(--text-secondary);">Offline-First AI Audit Workspace</div>
       </div>
 
-      <div class="login-body">
-        <div id="login-alert" class="login-alert-box ${errorMsg ? 'error' : ''}">
+      <div class="login-body" style="padding: 0;">
+        <div id="login-alert" class="login-alert-box ${errorMsg ? 'error' : ''}" style="${errorMsg ? 'display:block;' : 'display:none;'}">
           ${errorMsg || ''}
         </div>
 
         <form id="login-form" onsubmit="handleLoginFormSubmit(event)">
           <div class="form-group">
-            <label class="form-label">Username</label>
-            <input type="text" id="login-username" class="form-control" placeholder="Enter your username" required autofocus>
+            <label class="form-label">Username / Email</label>
+            <input type="text" id="login-username" class="form-control" placeholder="Enter username or email" required autofocus>
           </div>
 
           <div class="form-group">
             <label class="form-label">Password</label>
             <div class="password-input-wrap">
               <input type="password" id="login-password" class="form-control" placeholder="Enter password" required>
-              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('login-password')">👁️</button>
             </div>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 12px; color: #64748b;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; font-size: 12px; color: var(--text-secondary);">
             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-              <input type="checkbox" id="remember-me" checked> Remember session locally
+              <input type="checkbox" id="remember-me" checked> Remember session
             </label>
+            <a href="javascript:void(0)" onclick="showActivationModal()" style="color: var(--text-main); text-decoration: underline; font-weight: 500;">
+              Activate Account
+            </a>
           </div>
 
-          <button type="submit" id="login-submit-btn" class="btn btn-primary" style="width: 100%; padding: 10px; font-size: 14px;">
+          <button type="submit" id="login-submit-btn" class="btn btn-primary" style="width: 100%; padding: 10px;">
             Secure Offline Sign In
           </button>
         </form>
-
-        <div class="login-footer-security">
-          <span class="offline-pill" style="font-size: 10px;"><span class="offline-dot"></span> Local SQLite Database</span>
-          <span>• Zero Cloud Transmissions</span>
-        </div>
       </div>
     </div>
   `;
 }
-
 window.showLoginScreen = showLoginScreen;
 
 function hideLoginScreen() {
@@ -574,8 +1156,9 @@ async function handleLoginFormSubmit(event) {
     applyRoleNavigationPermissions();
     await loadEngagements();
     navigateTo("dashboard");
+    FinNotify.success(`Welcome back, ${res.user.full_name}!`);
   } catch (err) {
-    alertBox.innerText = err.message || "Invalid username or password";
+    alertBox.innerText = err.message || "Invalid username or password.";
     alertBox.className = "login-alert-box error";
     alertBox.style.display = "block";
     submitBtn.disabled = false;
@@ -601,6 +1184,31 @@ async function handleLogout() {
     state.currentUser = null;
     state.isAuthenticated = false;
     showLoginScreen("You have been signed out.");
+  }
+}
+
+function setupUserMenu() {
+  const badge = document.getElementById("top-user-badge");
+  const menu = document.getElementById("user-dropdown-menu");
+  if (badge && menu) {
+    badge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menu.classList.toggle("show");
+      const isExpanded = menu.classList.contains("show");
+      badge.setAttribute("aria-expanded", isExpanded);
+    });
+    document.addEventListener("click", (e) => {
+      if (!badge.contains(e.target) && !menu.contains(e.target)) {
+        menu.classList.remove("show");
+        badge.setAttribute("aria-expanded", "false");
+      }
+    });
+    badge.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        badge.click();
+      }
+    });
   }
 }
 
@@ -1062,8 +1670,8 @@ async function renderUserManagement() {
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">User Management & Role Access</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">User Management & Role Access</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Manage audit team accounts, roles, active status, and password resets
           </div>
         </div>
@@ -1100,7 +1708,7 @@ async function renderUserManagement() {
                       </div>
                       <div>
                         <b>${u.full_name}</b><br/>
-                        <span style="font-size: 11px; color: #64748b;">${u.email}</span>
+                        <span style="font-size: 11px; color: var(--text-muted);">${u.email}</span>
                       </div>
                     </div>
                   </td>
@@ -1113,22 +1721,36 @@ async function renderUserManagement() {
                     </select>
                   </td>
                   <td>
-                    <span class="badge ${u.is_active ? 'badge-resolved' : 'badge-disabled'}">
-                      ${u.is_active ? 'Active' : 'Disabled'}
-                    </span>
+                    ${u.status === 'INVITED' ? `
+                      <span class="badge" style="background:#fef3c7; color:#b45309; border: 1px solid var(--border);">
+                        Invited (Pending)
+                      </span>
+                    ` : u.is_active ? `
+                      <span class="badge badge-resolved">Active</span>
+                    ` : `
+                      <span class="badge badge-disabled">Disabled</span>
+                    `}
                   </td>
                   <td style="font-size: 12px;">${u.phone || '—'}</td>
-                  <td class="font-mono" style="font-size: 11.5px; color: #475569;">
+                  <td class="font-mono" style="font-size: 11.5px; color: var(--text-secondary);">
                     ${u.last_login ? u.last_login.replace('T', ' ').split('.')[0] : 'Never logged in'}
                   </td>
                   <td class="text-center">
-                    <div style="display: flex; gap: 6px; justify-content: center;">
+                    <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
+                      ${u.status === 'INVITED' && u.activation_token ? `
+                        <button class="btn btn-sm btn-outline" onclick="copyActivationCode('${u.activation_token}', '${u.full_name}')" title="Copy Activation Code">
+                          📋 Code
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="handleReissueActivation(${u.id}, '${u.username}')" title="Re-issue Token">
+                          🔄 New Code
+                        </button>
+                      ` : ''}
                       ${u.id !== state.currentUser.id ? `
                         <button class="btn btn-sm ${u.is_active ? 'btn-secondary' : 'btn-success'}" onclick="toggleUserStatus(${u.id}, ${u.is_active ? 'false' : 'true'}, '${u.username}')">
                           ${u.is_active ? 'Disable' : 'Enable'}
                         </button>
                       ` : `
-                        <span style="font-size: 11px; color: #94a3b8; padding: 4px 6px;">(You)</span>
+                        <span style="font-size: 11px; color: var(--text-muted); padding: 4px 6px;">(You)</span>
                       `}
                       <button class="btn btn-sm btn-secondary" onclick="openAdminResetPasswordModal(${u.id}, '${u.username}')">
                         Reset Pwd
@@ -1148,6 +1770,31 @@ async function renderUserManagement() {
 }
 
 // User Actions
+async function copyActivationCode(token, name) {
+  try {
+    await navigator.clipboard.writeText(token);
+    notifySuccess(`Activation code for ${name} copied to clipboard!`);
+  } catch (e) {
+    FinAlert({
+      title: `Activation Code for ${name}`,
+      message: `Share this code with the user for local offline activation:\n\n${token}`
+    });
+  }
+}
+
+async function handleReissueActivation(userId, username) {
+  try {
+    const res = await FinAuditAPI.resetUserActivation(userId);
+    FinAlert({
+      title: "New Activation Code Issued",
+      message: `A new 48-hour offline activation code has been generated for ${username}:\n\n${res.activation_token}`
+    });
+    renderUserManagement();
+  } catch (err) {
+    notifyError("Failed to re-issue activation token: " + err.message);
+  }
+}
+
 async function changeUserRole(userId, newRole) {
   try {
     await FinAuditAPI.updateUser(userId, { role: newRole });
@@ -1182,9 +1829,9 @@ async function toggleUserStatus(userId, newStatus, username) {
 function openCreateUserModal() {
   const modalHtml = `
     <div class="modal-overlay" id="user-modal">
-      <div class="modal-card">
+      <div class="modal-card" style="width: 520px;">
         <div class="modal-header">
-          <div class="modal-title">Create New Audit Team User</div>
+          <div class="modal-title">Add / Invite Audit Team User</div>
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('user-modal')">✕</button>
         </div>
         <div class="modal-body">
@@ -1193,33 +1840,39 @@ function openCreateUserModal() {
               <label class="form-label">Full Name *</label>
               <input type="text" id="new-full-name" class="form-control" placeholder="e.g. Vikram Joshi (ACA)" required>
             </div>
-            <div class="form-group">
-              <label class="form-label">Username *</label>
-              <input type="text" id="new-username" class="form-control" placeholder="e.g. vikram_j" required>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label class="form-label">Username *</label>
+                <input type="text" id="new-username" class="form-control" placeholder="vikram_j" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address *</label>
+                <input type="email" id="new-email" class="form-control" placeholder="vikram@cafirm.in" required>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Email Address *</label>
-              <input type="email" id="new-email" class="form-control" placeholder="e.g. vikram@finauditpro.in" required>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label class="form-label">Role Assignment *</label>
+                <select id="new-role" class="form-control">
+                  <option value="Auditor">Auditor (Clients, Engagements, Rules, Reports)</option>
+                  <option value="Audit Staff" selected>Audit Staff (Assigned checks & WP notes)</option>
+                  <option value="Admin">Admin (Full User & System Management)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone / Mobile</label>
+                <input type="text" id="new-phone" class="form-control" placeholder="+91 98200 55667">
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Phone / Mobile</label>
-              <input type="text" id="new-phone" class="form-control" placeholder="+91 98200 55667">
+
+            <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px; font-size: 12px; color: #0284c7;">
+              🔑 <strong>Secure Offline Activation:</strong> An invitation token will be generated for the user to activate their own account and set their private password upon first launch.
             </div>
-            <div class="form-group">
-              <label class="form-label">Role Assignment *</label>
-              <select id="new-role" class="form-control">
-                <option value="Auditor">Auditor (Clients, Engagements, Rules, Reports)</option>
-                <option value="Audit Staff">Audit Staff (Assigned checks & WP notes)</option>
-                <option value="Admin">Admin (Full User & System Management)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Temporary Password (Min 6 chars) *</label>
-              <input type="password" id="new-password" class="form-control" placeholder="Create temporary password" minlength="6" required>
-            </div>
+
             <div class="modal-footer" style="padding: 10px 0 0 0; margin-top: 14px;">
               <button type="button" class="btn btn-secondary" onclick="closeModal('user-modal')">Cancel</button>
-              <button type="submit" class="btn btn-primary">Create User</button>
+              <button type="submit" class="btn btn-primary">Generate User Invitation Token →</button>
             </div>
           </form>
         </div>
@@ -1236,15 +1889,18 @@ async function handleCreateUserSubmit(event) {
   const email = document.getElementById("new-email").value.trim();
   const phone = document.getElementById("new-phone").value.trim();
   const role = document.getElementById("new-role").value;
-  const password = document.getElementById("new-password").value;
 
   try {
-    await FinAuditAPI.createUser({
-      full_name, username, email, phone, role, password
+    const res = await FinAuditAPI.inviteUser({
+      full_name, username, email, phone, role
     });
-    notifySuccess(`User '${username}' created successfully with role '${role}'.`);
     closeModal("user-modal");
     renderUserManagement();
+
+    FinAlert({
+      title: "User Invitation Created Successfully",
+      message: `Account for ${full_name} has been created.\n\nOffline Activation Code (Valid 48h):\n${res.activation_token}\n\nProvide this code to the user for first-time activation.`
+    });
   } catch (err) {
     notifyError("Error creating user: " + err.message);
   }
@@ -1380,7 +2036,7 @@ async function renderClients(searchQuery = null, entityFilter = null) {
   if (searchQuery !== null) clientSearchState.search = searchQuery;
   if (entityFilter !== null) clientSearchState.entityType = entityFilter;
 
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading Client Directory...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading Client Directory...</div>`;
 
   try {
     const clients = await FinAuditAPI.getClients({
@@ -1394,8 +2050,8 @@ async function renderClients(searchQuery = null, entityFilter = null) {
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Client Directory & Entity Master</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Client Directory & Entity Master</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Independent entity profiles, PAN/GSTIN registration, and multi-year financial audit isolation
           </div>
         </div>
@@ -1456,9 +2112,13 @@ async function renderClients(searchQuery = null, entityFilter = null) {
           <div class="card-title">Registered Clients (${clients.length})</div>
         </div>
         ${clients.length === 0 ? `
-          <div style="padding: 40px; text-align: center; color: #64748b;">
-            <p>No clients matched your search criteria.</p>
-            ${isAuditorOrAdmin ? `<button class="btn btn-primary" style="margin-top: 12px;" onclick="openCreateClientModal()">+ Register Client</button>` : ''}
+          <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
+            <div style="font-size: 44px; margin-bottom: 10px;">🏢</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No clients yet</div>
+            <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
+              Register your audited entity to establish tenancy, define statutory identifiers (PAN, GSTIN), and begin creating audit engagements.
+            </p>
+            ${isAuditorOrAdmin ? `<button class="btn btn-primary" onclick="openCreateClientModal()">+ Register First Client</button>` : ''}
           </div>
         ` : `
           <div class="table-container">
@@ -1478,19 +2138,19 @@ async function renderClients(searchQuery = null, entityFilter = null) {
                 ${clients.map(c => `
                   <tr>
                     <td>
-                      <div style="font-weight: 700; color: #0f172a; font-size: 14px;">${c.name}</div>
-                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                      <div style="font-weight: 700; color: var(--text-main); font-size: 14px;">${c.name}</div>
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ID: <span class="font-mono font-bold">#${c.id}</span> • Registered FY: ${c.financial_year || '2024-25'}
                       </div>
                     </td>
                     <td>${getEntityBadge(c.entity_type)}</td>
                     <td>
-                      <div style="font-size: 12px;"><b style="color: #475569;">PAN:</b> <span class="font-mono font-bold">${c.pan || '—'}</span></div>
-                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;"><b style="color: #475569;">GSTIN:</b> <span class="font-mono">${c.gstin || '—'}</span></div>
+                      <div style="font-size: 12px;"><b style="color: var(--text-secondary);">PAN:</b> <span class="font-mono font-bold">${c.pan || '—'}</span></div>
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;"><b style="color: var(--text-secondary);">GSTIN:</b> <span class="font-mono">${c.gstin || '—'}</span></div>
                     </td>
                     <td>
                       <div style="font-size: 12px; font-weight: 600;">${c.industry || 'General'}</div>
-                      <div style="font-size: 11px; color: #64748b;">
+                      <div style="font-size: 11px; color: var(--text-muted);">
                         ${c.contact_person ? `👤 ${c.contact_person}` : ''}
                         ${c.phone ? ` • 📞 ${c.phone}` : ''}
                       </div>
@@ -1498,8 +2158,8 @@ async function renderClients(searchQuery = null, entityFilter = null) {
                     <td>
                       <div style="display: flex; gap: 4px; flex-wrap: wrap;">
                         ${(c.financial_years || []).map(fy => `
-                          <span class="badge" style="background: #f1f5f9; color: #334155; font-size: 10.5px;">${fy}</span>
-                        `).join('') || '<span style="color: #94a3b8; font-size: 11px;">None</span>'}
+                          <span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary); font-size: 10.5px;">${fy}</span>
+                        `).join('') || '<span style="color: var(--text-muted); font-size: 11px;">None</span>'}
                       </div>
                     </td>
                     <td>
@@ -1586,12 +2246,12 @@ function openCreateClientModal() {
               <div class="form-group">
                 <label class="form-label">Permanent Account Number (PAN)</label>
                 <input type="text" id="client-pan" class="form-control font-mono" placeholder="AAAAA9999A" maxlength="10" style="text-transform: uppercase;">
-                <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">Format: 5 letters + 4 digits + 1 letter</div>
+                <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Format: 5 letters + 4 digits + 1 letter</div>
               </div>
               <div class="form-group">
                 <label class="form-label">GST Identification Number (GSTIN)</label>
                 <input type="text" id="client-gstin" class="form-control font-mono" placeholder="27AAAAA9999A1Z5" maxlength="15" style="text-transform: uppercase;">
-                <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">Format: 15-character statutory GSTIN</div>
+                <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Format: 15-character statutory GSTIN</div>
               </div>
             </div>
 
@@ -1820,19 +2480,19 @@ async function openClientHistoryDrawer(clientId) {
     header.innerHTML = `Multi-Year Audit History: ${client.name}`;
 
     body.innerHTML = `
-      <div style="margin-bottom: 18px; padding: 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md);">
-        <div style="font-weight: 700; font-size: 14px; color: #0f172a;">${client.name}</div>
-        <div style="font-size: 11.5px; color: #64748b; margin-top: 4px;">
+      <div style="margin-bottom: 18px; padding: 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
+        <div style="font-weight: 700; font-size: 14px; color: var(--text-main);">${client.name}</div>
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">
           Entity: ${getEntityBadge(client.entity_type)} • PAN: <span class="font-mono font-bold">${client.pan || '—'}</span> • Industry: ${client.industry || 'General'}
         </div>
       </div>
 
-      <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">
+      <div style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
         Financial Years & Engagement Timelines (${timeline.length}):
       </div>
 
       ${timeline.length === 0 ? `
-        <div style="padding: 20px; text-align: center; color: #64748b;">
+        <div style="padding: 20px; text-align: center; color: var(--text-muted);">
           No audit engagements recorded for this client yet.
         </div>
       ` : `
@@ -1848,8 +2508,8 @@ async function openClientHistoryDrawer(clientId) {
                   </div>
                   <div>${getEngagementStatusBadge(item.status)}</div>
                 </div>
-                <div style="font-weight: 600; font-size: 13px; color: #0f172a;">${item.title}</div>
-                <div style="font-size: 11.5px; color: #64748b; margin-top: 4px;">
+                <div style="font-weight: 600; font-size: 13px; color: var(--text-main);">${item.title}</div>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">
                   Period: <span class="font-mono">${item.period_start || '—'}</span> to <span class="font-mono">${item.period_end || '—'}</span>
                 </div>
                 <div style="display: flex; gap: 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9; font-size: 11.5px;">
@@ -1892,7 +2552,7 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
   if (clientFilter !== null) engagementFilterState.clientId = clientFilter;
   if (fyFilter !== null) engagementFilterState.financialYear = fyFilter;
 
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading Engagements...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading Engagements...</div>`;
 
   try {
     const clients = await FinAuditAPI.getClients();
@@ -1910,8 +2570,8 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Audit Engagements Workspace</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Audit Engagements Workspace</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Multi-client, multi-financial year audit portfolio with strict data segregation
           </div>
         </div>
@@ -1966,7 +2626,7 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
           <div class="card-title">Audit Portfolio Engagements (${engagements.length})</div>
         </div>
         ${engagements.length === 0 ? `
-          <div style="padding: 40px; text-align: center; color: #64748b;">
+          <div style="padding: 40px; text-align: center; color: var(--text-muted);">
             <p>No engagements found matching the selected filters.</p>
             ${isAuditorOrAdmin ? `<button class="btn btn-primary" style="margin-top: 12px;" onclick="openCreateEngagementModal()">+ Create Engagement</button>` : ''}
           </div>
@@ -1993,13 +2653,13 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
                         <b>${e.title}</b>
                         ${e.id === state.currentEngagementId ? '<span class="badge badge-resolved" style="font-size: 10px;">ACTIVE</span>' : ''}
                       </div>
-                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ${e.notes ? e.notes.substring(0, 50) + (e.notes.length > 50 ? '...' : '') : 'Standard audit engagement'}
                       </div>
                     </td>
                     <td>
-                      <div style="font-weight: 600; color: #0f172a;">${e.client_name}</div>
-                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                      <div style="font-weight: 600; color: var(--text-main);">${e.client_name}</div>
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ${getEntityBadge(e.client_entity_type)}
                       </div>
                     </td>
@@ -2008,13 +2668,13 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
                       <div style="margin-top: 2px;">${getAuditTypeBadge(e.audit_type)}</div>
                     </td>
                     <td>
-                      <div class="font-mono" style="font-size: 11.5px; color: #475569;">
+                      <div class="font-mono" style="font-size: 11.5px; color: var(--text-secondary);">
                         ${e.period_start || '—'} to ${e.period_end || '—'}
                       </div>
                     </td>
                     <td>
                       <div style="font-size: 12px;">👤 <b>${e.lead_auditor_name || 'Unassigned'}</b></div>
-                      <div style="font-size: 11px; color: #64748b;">Staff: ${e.assigned_staff_name || 'Unassigned'}</div>
+                      <div style="font-size: 11px; color: var(--text-muted);">Staff: ${e.assigned_staff_name || 'Unassigned'}</div>
                     </td>
                     <td>
                       ${isAuditorOrAdmin ? `
@@ -2394,9 +3054,9 @@ async function openDuplicateEngagementModal(sourceEngId) {
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('duplicate-modal')">✕</button>
           </div>
           <div class="modal-body">
-            <div style="margin-bottom: 16px; padding: 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md);">
-              <div style="font-weight: 700; font-size: 13.5px; color: #0f172a;">Source Audit: ${src.title}</div>
-              <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+            <div style="margin-bottom: 16px; padding: 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
+              <div style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">Source Audit: ${src.title}</div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
                 Client: <b>${src.client_name}</b> | Current FY: <b>${src.financial_year}</b> | Type: ${src.audit_type}
               </div>
             </div>
@@ -2405,7 +3065,7 @@ async function openDuplicateEngagementModal(sourceEngId) {
               <div class="form-group">
                 <label class="form-label">Target Financial Year *</label>
                 <input type="text" id="dup-target-fy" class="form-control font-mono font-bold" value="${nextFy}" required>
-                <div style="font-size: 11px; color: #64748b; margin-top: 2px;">e.g. 2025-26, 2026-27</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">e.g. 2025-26, 2026-27</div>
               </div>
 
               <div class="form-group">
@@ -2413,7 +3073,7 @@ async function openDuplicateEngagementModal(sourceEngId) {
                 <input type="text" id="dup-title" class="form-control" value="${src.audit_type} FY ${nextFy}" placeholder="Custom title">
               </div>
 
-              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 12px; margin-bottom: 16px;">
+              <div style="background: #eff6ff; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; margin-bottom: 16px;">
                 <div style="font-weight: 700; font-size: 12px; color: #1e40af; margin-bottom: 8px;">Structure Cloning Options:</div>
                 <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #1e3a8a; margin-bottom: 6px; cursor: pointer;">
                   <input type="checkbox" id="dup-copy-checklists" checked> Clone 3CD & Audit Checklists (Reset status to Pending)
@@ -2423,7 +3083,7 @@ async function openDuplicateEngagementModal(sourceEngId) {
                 </label>
               </div>
 
-              <div style="font-size: 11.5px; color: #059669; padding: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: var(--radius-md); margin-bottom: 16px;">
+              <div style="font-size: 11.5px; color: #059669; padding: 10px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px;">
                 🔒 <b>Multi-Year Isolation Assurance:</b> Transaction vouchers, ledger balances, and prior-year exceptions will <b>NOT</b> be copied. The new engagement will start with completely clean financial tables.
               </div>
 
@@ -2500,7 +3160,7 @@ async function renderImportData() {
   if (!state.activeEngagement) await updateActiveEngagement();
   const eng = state.activeEngagement || {};
 
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading Financial Data Import...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading Financial Data Import...</div>`;
 
   try {
     const uploadedFiles = await FinAuditAPI.getUploadedFiles(state.currentEngagementId);
@@ -2508,8 +3168,8 @@ async function renderImportData() {
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Financial Data Import Workspace</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Financial Data Import Workspace</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Target Client: <b>${eng.client_name || 'Client'}</b> | Engagement: <b>${eng.title || 'Audit'}</b> (FY ${eng.financial_year || '2024-25'})
           </div>
         </div>
@@ -2552,21 +3212,21 @@ async function renderImportData() {
                 <option value="GST-related data">GST Returns / 2B Reconciliation</option>
                 <option value="Other transaction data">Other Financial Transactions</option>
               </select>
-              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
                 FinAuditPro applies specific statutory audit checks tailored to the selected data category.
               </div>
             </div>
 
-            <div style="padding: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: var(--radius-md); font-size: 11.5px; color: #065f46;">
+            <div style="padding: 10px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 11.5px; color: #065f46;">
               🔒 <b>Security & Integrity:</b> Files are processed purely on your machine using Python & SQLite. No data is ever transmitted to external cloud APIs.
             </div>
           </div>
 
           <div>
-            <div class="upload-zone" id="file-drop-zone" onclick="document.getElementById('file-upload-input').click()" style="border: 2px dashed #93c5fd; background: #f8fafc; border-radius: var(--radius-lg); padding: 30px; text-align: center; cursor: pointer; transition: all 0.2s;">
+            <div class="upload-zone" id="file-drop-zone" onclick="document.getElementById('file-upload-input').click()" style="border: 2px dashed #93c5fd; background: var(--bg-app); border-radius: var(--radius-lg); padding: 30px; text-align: center; cursor: pointer; transition: all 0.2s;">
               <svg width="40" height="40" fill="none" stroke="#2563eb" viewBox="0 0 24 24" style="margin: 0 auto 10px auto;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-              <div style="font-size: 14px; font-weight: 700; color: #0f172a;">Click to browse or Drag & Drop financial file here</div>
-              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">CSV, XLSX, XLS, PDF, JSON (Max 100MB)</div>
+              <div style="font-size: 14px; font-weight: 700; color: var(--text-main);">Click to browse or Drag & Drop financial file here</div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">CSV, XLSX, XLS, PDF, JSON (Max 100MB)</div>
               <input type="file" id="file-upload-input" style="display: none;" accept=".csv,.xlsx,.xls,.json,.pdf" onchange="handleFileInputChange(event)">
             </div>
           </div>
@@ -2582,7 +3242,7 @@ async function renderImportData() {
           <div class="card-title">Imported Financial Datasets & Audit Logs (${uploadedFiles.length})</div>
         </div>
         ${uploadedFiles.length === 0 ? `
-          <div style="padding: 30px; text-align: center; color: #64748b;">
+          <div style="padding: 30px; text-align: center; color: var(--text-muted);">
             No financial datasets have been imported for this audit engagement yet.
           </div>
         ` : `
@@ -2604,15 +3264,15 @@ async function renderImportData() {
                 ${uploadedFiles.map(f => `
                   <tr>
                     <td>
-                      <div style="font-weight: 700; color: #0f172a; font-size: 13px;">${f.file_name}</div>
-                      <div style="font-size: 11px; color: #64748b;" class="font-mono">Format: ${f.file_type.toUpperCase()}</div>
+                      <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">${f.file_name}</div>
+                      <div style="font-size: 11px; color: var(--text-muted);" class="font-mono">Format: ${f.file_type.toUpperCase()}</div>
                     </td>
                     <td>
                       <span class="badge badge-entity">${f.data_category || 'General Ledger'}</span>
                     </td>
                     <td>
                       <div style="font-size: 12px;">${f.uploaded_at ? f.uploaded_at.replace('T', ' ').split('.')[0] : '—'}</div>
-                      <div style="font-size: 11px; color: #64748b;">By: <b>${f.uploaded_by || 'Auditor'}</b></div>
+                      <div style="font-size: 11px; color: var(--text-muted);">By: <b>${f.uploaded_by || 'Auditor'}</b></div>
                     </td>
                     <td class="font-mono font-bold">${f.row_count || 0}</td>
                     <td class="font-mono" style="color: #059669; font-weight: 600;">${f.successful_rows || f.row_count || 0}</td>
@@ -2653,7 +3313,7 @@ async function handleFileInputChange(event) {
     dropZone.innerHTML = `
       <div style="padding: 20px; color: var(--primary);">
         <div style="font-size: 16px; font-weight: 700;">Parsing '${file.name}' locally...</div>
-        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Detecting encoding, headers, data structures, and column mapping...</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Detecting encoding, headers, data structures, and column mapping...</div>
       </div>
     `;
   }
@@ -2694,7 +3354,7 @@ function renderMappingWorkspace(preview) {
       </div>
 
       <!-- Raw Preview Table -->
-      <div style="padding: 12px 16px; font-weight: 700; font-size: 13px; color: #0f172a; border-bottom: 1px solid var(--border);">
+      <div style="padding: 12px 16px; font-weight: 700; font-size: 13px; color: var(--text-main); border-bottom: 1px solid var(--border);">
         Top File Preview (First ${previewRows.length} rows):
       </div>
       <div class="table-container" style="max-height: 220px; overflow-y: auto; margin-bottom: 16px;">
@@ -2716,7 +3376,7 @@ function renderMappingWorkspace(preview) {
 
       <!-- Column Mapping Controls -->
       <div style="padding: 0 16px 16px 16px;">
-        <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 10px;">
+        <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 10px;">
           Column Mapping Configuration:
         </div>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
@@ -2730,21 +3390,21 @@ function renderMappingWorkspace(preview) {
               }
             }
 
-            let statusBadge = `<span class="badge" style="background:#f1f5f9; color:#64748b;">Not detected</span>`;
+            let statusBadge = `<span class="badge" style="background: var(--bg-sidebar); color: var(--text-muted);">Not detected</span>`;
             if (mappedSource) {
               statusBadge = `<span class="badge badge-resolved">● Detected</span>`;
             } else if (f.required) {
-              statusBadge = `<span class="badge" style="background:#fffbeb; color:#d97706; border:1px solid #fde68a;">Needs mapping</span>`;
+              statusBadge = `<span class="badge" style="background:#fffbeb; color:#d97706; border: 1px solid var(--border);">Needs mapping</span>`;
             }
 
             return `
-              <div style="padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: #ffffff; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+              <div style="padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                 <div style="flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px;">
-                    <b style="font-size: 12.5px; color: #0f172a;">${f.label}</b>
+                    <b style="font-size: 12.5px; color: var(--text-main);">${f.label}</b>
                     ${statusBadge}
                   </div>
-                  <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${f.desc}</div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${f.desc}</div>
                 </div>
                 <div style="width: 180px;">
                   <select class="form-control mapping-select" data-target="${f.key}" style="font-size: 12px; font-weight: 600;">
@@ -2759,8 +3419,8 @@ function renderMappingWorkspace(preview) {
           }).join("")}
         </div>
 
-        <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
-          <div style="font-size: 12px; color: #64748b;">
+        <div style="margin-top: 16px; padding: 12px; background: var(--bg-app); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+          <div style="font-size: 12px; color: var(--text-muted);">
             💡 <b>Auditor Tip:</b> FinAuditPro never alters raw values. Original strings are stored for audit defense.
           </div>
           <div style="display: flex; gap: 8px;">
@@ -2814,27 +3474,27 @@ async function handleValidateData(fileId, dataCategory) {
           <div class="modal-body">
             <!-- Metrics Badges -->
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px;">
-              <div style="padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
-                <div style="font-size: 11px; color: #64748b;">TOTAL ROWS</div>
+              <div style="padding: 10px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted);">TOTAL ROWS</div>
                 <div style="font-size: 18px; font-weight: 700;" class="font-mono">${report.total_rows || 0}</div>
               </div>
-              <div style="padding: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: var(--radius-md); text-align: center;">
+              <div style="padding: 10px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
                 <div style="font-size: 11px; color: #065f46;">VALID ROWS</div>
                 <div style="font-size: 18px; font-weight: 700; color: #059669;" class="font-mono">${report.valid_rows || 0}</div>
               </div>
-              <div style="padding: 10px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: var(--radius-md); text-align: center;">
+              <div style="padding: 10px; background: #fff7ed; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
                 <div style="font-size: 11px; color: #9a3412;">WARNINGS</div>
                 <div style="font-size: 18px; font-weight: 700; color: #ea580c;" class="font-mono">${report.warning_count || 0}</div>
               </div>
-              <div style="padding: 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-md); text-align: center;">
+              <div style="padding: 10px; background: #fef2f2; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
                 <div style="font-size: 11px; color: #991b1b;">ERRORS</div>
                 <div style="font-size: 18px; font-weight: 700; color: #dc2626;" class="font-mono">${report.failed_rows || 0}</div>
               </div>
             </div>
 
             <!-- Issues Breakdown Summary -->
-            <div style="margin-bottom: 16px; padding: 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md);">
-              <div style="font-weight: 700; font-size: 12.5px; color: #0f172a; margin-bottom: 6px;">Accounting & Statutory Checks Breakdown:</div>
+            <div style="margin-bottom: 16px; padding: 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
+              <div style="font-weight: 700; font-size: 12.5px; color: var(--text-main); margin-bottom: 6px;">Accounting & Statutory Checks Breakdown:</div>
               <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 12px;">
                 <div>• Invalid Date Formats: <b>${sum.invalid_dates || 0}</b></div>
                 <div>• Non-Numeric Amounts: <b>${sum.invalid_numeric || 0}</b></div>
@@ -2853,7 +3513,7 @@ async function handleValidateData(fileId, dataCategory) {
                 ✓ Perfect Data Integrity! Zero errors or anomalies detected.
               </div>
             ` : `
-              <div style="font-weight: 700; font-size: 12.5px; color: #0f172a; margin-bottom: 6px;">
+              <div style="font-weight: 700; font-size: 12.5px; color: var(--text-main); margin-bottom: 6px;">
                 Detected Issues Details (${errors.length + warnings.length}):
               </div>
               <div class="table-container" style="max-height: 200px; overflow-y: auto;">
@@ -2915,24 +3575,24 @@ async function handleConfirmImport(fileId, dataCategory) {
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('import-success-modal')">✕</button>
           </div>
           <div class="modal-body">
-            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">
+            <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
               ${res.imported_rows} Financial Transactions Imported
             </div>
-            <div style="font-size: 12px; color: #475569; margin-bottom: 16px;">
+            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
               File: <b>${res.file_name}</b> | Category: <b>${res.data_category}</b>
             </div>
 
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;">
-              <div style="padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
-                <div style="font-size: 11px; color: #64748b;">SUCCESSFUL</div>
+              <div style="padding: 10px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted);">SUCCESSFUL</div>
                 <div style="font-size: 16px; font-weight: 700; color: #059669;">${res.imported_rows}</div>
               </div>
-              <div style="padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
-                <div style="font-size: 11px; color: #64748b;">FAILED</div>
+              <div style="padding: 10px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted);">FAILED</div>
                 <div style="font-size: 16px; font-weight: 700; color: ${res.failed_rows > 0 ? '#dc2626' : '#64748b'};">${res.failed_rows}</div>
               </div>
-              <div style="padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
-                <div style="font-size: 11px; color: #64748b;">WARNINGS</div>
+              <div style="padding: 10px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted);">WARNINGS</div>
                 <div style="font-size: 16px; font-weight: 700; color: #d97706;">${res.warning_count}</div>
               </div>
             </div>
@@ -3006,11 +3666,11 @@ let cleaningLogFilterState = {
 async function renderDataCleaningLogs() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
-    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: #64748b;">Please select an active audit engagement first.</div>`;
+    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">Please select an active audit engagement first.</div>`;
     return;
   }
 
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading Data Cleaning Logs & Transformations...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading Data Cleaning Logs & Transformations...</div>`;
 
   try {
     const summary = await FinAuditAPI.getCleaningSummary(state.currentEngagementId);
@@ -3036,8 +3696,8 @@ async function renderDataCleaningLogs() {
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Data Cleaning & Normalization Engine</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Data Cleaning & Normalization Engine</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Standardizing dates, amounts, legal suffixes & GSTINs with 100% raw data preservation in Layer 1
           </div>
         </div>
@@ -3054,12 +3714,12 @@ async function renderDataCleaningLogs() {
       <!-- Two-Layer Architecture Banner -->
       <div style="background: linear-gradient(135deg, #1e293b, #0f172a); color: white; padding: 14px 18px; border-radius: var(--radius-lg); margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 14px;">
-          <div style="background: rgba(37, 99, 235, 0.2); border: 1px solid #3b82f6; border-radius: 8px; padding: 8px 12px; text-align: center;">
+          <div style="background: rgba(37, 99, 235, 0.2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; text-align: center;">
             <div style="font-size: 10px; font-weight: 700; color: #93c5fd; letter-spacing: 0.5px;">LAYER 1</div>
             <div style="font-size: 12px; font-weight: 700; color: #ffffff;">RAW DATA</div>
           </div>
-          <div style="color: #94a3b8; font-size: 18px;">➔</div>
-          <div style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; border-radius: 8px; padding: 8px 12px; text-align: center;">
+          <div style="color: var(--text-muted); font-size: 18px;">➔</div>
+          <div style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; text-align: center;">
             <div style="font-size: 10px; font-weight: 700; color: #a7f3d0; letter-spacing: 0.5px;">LAYER 2</div>
             <div style="font-size: 12px; font-weight: 700; color: #ffffff;">NORMALIZED</div>
           </div>
@@ -3141,13 +3801,13 @@ async function renderDataCleaningLogs() {
           <div class="card-title">
             Transformation Audit Trail (${totalCount} records)
           </div>
-          <div style="font-size: 12px; color: #64748b;">
+          <div style="font-size: 12px; color: var(--text-muted);">
             Showing rows ${totalCount > 0 ? cleaningLogFilterState.offset + 1 : 0} to ${Math.min(cleaningLogFilterState.offset + cleaningLogFilterState.limit, totalCount)} of ${totalCount}
           </div>
         </div>
 
         ${logs.length === 0 ? `
-          <div style="padding: 40px; text-align: center; color: #64748b;">
+          <div style="padding: 40px; text-align: center; color: var(--text-muted);">
             <p>No data cleaning log records match the current filter criteria.</p>
             <button class="btn btn-secondary" style="margin-top: 10px;" onclick="resetCleaningFilters()">Reset Filters</button>
           </div>
@@ -3168,10 +3828,10 @@ async function renderDataCleaningLogs() {
               </thead>
               <tbody>
                 ${logs.map(log => {
-                  let statusBadge = `<span class="badge" style="background:#f1f5f9; color:#475569;">Auto-Applied</span>`;
+                  let statusBadge = `<span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary);">Auto-Applied</span>`;
                   if (log.review_status === 'Accepted') statusBadge = `<span class="badge badge-resolved">Accepted</span>`;
-                  if (log.review_status === 'Overridden') statusBadge = `<span class="badge" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;">Overridden</span>`;
-                  if (log.review_status === 'Reverted') statusBadge = `<span class="badge" style="background:#fff1f2; color:#e11d48; border:1px solid #fecdd3;">Reverted</span>`;
+                  if (log.review_status === 'Overridden') statusBadge = `<span class="badge" style="background:#eff6ff; color:#2563eb; border: 1px solid var(--border);">Overridden</span>`;
+                  if (log.review_status === 'Reverted') statusBadge = `<span class="badge" style="background:#fff1f2; color:#e11d48; border: 1px solid var(--border);">Reverted</span>`;
 
                   const isQuest = log.is_questionable === 1;
                   const confPct = Math.round((log.confidence_score || 1.0) * 100);
@@ -3179,34 +3839,34 @@ async function renderDataCleaningLogs() {
                   return `
                     <tr style="${isQuest && log.review_status === 'Auto-Applied' ? 'background-color: #fffdf5;' : ''}">
                       <td>
-                        <div class="font-mono font-bold" style="font-size: 11.5px; color: #475569;">
+                        <div class="font-mono font-bold" style="font-size: 11.5px; color: var(--text-secondary);">
                           #${log.row_number || '—'}
                         </div>
-                        <div style="font-size: 10px; color: #94a3b8; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <div style="font-size: 10px; color: var(--text-muted); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                           ${escapeHtml(log.file_name || 'Import File')}
                         </div>
                       </td>
                       <td>
-                        <span class="badge" style="background: #f8fafc; border: 1px solid var(--border); color: #0f172a; font-weight: 700; font-size: 11px;">
+                        <span class="badge" style="background: var(--bg-app); border: 1px solid var(--border); color: var(--text-main); font-weight: 700; font-size: 11px;">
                           ${escapeHtml(log.field_name)}
                         </span>
                       </td>
                       <td>
-                        <div class="font-mono" style="font-size: 11.5px; background: #fef2f2; color: #991b1b; padding: 3px 6px; border-radius: 4px; border: 1px solid #fee2e2; word-break: break-all;">
+                        <div class="font-mono" style="font-size: 11.5px; background: #fef2f2; color: #991b1b; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border); word-break: break-all;">
                           "${escapeHtml(log.original_value || '')}"
                         </div>
                       </td>
                       <td>
-                        <div class="font-mono font-bold" style="font-size: 11.5px; background: #ecfdf5; color: #065f46; padding: 3px 6px; border-radius: 4px; border: 1px solid #d1fae5; word-break: break-all;">
+                        <div class="font-mono font-bold" style="font-size: 11.5px; background: #ecfdf5; color: #065f46; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border); word-break: break-all;">
                           "${escapeHtml(log.normalized_value || '')}"
                         </div>
                       </td>
                       <td>
-                        <div style="font-size: 11.5px; font-weight: 600; color: #334155;">
+                        <div style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary);">
                           ${escapeHtml(log.transformation_rule)}
                         </div>
                         ${log.auditor_comment ? `
-                          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                             💬 <i>${escapeHtml(log.auditor_comment)}</i>
                           </div>
                         ` : ''}
@@ -3214,7 +3874,7 @@ async function renderDataCleaningLogs() {
                       <td>
                         <div style="display: flex; align-items: center; gap: 4px;">
                           ${isQuest ? `
-                            <span class="badge" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-size: 10px;">
+                            <span class="badge" style="background: #fffbeb; color: #b45309; border: 1px solid var(--border); font-size: 10px;">
                               ⚠️ ${confPct}%
                             </span>
                           ` : `
@@ -3239,7 +3899,7 @@ async function renderDataCleaningLogs() {
 
           <!-- Pagination footer -->
           <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border);">
-            <div style="font-size: 12px; color: #64748b;">
+            <div style="font-size: 12px; color: var(--text-muted);">
               Showing ${logs.length} of ${totalCount} records
             </div>
             <div style="display: flex; gap: 6px;">
@@ -3307,21 +3967,21 @@ function openReviewCleaningModal(logId, logJsonStr) {
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('review-cleaning-modal')">✕</button>
         </div>
         <div class="modal-body">
-          <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; margin-bottom: 16px;">
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; margin-bottom: 16px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">
-              <div><b style="color: #475569;">Target Field:</b> <span class="badge" style="background:#e2e8f0; color:#0f172a;">${escapeHtml(log.field_name)}</span></div>
-              <div><b style="color: #475569;">Row / Ref:</b> Row #${log.row_number || 'N/A'} (Txn #${log.transaction_id || 'N/A'})</div>
-              <div><b style="color: #475569;">Rule Applied:</b> <code>${escapeHtml(log.transformation_rule)}</code></div>
-              <div><b style="color: #475569;">Ambiguity Status:</b> ${log.is_questionable ? '<span class="badge" style="background:#fffbeb; color:#b45309;">⚠️ Questionable</span>' : '<span class="badge badge-resolved">✓ Confident</span>'}</div>
+              <div><b style="color: var(--text-secondary);">Target Field:</b> <span class="badge" style="background:#e2e8f0; color: var(--text-main);">${escapeHtml(log.field_name)}</span></div>
+              <div><b style="color: var(--text-secondary);">Row / Ref:</b> Row #${log.row_number || 'N/A'} (Txn #${log.transaction_id || 'N/A'})</div>
+              <div><b style="color: var(--text-secondary);">Rule Applied:</b> <code>${escapeHtml(log.transformation_rule)}</code></div>
+              <div><b style="color: var(--text-secondary);">Ambiguity Status:</b> ${log.is_questionable ? '<span class="badge" style="background:#fffbeb; color:#b45309;">⚠️ Questionable</span>' : '<span class="badge badge-resolved">✓ Confident</span>'}</div>
             </div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-            <div style="padding: 10px; background: #fef2f2; border: 1px solid #fecdd3; border-radius: var(--radius-md);">
+            <div style="padding: 10px; background: #fef2f2; border: 1px solid var(--border); border-radius: var(--radius-md);">
               <div style="font-size: 11px; font-weight: 700; color: #991b1b; margin-bottom: 4px;">RAW ORIGINAL SOURCE (Untouched)</div>
               <div class="font-mono font-bold" style="font-size: 13px; color: #991b1b; word-break: break-all;">${escapeHtml(log.original_value)}</div>
             </div>
-            <div style="padding: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: var(--radius-md);">
+            <div style="padding: 10px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md);">
               <div style="font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 4px;">CURRENT NORMALIZED VALUE</div>
               <div class="font-mono font-bold" style="font-size: 13px; color: #065f46; word-break: break-all;">${escapeHtml(log.normalized_value)}</div>
             </div>
@@ -3349,7 +4009,7 @@ function openReviewCleaningModal(logId, logJsonStr) {
             <div class="form-group" id="custom-value-group" style="display: none;">
               <label class="form-label">Custom Auditor Normalized Value *</label>
               <input type="text" id="custom-norm-val" class="form-control font-mono" placeholder="Enter custom standardized value" value="${escapeHtml(log.normalized_value)}">
-              <div style="font-size: 11px; color: #64748b; margin-top: 3px;">This value will directly update the transaction record while preserving the raw input.</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">This value will directly update the transaction record while preserving the raw input.</div>
             </div>
 
             <div class="form-group">
@@ -3404,13 +4064,13 @@ function openNormalizationSandboxModal() {
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('sandbox-modal')">✕</button>
         </div>
         <div class="modal-body">
-          <div style="font-size: 12.5px; color: #64748b; margin-bottom: 14px;">
+          <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
             Test how FinAuditPro's deterministic rule engine standardizes inconsistent client financial strings without external AI calls.
           </div>
 
           <!-- Quick Preset Examples -->
           <div style="margin-bottom: 14px;">
-            <div style="font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px;">QUICK PRESET TEST CASES:</div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">QUICK PRESET TEST CASES:</div>
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
               <button type="button" class="demo-chip" onclick="loadSandboxExample('date', '01/04/2026')">📅 Date: 01/04/2026</button>
               <button type="button" class="demo-chip" onclick="loadSandboxExample('date', '01-Apr-2026')">📅 Date: 01-Apr-2026</button>
@@ -3477,7 +4137,7 @@ async function handleSandboxPreviewSubmit(event) {
   if (!container) return;
 
   container.style.display = "block";
-  container.innerHTML = `<div style="padding: 12px; color: #64748b; font-size: 12px;">Running deterministic normalization...</div>`;
+  container.innerHTML = `<div style="padding: 12px; color: var(--text-muted); font-size: 12px;">Running deterministic normalization...</div>`;
 
   try {
     const res = await FinAuditAPI.previewNormalization(field, raw);
@@ -3486,22 +4146,22 @@ async function handleSandboxPreviewSubmit(event) {
     const isQuest = res.is_questionable === 1;
 
     container.innerHTML = `
-      <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px;">
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <div style="font-weight: 700; font-size: 13px; color: #0f172a;">Normalization Engine Output</div>
-          <span class="badge ${isQuest ? '' : 'badge-resolved'}" style="${isQuest ? 'background:#fffbeb; color:#b45309; border:1px solid #fde68a;' : ''}">
+          <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">Normalization Engine Output</div>
+          <span class="badge ${isQuest ? '' : 'badge-resolved'}" style="${isQuest ? 'background:#fffbeb; color:#b45309; border: 1px solid var(--border);' : ''}">
             ${isQuest ? `⚠️ Ambiguity Flagged (${confPct}%)` : `✓ Deterministic Match (${confPct}%)`}
           </span>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-          <div style="padding: 10px; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-md);">
-            <div style="font-size: 11px; color: #64748b;">RAW INPUT (Layer 1)</div>
+          <div style="padding: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);">
+            <div style="font-size: 11px; color: var(--text-muted);">RAW INPUT (Layer 1)</div>
             <div class="font-mono font-bold" style="font-size: 13px; color: #dc2626; margin-top: 2px;">
               "${escapeHtml(res.original_value)}"
             </div>
           </div>
-          <div style="padding: 10px; background: #ffffff; border: 1px solid #10b981; border-radius: var(--radius-md);">
+          <div style="padding: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);">
             <div style="font-size: 11px; color: #059669; font-weight: 700;">STANDARDIZED OUTPUT (Layer 2)</div>
             <div class="font-mono font-bold" style="font-size: 13px; color: #059669; margin-top: 2px;">
               "${escapeHtml(res.normalized_value)}"
@@ -3509,11 +4169,11 @@ async function handleSandboxPreviewSubmit(event) {
           </div>
         </div>
 
-        <div style="font-size: 12px; color: #475569; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 12px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
           <div>
             <b>Applied Rule:</b> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${escapeHtml(res.transformation_rule)}</code>
           </div>
-          <div style="font-size: 11px; color: #64748b;">
+          <div style="font-size: 11px; color: var(--text-muted);">
             ${res.is_transformed ? '✨ Transformed from raw' : 'Identical to raw'}
           </div>
         </div>
@@ -3537,9 +4197,9 @@ async function renderDashboard() {
   const eng = state.activeEngagement || {};
 
   container.innerHTML = `
-    <div style="padding: 40px; text-align: center; color: #64748b;">
+    <div style="padding: 40px; text-align: center; color: var(--text-muted);">
       <div class="spinner" style="margin: 0 auto 16px auto;"></div>
-      <div style="font-size: 15px; font-weight: 600; color: #0f172a;">Loading Comprehensive Audit Dashboard...</div>
+      <div style="font-size: 15px; font-weight: 600; color: var(--text-main);">Loading Comprehensive Audit Dashboard...</div>
       <div style="font-size: 12px; margin-top: 4px;">Aggregating real database records, reconciliations, anomalies, and findings...</div>
     </div>
   `;
@@ -3564,15 +4224,173 @@ async function renderDashboard() {
     const maxValMonth = Math.max(...monthlyTrends.map(m => m.total_value), 1);
     const maxAreaFinding = Math.max(...Object.values(risk.area_counts || {}), 1);
 
+    if (!eng || !eng.id) {
+      container.innerHTML = `
+        <!-- Top Title & Quick Actions Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin: 0;">Audit Practice Dashboard</h2>
+              <span class="badge badge-open">Workspace Ready</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+              Welcome to FinAuditPro. Register your first client and create an audit engagement to begin substantive testing.
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            ${isAuditorOrAdmin ? `
+              <button class="btn btn-primary" onclick="openCreateClientModal()">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                + Register Client
+              </button>
+            ` : ''}
+            <button class="btn btn-secondary" onclick="navigateTo('clients')">
+              🏢 Clients
+            </button>
+            <button class="btn btn-secondary" onclick="navigateTo('settings')">
+              ⚙️ Settings
+            </button>
+          </div>
+        </div>
+
+        <!-- 6 TOP CARDS (Real 0 Metrics) -->
+        <div class="dash-top-grid">
+          <div class="dash-stat-card card-blue" onclick="navigateTo('clients')" title="Click to view all active clients">
+            <div class="dash-stat-header">
+              <span class="dash-stat-title">Active Clients</span>
+              <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">🏢</div>
+            </div>
+            <div class="dash-stat-val">${cards.active_clients_count || 0}</div>
+            <div class="dash-stat-sub"><span>Registered audit clients</span></div>
+          </div>
+
+          <div class="dash-stat-card card-indigo" onclick="navigateTo('engagements')" title="Click to view all active audit engagements">
+            <div class="dash-stat-header">
+              <span class="dash-stat-title">Active Engagements</span>
+              <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">📁</div>
+            </div>
+            <div class="dash-stat-val font-mono" style="color: #4f46e5;">${cards.active_engagements_count || 0}</div>
+            <div class="dash-stat-sub"><span>In Progress / Draft audits</span></div>
+          </div>
+
+          <div class="dash-stat-card card-amber">
+            <div class="dash-stat-header">
+              <span class="dash-stat-title">Open Findings</span>
+              <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">⚠️</div>
+            </div>
+            <div class="dash-stat-val font-mono" style="color: #d97706;">0</div>
+            <div class="dash-stat-sub"><span>Unresolved observations</span></div>
+          </div>
+
+          <div class="dash-stat-card card-red">
+            <div class="dash-stat-header">
+              <span class="dash-stat-title">High-Risk Findings</span>
+              <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">🚨</div>
+            </div>
+            <div class="dash-stat-val font-mono" style="color: #dc2626;">0</div>
+            <div class="dash-stat-sub"><span>Critical & High severity</span></div>
+          </div>
+
+          <div class="dash-stat-card card-purple">
+            <div class="dash-stat-header">
+              <span class="dash-stat-title">Unmatched Txns</span>
+              <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">⚖️</div>
+            </div>
+            <div class="dash-stat-val font-mono" style="color: #9333ea;">0</div>
+            <div class="dash-stat-sub"><span>BRS & GST 2B unreconciled</span></div>
+          </div>
+
+          <div class="dash-stat-card card-orange">
+            <div class="dash-stat-header">
+              <span class="dash-stat-title">Pending Reviews</span>
+              <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">⏳</div>
+            </div>
+            <div class="dash-stat-val font-mono" style="color: #ea580c;">0</div>
+            <div class="dash-stat-sub"><span>Awaiting sign-off / WPs</span></div>
+          </div>
+        </div>
+
+        <!-- GETTING STARTED CHECKLIST HERO -->
+        <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--primary);">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div class="card-title" style="font-size: 16px; font-weight: 700;">🚀 Practice Setup & Getting Started Guide</div>
+              <div class="card-subtitle">Zero data has been preloaded. Follow the sequential workflow below to initialize your practice:</div>
+            </div>
+          </div>
+          <div style="padding: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+              <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="background: #eff6ff; color: #2563eb; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">1</span>
+                    <strong style="color: var(--text-main); font-size: 14px;">Register Client Entity</strong>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;">
+                    Create master records for your audited entities (Companies, LLPs, Firms) with PAN, GSTIN, and business sector details.
+                  </p>
+                </div>
+                ${isAuditorOrAdmin ? `
+                  <button class="btn btn-sm btn-primary" onclick="openCreateClientModal()">+ Create Client</button>
+                ` : `<button class="btn btn-sm btn-secondary" onclick="navigateTo('clients')">View Clients</button>`}
+              </div>
+
+              <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="background: #eff6ff; color: #2563eb; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">2</span>
+                    <strong style="color: var(--text-main); font-size: 14px;">Create Audit Engagement</strong>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;">
+                    Establish an isolated audit engagement for the specific financial year, defining audit scope and materiality thresholds.
+                  </p>
+                </div>
+                ${isAuditorOrAdmin ? `
+                  <button class="btn btn-sm btn-secondary" onclick="openCreateEngagementModal()">+ Create Engagement</button>
+                ` : `<button class="btn btn-sm btn-secondary" onclick="navigateTo('engagements')">View Engagements</button>`}
+              </div>
+
+              <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="background: #eff6ff; color: #2563eb; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">3</span>
+                    <strong style="color: var(--text-main); font-size: 14px;">Add Audit Team</strong>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;">
+                    Invite Partners, Senior Auditors, and Staff members with single-use offline activation codes.
+                  </p>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="navigateTo('users')">Manage Team</button>
+              </div>
+
+              <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="background: #eff6ff; color: #2563eb; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">4</span>
+                    <strong style="color: var(--text-main); font-size: 14px;">Import Financial Data</strong>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;">
+                    Ingest General Ledger, Day Book CSV, XLSX registers, or bank statement PDFs to execute substantive audit procedures.
+                  </p>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="navigateTo('import')">Import Records</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     container.innerHTML = `
       <!-- Top Title & Quick Actions Bar -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 0;">Audit Practice Dashboard</h2>
+            <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin: 0;">Audit Practice Dashboard</h2>
             <span class="badge ${getStatusBadgeClass(eng.status)}">${eng.status || 'In Progress'}</span>
           </div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
             Client: <b style="color: #1e293b;">${eng.client_name || 'Selected Client'}</b> | 
             FY: <b style="color: #1e293b;">${eng.financial_year || '2024-25'}</b> | 
             Audit: <b>${eng.audit_type || 'Statutory Audit'}</b> | 
@@ -3692,50 +4510,50 @@ async function renderDashboard() {
             </button>
           </div>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 16px; background: #f8fafc; border-radius: 8px; margin: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 16px; background: var(--bg-app); border-radius: var(--radius-md); margin: 16px;">
           <div>
-            <div style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700;">Entity & Legal Form</div>
-            <div style="font-weight: 700; color: #0f172a; margin-top: 2px;">${eng.client_name || 'N/A'}</div>
-            <div style="font-size: 12px; color: #475569;">${eng.client_entity_type || 'Private Limited'} (${eng.client_industry || 'Manufacturing'})</div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Entity & Legal Form</div>
+            <div style="font-weight: 700; color: var(--text-main); margin-top: 2px;">${eng.client_name || 'N/A'}</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">${eng.client_entity_type || 'Private Limited'} (${eng.client_industry || 'Manufacturing'})</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700;">Statutory Identifiers</div>
-            <div style="font-size: 12.5px; font-weight: 600; color: #0f172a; margin-top: 2px;">PAN: <span class="font-mono">${eng.client_pan || 'N/A'}</span></div>
-            <div style="font-size: 12px; color: #475569;">GSTIN: <span class="font-mono">${eng.client_gstin || 'N/A'}</span></div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Statutory Identifiers</div>
+            <div style="font-size: 12.5px; font-weight: 600; color: var(--text-main); margin-top: 2px;">PAN: <span class="font-mono">${eng.client_pan || 'N/A'}</span></div>
+            <div style="font-size: 12px; color: var(--text-secondary);">GSTIN: <span class="font-mono">${eng.client_gstin || 'N/A'}</span></div>
           </div>
           <div>
-            <div style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700;">Audit Team Assigned</div>
-            <div style="font-size: 12.5px; font-weight: 600; color: #0f172a; margin-top: 2px;">Lead: ${eng.lead_auditor_name || 'Engagement Partner'}</div>
-            <div style="font-size: 12px; color: #475569;">Staff: ${eng.assigned_staff_name || 'Audit Senior'}</div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Audit Team Assigned</div>
+            <div style="font-size: 12.5px; font-weight: 600; color: var(--text-main); margin-top: 2px;">Lead: ${eng.lead_auditor_name || 'Engagement Partner'}</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Staff: ${eng.assigned_staff_name || 'Audit Senior'}</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700;">Audit Period & Scope</div>
-            <div style="font-size: 12.5px; font-weight: 600; color: #0f172a; margin-top: 2px;">${eng.period_start || '01-04-2024'} to ${eng.period_end || '31-03-2025'}</div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Audit Period & Scope</div>
+            <div style="font-size: 12.5px; font-weight: 600; color: var(--text-main); margin-top: 2px;">${eng.period_start || '01-04-2024'} to ${eng.period_end || '31-03-2025'}</div>
             <div style="font-size: 12px; color: #2563eb; font-weight: 600;">Threshold: ${formatINR(eng.materiality_threshold || 50000)}</div>
           </div>
         </div>
 
         <!-- Volume Badges Grid -->
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 0 16px 16px 16px;">
-          <div style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
-            <div style="font-size: 11px; color: #64748b; font-weight: 600;">DATA SOURCES IMPORTED</div>
-            <div class="font-mono font-bold" style="font-size: 18px; color: #0f172a; margin-top: 2px;">${overview.total_files || 0} Files</div>
-            <div style="font-size: 11.5px; color: #64748b;">Ledgers, BRS, GSTR-2B</div>
+          <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">DATA SOURCES IMPORTED</div>
+            <div class="font-mono font-bold" style="font-size: 18px; color: var(--text-main); margin-top: 2px;">${overview.total_files || 0} Files</div>
+            <div style="font-size: 11.5px; color: var(--text-muted);">Ledgers, BRS, GSTR-2B</div>
           </div>
-          <div style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; cursor: pointer;" onclick="openDashboardTransactionsModal('', 'All Transactions')">
-            <div style="font-size: 11px; color: #64748b; font-weight: 600;">TOTAL TRANSACTIONS</div>
+          <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); cursor: pointer;" onclick="openDashboardTransactionsModal('', 'All Transactions')">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL TRANSACTIONS</div>
             <div class="font-mono font-bold" style="font-size: 18px; color: #2563eb; margin-top: 2px;">${(overview.total_transactions || 0).toLocaleString()} Entries</div>
             <div style="font-size: 11.5px; color: #2563eb;">🔍 Click to inspect all</div>
           </div>
-          <div style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
-            <div style="font-size: 11px; color: #64748b; font-weight: 600;">TOTAL DEBIT TURNOVER</div>
+          <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL DEBIT TURNOVER</div>
             <div class="font-mono font-bold" style="font-size: 18px; color: #059669; margin-top: 2px;">${formatINR(overview.total_debit_turnover || 0)}</div>
-            <div style="font-size: 11.5px; color: #64748b;">Examined payments/purchases</div>
+            <div style="font-size: 11.5px; color: var(--text-muted);">Examined payments/purchases</div>
           </div>
-          <div style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
-            <div style="font-size: 11px; color: #64748b; font-weight: 600;">TOTAL CREDIT TURNOVER</div>
+          <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL CREDIT TURNOVER</div>
             <div class="font-mono font-bold" style="font-size: 18px; color: #0284c7; margin-top: 2px;">${formatINR(overview.total_credit_turnover || 0)}</div>
-            <div style="font-size: 11.5px; color: #64748b;">Examined receipts/revenues</div>
+            <div style="font-size: 11.5px; color: var(--text-muted);">Examined receipts/revenues</div>
           </div>
         </div>
       </div>
@@ -3754,29 +4572,29 @@ async function renderDashboard() {
               <div class="dash-chart-subtitle">Click any severity segment to view underlying findings</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 11px; color: #64748b; font-weight: 700;">AVG RISK SCORE</div>
-              <div class="font-mono font-bold" style="font-size: 18px; color: #0f172a;">${risk.average_risk_score || 0.0} / 10.0</div>
+              <div style="font-size: 11px; color: var(--text-muted); font-weight: 700;">AVG RISK SCORE</div>
+              <div class="font-mono font-bold" style="font-size: 18px; color: var(--text-main);">${risk.average_risk_score || 0.0} / 10.0</div>
             </div>
           </div>
 
           <!-- Finding Severity Distribution Chart (Interactive Clickable Bars) -->
           <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
-            <div class="chart-bar-interactive" style="padding: 12px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; text-align: center;" onclick="openDashboardFindingsModal('CRITICAL', null)" title="Click to view Critical findings">
+            <div class="chart-bar-interactive" style="padding: 12px; border: 1px solid var(--border); background: #fef2f2; border-radius: var(--radius-md); text-align: center;" onclick="openDashboardFindingsModal('CRITICAL', null)" title="Click to view Critical findings">
               <div style="font-size: 11px; font-weight: 700; color: #dc2626;">CRITICAL</div>
               <div class="font-mono font-bold" style="font-size: 24px; color: #dc2626; margin: 4px 0;">${risk.severity_counts?.CRITICAL || 0}</div>
               <div style="font-size: 11px; color: #991b1b;">Immediate Action</div>
             </div>
-            <div class="chart-bar-interactive" style="padding: 12px; border: 1px solid #fed7aa; background: #fff7ed; border-radius: 8px; text-align: center;" onclick="openDashboardFindingsModal('HIGH', null)" title="Click to view High risk findings">
+            <div class="chart-bar-interactive" style="padding: 12px; border: 1px solid var(--border); background: #fff7ed; border-radius: var(--radius-md); text-align: center;" onclick="openDashboardFindingsModal('HIGH', null)" title="Click to view High risk findings">
               <div style="font-size: 11px; font-weight: 700; color: #ea580c;">HIGH</div>
               <div class="font-mono font-bold" style="font-size: 24px; color: #ea580c; margin: 4px 0;">${risk.severity_counts?.HIGH || 0}</div>
               <div style="font-size: 11px; color: #c2410c;">Material Deviation</div>
             </div>
-            <div class="chart-bar-interactive" style="padding: 12px; border: 1px solid #fef08a; background: #fffbeb; border-radius: 8px; text-align: center;" onclick="openDashboardFindingsModal('MEDIUM', null)" title="Click to view Medium risk findings">
+            <div class="chart-bar-interactive" style="padding: 12px; border: 1px solid var(--border); background: #fffbeb; border-radius: var(--radius-md); text-align: center;" onclick="openDashboardFindingsModal('MEDIUM', null)" title="Click to view Medium risk findings">
               <div style="font-size: 11px; font-weight: 700; color: #d97706;">MEDIUM</div>
               <div class="font-mono font-bold" style="font-size: 24px; color: #d97706; margin: 4px 0;">${risk.severity_counts?.MEDIUM || 0}</div>
               <div style="font-size: 11px; color: #b45309;">Review Required</div>
             </div>
-            <div class="chart-bar-interactive" style="padding: 12px; border: 1px solid #a7f3d0; background: #ecfdf5; border-radius: 8px; text-align: center;" onclick="openDashboardFindingsModal('LOW', null)" title="Click to view Low risk findings">
+            <div class="chart-bar-interactive" style="padding: 12px; border: 1px solid var(--border); background: #ecfdf5; border-radius: var(--radius-md); text-align: center;" onclick="openDashboardFindingsModal('LOW', null)" title="Click to view Low risk findings">
               <div style="font-size: 11px; font-weight: 700; color: #059669;">LOW</div>
               <div class="font-mono font-bold" style="font-size: 24px; color: #059669; margin: 4px 0;">${risk.severity_counts?.LOW || 0}</div>
               <div style="font-size: 11px; color: #047857;">Informational</div>
@@ -3784,7 +4602,7 @@ async function renderDashboard() {
           </div>
 
           <!-- Multi-Engine Detection Distribution Pills -->
-          <div style="display: flex; gap: 10px; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 12px; justify-content: space-between;">
+          <div style="display: flex; gap: 10px; background: var(--bg-app); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 12px; justify-content: space-between;">
             <div><b>Deterministic Rules:</b> <span class="font-mono font-bold" style="color: #2563eb;">${risk.engine_counts?.DETERMINISTIC || 0}</span></div>
             <div><b>Statistical & ML Outliers:</b> <span class="font-mono font-bold" style="color: #7c3aed;">${risk.engine_counts?.STATISTICAL_ML || 0}</span></div>
             <div><b>Local AI Observations:</b> <span class="font-mono font-bold" style="color: #059669;">${risk.engine_counts?.LOCAL_AI || 0}</span></div>
@@ -3801,7 +4619,7 @@ async function renderDashboard() {
           </div>
           <div>
             ${Object.keys(risk.area_counts || {}).length === 0 ? `
-              <div style="text-align: center; color: #94a3b8; padding: 20px 0;">No risk areas flagged yet.</div>
+              <div style="text-align: center; color: var(--text-muted); padding: 20px 0;">No risk areas flagged yet.</div>
             ` : Object.entries(risk.area_counts || {}).map(([area, cnt]) => {
               const pct = Math.round((cnt / maxAreaFinding) * 100);
               return `
@@ -3836,7 +4654,7 @@ async function renderDashboard() {
         </div>
 
         ${recentFindings.length === 0 ? `
-          <div style="padding: 40px; text-align: center; color: #64748b;">
+          <div style="padding: 40px; text-align: center; color: var(--text-muted);">
             <p>No audit findings registered for this engagement yet.</p>
             ${isAuditorOrAdmin ? `<button class="btn btn-primary" style="margin-top: 10px;" onclick="triggerRunHybridEngine()">Execute Audit Engine Now</button>` : ''}
           </div>
@@ -3859,19 +4677,19 @@ async function renderDashboard() {
                   const hideRow = (activeFindingsFilter !== 'ALL' && (f.severity || '').toUpperCase() !== activeFindingsFilter);
                   return `
                     <tr style="${hideRow ? 'display: none;' : ''}" data-sev="${(f.severity || '').toUpperCase()}">
-                      <td class="font-mono font-bold" style="color: #0f172a;">
+                      <td class="font-mono font-bold" style="color: var(--text-main);">
                         <span style="background: #e2e8f0; padding: 2px 5px; border-radius: 4px; font-size: 11px;">[ID: ${f.id}]</span>
                         <span style="margin-left: 4px;">${f.finding_code}</span>
                       </td>
                       <td>${getSeverityBadge(f.severity)}</td>
                       <td>
-                        <div style="font-weight: 700; color: #0f172a;">${escapeHtml(f.title)}</div>
-                        <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">
+                        <div style="font-weight: 700; color: var(--text-main);">${escapeHtml(f.title)}</div>
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
                           Rule: <b>${escapeHtml(f.rule_used || 'ICAI Standard Procedure')}</b>
                         </div>
                       </td>
                       <td>
-                        <span class="badge" style="background: #f1f5f9; color: #334155; font-size: 11px;">${escapeHtml(f.category || f.module || 'General')}</span>
+                        <span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary); font-size: 11px;">${escapeHtml(f.category || f.module || 'General')}</span>
                       </td>
                       <td class="text-right font-mono" style="color: #dc2626; font-weight: 700;">
                         ${f.difference ? escapeHtml(f.difference) : '—'}
@@ -3905,14 +4723,14 @@ async function renderDashboard() {
 
           <div style="display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 10px 0 0 0; border-bottom: 1px solid #e2e8f0;">
             ${monthlyTrends.length === 0 ? `
-              <div style="width: 100%; text-align: center; color: #94a3b8; align-self: center;">No transactions found for active engagement.</div>
+              <div style="width: 100%; text-align: center; color: var(--text-muted); align-self: center;">No transactions found for active engagement.</div>
             ` : monthlyTrends.map(m => {
               const heightPct = Math.max(12, Math.round((m.transaction_count / maxTxMonth) * 100));
               return `
                 <div class="chart-bar-interactive" style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end;" onclick="openDashboardTransactionsModal('${m.month}', '${m.month_label}')" title="${m.month_label}: ${m.transaction_count} transactions (Click to inspect)">
                   <div style="font-size: 10.5px; font-weight: 700; color: #2563eb; margin-bottom: 4px;">${m.transaction_count}</div>
                   <div style="width: 100%; height: ${heightPct}%; background: linear-gradient(180deg, #3b82f6, #1d4ed8); border-radius: 4px 4px 0 0;"></div>
-                  <div style="font-size: 10px; color: #64748b; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48px;">${m.month_label.split(' ')[0]}</div>
+                  <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48px;">${m.month_label.split(' ')[0]}</div>
                 </div>
               `;
             }).join("")}
@@ -3933,14 +4751,14 @@ async function renderDashboard() {
 
           <div style="display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 10px 0 0 0; border-bottom: 1px solid #e2e8f0;">
             ${monthlyTrends.length === 0 ? `
-              <div style="width: 100%; text-align: center; color: #94a3b8; align-self: center;">No transaction values recorded.</div>
+              <div style="width: 100%; text-align: center; color: var(--text-muted); align-self: center;">No transaction values recorded.</div>
             ` : monthlyTrends.map(m => {
               const heightPct = Math.max(12, Math.round((m.total_value / maxValMonth) * 100));
               return `
                 <div class="chart-bar-interactive" style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end;" onclick="openDashboardTransactionsModal('${m.month}', '${m.month_label}')" title="${m.month_label}: ${formatINR(m.total_value)} turnover (Click to inspect)">
                   <div style="font-size: 10px; font-weight: 700; color: #059669; margin-bottom: 4px;">${formatCompactINR(m.total_value)}</div>
                   <div style="width: 100%; height: ${heightPct}%; background: linear-gradient(180deg, #10b981, #059669); border-radius: 4px 4px 0 0;"></div>
-                  <div style="font-size: 10px; color: #64748b; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48px;">${m.month_label.split(' ')[0]}</div>
+                  <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48px;">${m.month_label.split(' ')[0]}</div>
                 </div>
               `;
             }).join("")}
@@ -3962,22 +4780,22 @@ async function renderDashboard() {
 
           <!-- Reconciliation Status Chart Breakdown -->
           <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px;">
-            <div class="chart-bar-interactive" style="padding: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; text-align: center;" onclick="openDashboardReconciliationModal('MATCHED')">
+            <div class="chart-bar-interactive" style="padding: 10px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;" onclick="openDashboardReconciliationModal('MATCHED')">
               <div style="font-size: 11px; font-weight: 700; color: #059669;">MATCHED</div>
               <div class="font-mono font-bold" style="font-size: 20px; color: #059669;">${recon.matched_items || 0}</div>
               <div style="font-size: 10.5px; color: #047857;">Items Reconciled</div>
             </div>
-            <div class="chart-bar-interactive" style="padding: 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; text-align: center;" onclick="openDashboardReconciliationModal('UNMATCHED_BANK')">
+            <div class="chart-bar-interactive" style="padding: 10px; background: #fef2f2; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;" onclick="openDashboardReconciliationModal('UNMATCHED_BANK')">
               <div style="font-size: 11px; font-weight: 700; color: #dc2626;">BANK UNMATCHED</div>
               <div class="font-mono font-bold" style="font-size: 20px; color: #dc2626;">${recon.unmatched_bank_items || 0}</div>
               <div style="font-size: 10.5px; color: #991b1b;">Missing in Books</div>
             </div>
-            <div class="chart-bar-interactive" style="padding: 10px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; text-align: center;" onclick="openDashboardReconciliationModal('UNMATCHED_BOOK')">
+            <div class="chart-bar-interactive" style="padding: 10px; background: #fff7ed; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;" onclick="openDashboardReconciliationModal('UNMATCHED_BOOK')">
               <div style="font-size: 11px; font-weight: 700; color: #ea580c;">BOOK / 2B UNMATCHED</div>
               <div class="font-mono font-bold" style="font-size: 20px; color: #ea580c;">${recon.unmatched_book_items || 0}</div>
               <div style="font-size: 10.5px; color: #c2410c;">Missing in Bank/Portal</div>
             </div>
-            <div class="chart-bar-interactive" style="padding: 10px; background: #fffbeb; border: 1px solid #fef08a; border-radius: 8px; text-align: center;" onclick="openDashboardReconciliationModal('MISMATCH')">
+            <div class="chart-bar-interactive" style="padding: 10px; background: #fffbeb; border: 1px solid var(--border); border-radius: var(--radius-md); text-align: center;" onclick="openDashboardReconciliationModal('MISMATCH')">
               <div style="font-size: 11px; font-weight: 700; color: #d97706;">AMT MISMATCH</div>
               <div class="font-mono font-bold" style="font-size: 20px; color: #d97706;">${recon.amount_mismatches || 0}</div>
               <div style="font-size: 10.5px; color: #b45309;">Difference Detected</div>
@@ -3986,16 +4804,16 @@ async function renderDashboard() {
 
           <!-- Reconciliations List -->
           ${(recon.reconciliations || []).length === 0 ? `
-            <div style="padding: 14px; text-align: center; color: #64748b; font-size: 12px; background: #f8fafc; border-radius: 6px;">
+            <div style="padding: 14px; text-align: center; color: var(--text-muted); font-size: 12px; background: var(--bg-app); border-radius: 6px;">
               No BRS statements executed yet. Click "Open BRS / 2B Module" to start bank ledger reconciliation.
             </div>
           ` : `
             <div style="display: flex; flex-direction: column; gap: 8px;">
               ${(recon.reconciliations || []).slice(0, 3).map(r => `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; font-size: 12px;">
                   <div>
-                    <div style="font-weight: 700; color: #0f172a;">${r.title}</div>
-                    <div style="font-size: 11px; color: #64748b;">${r.bank_account_name || 'Bank Ledger'} | Net Diff: <span class="font-mono font-bold" style="color: ${r.net_unreconciled_difference == 0 ? '#059669' : '#dc2626'};">${formatINR(r.net_unreconciled_difference || 0)}</span></div>
+                    <div style="font-weight: 700; color: var(--text-main);">${r.title}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${r.bank_account_name || 'Bank Ledger'} | Net Diff: <span class="font-mono font-bold" style="color: ${r.net_unreconciled_difference == 0 ? '#059669' : '#dc2626'};">${formatINR(r.net_unreconciled_difference || 0)}</span></div>
                   </div>
                   <span class="badge ${r.status === 'Completed' ? 'badge-low' : 'badge-medium'}">${r.status || 'Completed'}</span>
                 </div>
@@ -4030,23 +4848,23 @@ async function renderDashboard() {
                     <div style="width: 45%; height: ${actHeight}px; background: #2563eb; border-radius: 2px;" title="Actual: ${d.actual_pct}%"></div>
                     <div style="width: 45%; height: ${expHeight}px; background: #cbd5e1; border-radius: 2px;" title="Expected: ${d.expected_pct}%"></div>
                   </div>
-                  <div style="font-size: 10.5px; font-weight: 700; color: #334155; margin-top: 4px;">D${d.digit}</div>
+                  <div style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); margin-top: 4px;">D${d.digit}</div>
                 </div>
               `;
             }).join("")}
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11.5px; text-align: center;">
-            <div style="padding: 6px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-              <div style="color: #64748b;">ML Outliers</div>
+            <div style="padding: 6px; background: var(--bg-app); border-radius: 6px; border: 1px solid var(--border);">
+              <div style="color: var(--text-muted);">ML Outliers</div>
               <div class="font-mono font-bold" style="color: #7c3aed; font-size: 15px;">${anomaly.ml_outliers_count || 0}</div>
             </div>
-            <div style="padding: 6px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-              <div style="color: #64748b;">Round Sums (₹50k+)</div>
+            <div style="padding: 6px; background: var(--bg-app); border-radius: 6px; border: 1px solid var(--border);">
+              <div style="color: var(--text-muted);">Round Sums (₹50k+)</div>
               <div class="font-mono font-bold" style="color: #d97706; font-size: 15px;">${anomaly.round_sum_count || 0}</div>
             </div>
-            <div style="padding: 6px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-              <div style="color: #64748b;">Weekend Entries</div>
+            <div style="padding: 6px; background: var(--bg-app); border-radius: 6px; border: 1px solid var(--border);">
+              <div style="color: var(--text-muted);">Weekend Entries</div>
               <div class="font-mono font-bold" style="color: #ea580c; font-size: 15px;">${anomaly.weekend_count || 0}</div>
             </div>
           </div>
@@ -4066,7 +4884,7 @@ async function renderDashboard() {
           </div>
 
           ${yoy.length === 0 ? `
-            <div style="padding: 24px; text-align: center; color: #64748b; font-size: 12.5px;">
+            <div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12.5px;">
               No prior year comparison data active for this engagement. Upload previous year general ledger to unlock automatic YoY analytics.
             </div>
           ` : `
@@ -4075,12 +4893,12 @@ async function renderDashboard() {
                 const varPct = Number(item.variance_pct) || 0;
                 const isSig = item.is_significant;
                 return `
-                  <div class="chart-horizontal-bar-row" style="border: 1px solid #f1f5f9; padding: 6px 10px;" onclick="openDashboardYoYModal('${escapeHtml(item.account_name)}')" title="Click to view ledger breakdown for ${escapeHtml(item.account_name)}">
-                    <div style="flex: 1; font-weight: 600; color: #0f172a; font-size: 12px;">
+                  <div class="chart-horizontal-bar-row" style="border: 1px solid var(--border); padding: 6px 10px;" onclick="openDashboardYoYModal('${escapeHtml(item.account_name)}')" title="Click to view ledger breakdown for ${escapeHtml(item.account_name)}">
+                    <div style="flex: 1; font-weight: 600; color: var(--text-main); font-size: 12px;">
                       ${escapeHtml(item.account_name)}
                       ${isSig ? `<span class="badge badge-critical" style="margin-left: 6px; font-size: 10px;">⚠️ Variance</span>` : ''}
                     </div>
-                    <div class="font-mono" style="font-size: 11.5px; color: #64748b; margin-right: 12px;">
+                    <div class="font-mono" style="font-size: 11.5px; color: var(--text-muted); margin-right: 12px;">
                       CY: ${formatCompactINR(item.cy_amount || 0)} | PY: ${formatCompactINR(item.py_amount || 0)}
                     </div>
                     <div class="font-mono font-bold" style="font-size: 12px; min-width: 70px; text-align: right; color: ${varPct > 0 ? '#059669' : varPct < 0 ? '#dc2626' : '#64748b'};">
@@ -4105,7 +4923,7 @@ async function renderDashboard() {
 
           <div style="margin-bottom: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <span style="font-size: 12px; font-weight: 700; color: #0f172a;">Overall Completion</span>
+              <span style="font-size: 12px; font-weight: 700; color: var(--text-main);">Overall Completion</span>
               <span class="font-mono font-bold" style="font-size: 14px; color: #2563eb;">${chk.completion_pct || 0}%</span>
             </div>
             <div style="height: 12px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
@@ -4122,7 +4940,7 @@ async function renderDashboard() {
               <div>In Progress</div>
               <div class="font-mono font-bold" style="font-size: 14px;">${chk.in_progress_count || 0}</div>
             </div>
-            <div style="padding: 6px; background: #f8fafc; border-radius: 4px; color: #64748b; font-weight: 700;">
+            <div style="padding: 6px; background: var(--bg-app); border-radius: 4px; color: var(--text-muted); font-weight: 700;">
               <div>Not Started</div>
               <div class="font-mono font-bold" style="font-size: 14px;">${chk.not_started_count || 0}</div>
             </div>
@@ -4133,11 +4951,11 @@ async function renderDashboard() {
           </div>
 
           <!-- Category Progress Snippets -->
-          <div style="font-size: 11.5px; color: #64748b; font-weight: 600; margin-bottom: 6px;">Key Audit Checklist Sections:</div>
+          <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 6px;">Key Audit Checklist Sections:</div>
           <div style="display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto;">
             ${(chk.category_progress || []).slice(0, 4).map(c => `
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: #f8fafc; border-radius: 4px; font-size: 11.5px; cursor: pointer;" onclick="navigateTo('checklist')">
-                <span style="font-weight: 600; color: #334155; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(c.category || c.name || 'Category')}</span>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: var(--bg-app); border-radius: 4px; font-size: 11.5px; cursor: pointer;" onclick="navigateTo('checklist')">
+                <span style="font-weight: 600; color: var(--text-secondary); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(c.category || c.name || 'Category')}</span>
                 <span class="font-mono" style="color: #2563eb; font-weight: 700;">${c.completed || 0}/${c.total || 0}</span>
               </div>
             `).join("")}
@@ -4150,7 +4968,7 @@ async function renderDashboard() {
     container.innerHTML = `
       <div style="padding: 30px; text-align: center; color: #dc2626;">
         <div style="font-size: 16px; font-weight: 700;">Failed to load dashboard metrics</div>
-        <div style="font-size: 12.5px; margin-top: 6px; color: #64748b;">${escapeHTML(err.message)}</div>
+        <div style="font-size: 12.5px; margin-top: 6px; color: var(--text-muted);">${escapeHTML(err.message)}</div>
         <button class="btn btn-primary" style="margin-top: 14px;" onclick="renderDashboard()">Retry</button>
       </div>
     `;
@@ -4232,14 +5050,14 @@ async function openDashboardFindingsModal(severity = null, area = null) {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">🔍 Drill-Down: ${escapeHtml(title)}</div>
-            <div style="font-size: 12px; color: #64748b;">Showing ${findings.length} underlying audit findings from active engagement database</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">🔍 Drill-Down: ${escapeHtml(title)}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Showing ${findings.length} underlying audit findings from active engagement database</div>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
         </div>
         <div class="dash-modal-body">
           ${findings.length === 0 ? `
-            <div style="padding: 30px; text-align: center; color: #64748b;">No findings matching the selected filter.</div>
+            <div style="padding: 30px; text-align: center; color: var(--text-muted);">No findings matching the selected filter.</div>
           ` : `
             <div class="table-container">
               <table class="data-table">
@@ -4261,7 +5079,7 @@ async function openDashboardFindingsModal(severity = null, area = null) {
                       <td>${getSeverityBadge(f.severity)}</td>
                       <td><b>${escapeHtml(f.title)}</b></td>
                       <td class="font-mono" style="color: #dc2626;">${f.difference || '—'}</td>
-                      <td style="font-size: 11.5px; color: #64748b;">${escapeHtml(f.rule_used || 'ICAI Standard')}</td>
+                      <td style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(f.rule_used || 'ICAI Standard')}</td>
                       <td>${getStatusBadge(f.status)}</td>
                       <td class="text-center">
                         <button class="btn btn-sm btn-primary" onclick="closeDashboardModal(); openEvidenceDrawer(${f.id})">Examine</button>
@@ -4274,7 +5092,7 @@ async function openDashboardFindingsModal(severity = null, area = null) {
           `}
         </div>
         <div class="dash-modal-footer">
-          <span style="font-size: 12px; color: #64748b;">Total ${findings.length} Records</span>
+          <span style="font-size: 12px; color: var(--text-muted);">Total ${findings.length} Records</span>
           <button class="btn btn-secondary" onclick="closeDashboardModal()">Close</button>
         </div>
       </div>
@@ -4307,14 +5125,14 @@ async function openDashboardTransactionsModal(monthStr = '', monthLabel = 'Trans
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">📊 Monthly Transactions: ${escapeHtml(monthLabel)}</div>
-            <div style="font-size: 12px; color: #64748b;">Examining underlying vouchers recorded in general ledger for this period</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">📊 Monthly Transactions: ${escapeHtml(monthLabel)}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Examining underlying vouchers recorded in general ledger for this period</div>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
         </div>
         <div class="dash-modal-body">
           ${txns.length === 0 ? `
-            <div style="padding: 30px; text-align: center; color: #64748b;">No transactions recorded for ${escapeHtml(monthLabel)}.</div>
+            <div style="padding: 30px; text-align: center; color: var(--text-muted);">No transactions recorded for ${escapeHtml(monthLabel)}.</div>
           ` : `
             <div class="table-container">
               <table class="data-table">
@@ -4342,7 +5160,7 @@ async function openDashboardTransactionsModal(monthStr = '', monthLabel = 'Trans
                       <td class="text-right font-mono" style="color: ${t.credit > 0 ? '#0284c7' : '#94a3b8'};">
                         ${t.credit ? formatINR(t.credit) : '—'}
                       </td>
-                      <td style="font-size: 11.5px; color: #64748b; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                      <td style="font-size: 11.5px; color: var(--text-muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                         ${escapeHtml(t.description || '')}
                       </td>
                     </tr>
@@ -4353,7 +5171,7 @@ async function openDashboardTransactionsModal(monthStr = '', monthLabel = 'Trans
           `}
         </div>
         <div class="dash-modal-footer">
-          <span style="font-size: 12px; color: #64748b;">Showing ${Math.min(100, txns.length)} of ${txns.length} records</span>
+          <span style="font-size: 12px; color: var(--text-muted);">Showing ${Math.min(100, txns.length)} of ${txns.length} records</span>
           <button class="btn btn-secondary" onclick="closeDashboardModal()">Close</button>
         </div>
       </div>
@@ -4377,14 +5195,14 @@ async function openDashboardReconciliationModal(statusType = 'UNMATCHED') {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">⚖️ Reconciliation Status Drill-Down (${statusType})</div>
-            <div style="font-size: 12px; color: #64748b;">Bank BRS statements and GSTR-2B discrepancy schedules</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">⚖️ Reconciliation Status Drill-Down (${statusType})</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Bank BRS statements and GSTR-2B discrepancy schedules</div>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
         </div>
         <div class="dash-modal-body">
           ${recons.length === 0 ? `
-            <div style="padding: 30px; text-align: center; color: #64748b;">No active reconciliation statements recorded yet.</div>
+            <div style="padding: 30px; text-align: center; color: var(--text-muted);">No active reconciliation statements recorded yet.</div>
           ` : `
             <div class="table-container">
               <table class="data-table">
@@ -4446,8 +5264,8 @@ async function openDashboardPendingReviewsModal() {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">⏳ Pending Reviews & Sign-Off Schedule</div>
-            <div style="font-size: 12px; color: #64748b;">Working papers and audit engagements awaiting Partner / Manager review</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">⏳ Pending Reviews & Sign-Off Schedule</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Working papers and audit engagements awaiting Partner / Manager review</div>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
         </div>
@@ -4472,7 +5290,7 @@ async function openDashboardPendingReviewsModal() {
                     <tr>
                       <td class="font-mono font-bold">${w.wp_reference}</td>
                       <td><b>${escapeHtml(w.title)}</b></td>
-                      <td><span class="badge" style="background: #f1f5f9; color: #334155;">${escapeHtml(w.area || 'General')}</span></td>
+                      <td><span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary);">${escapeHtml(w.area || 'General')}</span></td>
                       <td>${w.prepared_by || 'Staff'}</td>
                       <td><span class="badge ${w.status === 'Needs Correction' ? 'badge-critical' : 'badge-medium'}">${w.status}</span></td>
                       <td class="text-center">
@@ -4514,14 +5332,14 @@ async function openDashboardYoYModal(accountName) {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">📊 YoY Movement Drill-Down: ${escapeHtml(accountName)}</div>
-            <div style="font-size: 12px; color: #64748b;">Inspecting vouchers posted to this account line for the current financial year</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">📊 YoY Movement Drill-Down: ${escapeHtml(accountName)}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Inspecting vouchers posted to this account line for the current financial year</div>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
         </div>
         <div class="dash-modal-body">
           ${txns.length === 0 ? `
-            <div style="padding: 30px; text-align: center; color: #64748b;">No direct ledger transactions found for "${escapeHtml(accountName)}".</div>
+            <div style="padding: 30px; text-align: center; color: var(--text-muted);">No direct ledger transactions found for "${escapeHtml(accountName)}".</div>
           ` : `
             <div class="table-container">
               <table class="data-table">
@@ -4543,7 +5361,7 @@ async function openDashboardYoYModal(accountName) {
                       <td>${escapeHtml(t.party_name || '—')}</td>
                       <td class="text-right font-mono" style="color: #059669;">${t.debit ? formatINR(t.debit) : '—'}</td>
                       <td class="text-right font-mono" style="color: #0284c7;">${t.credit ? formatINR(t.credit) : '—'}</td>
-                      <td style="font-size: 11.5px; color: #64748b;">${escapeHtml(t.description || '')}</td>
+                      <td style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(t.description || '')}</td>
                     </tr>
                   `).join("")}
                 </tbody>
@@ -4582,14 +5400,14 @@ async function openDashboardDigitModal(digit) {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">🔢 Benford's Law Drill-Down: Leading Digit ${digit}</div>
-            <div style="font-size: 12px; color: #64748b;">Found ${txns.length} transactions whose integer amount starts with digit ${digit}</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">🔢 Benford's Law Drill-Down: Leading Digit ${digit}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Found ${txns.length} transactions whose integer amount starts with digit ${digit}</div>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
         </div>
         <div class="dash-modal-body">
           ${txns.length === 0 ? `
-            <div style="padding: 30px; text-align: center; color: #64748b;">No transactions starting with digit ${digit}.</div>
+            <div style="padding: 30px; text-align: center; color: var(--text-muted);">No transactions starting with digit ${digit}.</div>
           ` : `
             <div class="table-container">
               <table class="data-table">
@@ -4613,7 +5431,7 @@ async function openDashboardDigitModal(digit) {
                         <td><b>${escapeHtml(t.ledger || 'General')}</b></td>
                         <td>${escapeHtml(t.party_name || '—')}</td>
                         <td class="text-right font-mono font-bold" style="color: #2563eb;">${formatINR(amt)}</td>
-                        <td style="font-size: 11.5px; color: #64748b;">${escapeHtml(t.description || '')}</td>
+                        <td style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(t.description || '')}</td>
                       </tr>
                     `;
                   }).join("")}
@@ -4623,7 +5441,7 @@ async function openDashboardDigitModal(digit) {
           `}
         </div>
         <div class="dash-modal-footer">
-          <span style="font-size: 12px; color: #64748b;">Showing ${txns.length} records</span>
+          <span style="font-size: 12px; color: var(--text-muted);">Showing ${txns.length} records</span>
           <button class="btn btn-secondary" onclick="closeDashboardModal()">Close</button>
         </div>
       </div>
@@ -4644,7 +5462,7 @@ async function triggerRunHybridEngine() {
   container.innerHTML = `
     <div style="padding: 40px; text-align: center;">
       <div style="font-size: 18px; font-weight: 700; color: var(--primary);">Running Hybrid Audit Engine...</div>
-      <div style="font-size: 13px; color: #64748b; margin-top: 8px;">
+      <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px;">
         1. Executing Deterministic Accounting Rules (Debit=Credit, 40A(3), 269ST, GSTIN, Duplicates)...<br/>
         2. Running Statistical & Scikit-Learn Isolation Forest Anomaly Detection...<br/>
         3. Calculating Benford's Law Digits Conformity & Local AI Observations...
@@ -4684,8 +5502,8 @@ async function renderAnomalyDetection() {
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Statistical & Machine Learning Anomaly Detection</h2>
-        <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Statistical & Machine Learning Anomaly Detection</h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
           Multi-layer detection: Benford's Law + Scikit-Learn Isolation Forest + 3-Sigma Z-Scores
         </div>
       </div>
@@ -4722,7 +5540,7 @@ async function renderAnomalyDetection() {
         }).join("")}
       </div>
 
-      <div style="margin-top: 14px; font-size: 12px; color: #64748b;">
+      <div style="margin-top: 14px; font-size: 12px; color: var(--text-muted);">
         * Mean Absolute Deviation (MAD) of ${benford.mad}. Standard audit threshold: MAD &lt; 0.012 indicates normal business distribution.
       </div>
     </div>
@@ -4750,7 +5568,7 @@ async function renderAnomalyDetection() {
                 <td>${getSeverityBadge(f.severity)}</td>
                 <td>
                   <b>${f.title}</b><br/>
-                  <span style="font-size: 11.5px; color: #64748b;">${f.description}</span>
+                  <span style="font-size: 11.5px; color: var(--text-muted);">${f.description}</span>
                 </td>
                 <td style="font-size: 12px; color: #2563eb;">${f.rule_used}</td>
                 <td class="font-mono font-bold">${f.risk_score} / 10</td>
@@ -4774,8 +5592,8 @@ async function renderFindings() {
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Audit Findings & Evidence Repository</h2>
-        <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Audit Findings & Evidence Repository</h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
           All deterministic, statutory, and statistical exceptions linked to source vouchers
         </div>
       </div>
@@ -4783,7 +5601,7 @@ async function renderFindings() {
     </div>
 
     <div class="card" style="padding: 12px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
-      <span style="font-size: 12px; font-weight: 600; color: #475569;">Filter Severity:</span>
+      <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Filter Severity:</span>
       <button class="btn btn-sm btn-secondary" onclick="filterFindingsTable('ALL')">All (${findings.length})</button>
       <button class="btn btn-sm btn-secondary" style="color: var(--sev-critical);" onclick="filterFindingsTable('CRITICAL')">Critical</button>
       <button class="btn btn-sm btn-secondary" style="color: var(--sev-high);" onclick="filterFindingsTable('HIGH')">High</button>
@@ -4815,7 +5633,7 @@ async function renderFindings() {
                 <td class="font-mono font-bold">${f.risk_score}</td>
                 <td style="max-width: 320px;">
                   <b>${f.title}</b><br/>
-                  <span style="font-size: 11.5px; color: #64748b;">${f.reason}</span>
+                  <span style="font-size: 11.5px; color: var(--text-muted);">${f.reason}</span>
                 </td>
                 <td class="font-mono" style="color: #dc2626; font-weight: 600;">${f.difference || '—'}</td>
                 <td>${getStatusBadge(f.status)}</td>
@@ -4853,11 +5671,11 @@ let currentTBData = null;
 async function renderTrialBalance() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
-    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: #64748b;">Please select an active audit engagement first.</div>`;
+    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">Please select an active audit engagement first.</div>`;
     return;
   }
 
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Performing 12-Point Trial Balance Deterministic Audit Analysis...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Performing 12-Point Trial Balance Deterministic Audit Analysis...</div>`;
 
   try {
     const tb = await FinAuditAPI.getTrialBalance(state.currentEngagementId);
@@ -4882,8 +5700,8 @@ async function renderTrialBalance() {
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Trial Balance Analysis & Audit Verification</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Trial Balance Analysis & Audit Verification</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             12-Point deterministic accounting checks, arithmetic roll-forward, and double-entry tally verification
           </div>
         </div>
@@ -4899,9 +5717,9 @@ async function renderTrialBalance() {
 
       <!-- High Priority Out of Balance Alert Banner -->
       ${!isBalanced ? `
-        <div style="padding: 16px 20px; border-radius: var(--radius-lg); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background-color: #fef2f2; border: 2px solid #ef4444; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.15);">
+        <div style="padding: 16px 20px; border-radius: var(--radius-lg); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background-color: #fef2f2; border: 2px solid #ef4444; ">
           <div style="display: flex; align-items: center; gap: 14px;">
-            <div style="background: #ef4444; color: white; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold;">
+            <div style="background: #ef4444; color: white; width: 40px; height: 40px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold;">
               ⚠️
             </div>
             <div>
@@ -4918,7 +5736,7 @@ async function renderTrialBalance() {
           </div>
         </div>
       ` : `
-        <div style="padding: 14px 20px; border-radius: var(--radius-lg); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background-color: #ecfdf5; border: 1px solid #a7f3d0;">
+        <div style="padding: 14px 20px; border-radius: var(--radius-lg); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background-color: #ecfdf5; border: 1px solid var(--border);">
           <div style="display: flex; align-items: center; gap: 12px;">
             <div style="background: #10b981; color: white; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px;">
               ✓
@@ -4976,7 +5794,7 @@ async function renderTrialBalance() {
 
       <!-- 12-Check Audit Exceptions Breakdown -->
       <div class="card" style="margin-bottom: 20px;">
-        <div class="card-header" style="background: #f8fafc;">
+        <div class="card-header" style="background: var(--bg-app);">
           <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <div>
               <div class="card-title">12-Point Deterministic Audit Exceptions Log (${exceptions.length})</div>
@@ -4990,7 +5808,7 @@ async function renderTrialBalance() {
           <div style="padding: 30px; text-align: center; color: #059669;">
             <div style="font-size: 24px; margin-bottom: 6px;">✓</div>
             <b>All 12 Trial Balance Audit Checks Passed Successfully!</b>
-            <p style="font-size: 12px; color: #64748b; margin-top: 4px;">No arithmetic imbalances, unusual balances, suspense heads, or roll-forward inconsistencies detected.</p>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">No arithmetic imbalances, unusual balances, suspense heads, or roll-forward inconsistencies detected.</p>
           </div>
         ` : `
           <div class="table-container">
@@ -5011,10 +5829,10 @@ async function renderTrialBalance() {
                   <tr style="${ex.severity === 'CRITICAL' ? 'background: #fff5f5;' : (ex.severity === 'HIGH' ? 'background: #fffdf5;' : '')}">
                     <td class="font-mono font-bold" style="font-size: 11px;">${escapeHtml(ex.check_id)}</td>
                     <td>${getSeverityBadge(ex.severity)}</td>
-                    <td><span class="badge" style="background:#f1f5f9; color:#475569; font-size:10.5px;">${escapeHtml(ex.category)}</span></td>
+                    <td><span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary); font-size:10.5px;">${escapeHtml(ex.category)}</span></td>
                     <td>
-                      <div style="font-weight: 700; color: #0f172a; font-size: 13px;">${escapeHtml(ex.check_name)}</div>
-                      <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">${escapeHtml(ex.description)}</div>
+                      <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">${escapeHtml(ex.check_name)}</div>
+                      <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(ex.description)}</div>
                       ${ex.exact_difference ? `
                         <div style="font-size: 11px; color: #dc2626; font-weight: 700; margin-top: 3px;" class="font-mono">
                           Exact Difference: ₹${Number(ex.exact_difference).toLocaleString('en-IN', {minimumFractionDigits: 2})}
@@ -5029,11 +5847,11 @@ async function renderTrialBalance() {
                           </span>
                         `).join('')}
                         ${(ex.affected_accounts || []).length > 4 ? `
-                          <span class="badge" style="font-size: 10px; background: #e2e8f0; color: #475569;">+${(ex.affected_accounts.length - 4)} more</span>
+                          <span class="badge" style="font-size: 10px; background: #e2e8f0; color: var(--text-secondary);">+${(ex.affected_accounts.length - 4)} more</span>
                         ` : ''}
                       </div>
                     </td>
-                    <td style="font-size: 11px; color: #64748b;">
+                    <td style="font-size: 11px; color: var(--text-muted);">
                       ${escapeHtml(ex.sa_reference || 'SA 500')}
                     </td>
                     <td class="text-center">
@@ -5094,16 +5912,16 @@ async function renderTrialBalance() {
                   <tr data-ledger="${escapeHtml(l.ledger.toLowerCase())}" data-group="${escapeHtml(l.account_group.toLowerCase())}" data-has-exception="${isAffected ? '1' : '0'}" data-is-suspense="${isSuspense ? '1' : '0'}" style="${isAffected ? 'background: #fffdf5;' : ''}">
                     <td>
                       <div style="display: flex; align-items: center; gap: 6px;">
-                        <b style="color: #0f172a; font-size: 13px;">${escapeHtml(l.ledger)}</b>
-                        ${isAffected ? `<span class="badge" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; font-size:9.5px;">EXCEPTION</span>` : ''}
+                        <b style="color: var(--text-main); font-size: 13px;">${escapeHtml(l.ledger)}</b>
+                        ${isAffected ? `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border); font-size:9.5px;">EXCEPTION</span>` : ''}
                         ${isSuspense ? `<span class="badge badge-critical" style="font-size:9.5px;">SUSPENSE</span>` : ''}
                       </div>
-                      <div style="font-size: 11px; color: #64748b;">
+                      <div style="font-size: 11px; color: var(--text-muted);">
                         ${l.first_txn_date ? `Period: ${l.first_txn_date} to ${l.last_txn_date}` : 'Standard Head'}
                       </div>
                     </td>
                     <td><span class="badge badge-medium" style="font-size: 11px;">${escapeHtml(l.account_group)}</span></td>
-                    <td class="text-right font-mono" style="font-size: 12px; color: #475569;">
+                    <td class="text-right font-mono" style="font-size: 12px; color: var(--text-secondary);">
                       ${l.opening_balance !== 0 ? formatINR(l.opening_balance) : '0.00'}
                     </td>
                     <td class="text-right font-mono font-bold" style="font-size: 12px; color: var(--primary);">
@@ -5131,7 +5949,7 @@ async function renderTrialBalance() {
             <tfoot>
               <tr style="background-color: #f1f5f9; font-weight: 800; font-size: 13px;">
                 <td colspan="2">GRAND TOTALS (TRIAL BALANCE)</td>
-                <td class="text-right font-mono" style="color: #475569;">${formatINR(tb.grand_opening_debit || 0.0)}</td>
+                <td class="text-right font-mono" style="color: var(--text-secondary);">${formatINR(tb.grand_opening_debit || 0.0)}</td>
                 <td class="text-right font-mono" style="color: var(--primary); font-size: 14px;">${formatINR(tb.grand_total_debit)}</td>
                 <td class="text-right font-mono" style="color: #059669; font-size: 14px;">${formatINR(tb.grand_total_credit)}</td>
                 <td class="text-right font-mono" colspan="2" style="color: ${isBalanced ? '#059669' : '#dc2626'}; font-size: 14px;">
@@ -5186,7 +6004,7 @@ async function openTBExceptionAIExplanation(exJsonStr) {
   const drawerBody = document.getElementById("drawer-content");
   
   drawerHeader.innerText = `Audit Standard & AI Guidance: ${ex.check_name}`;
-  drawerBody.innerHTML = `<div style="padding: 20px; color: #64748b;">Retrieving ICAI Standard Guidance...</div>`;
+  drawerBody.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Retrieving ICAI Standard Guidance...</div>`;
   
   document.getElementById("drawer-overlay").style.display = "block";
   document.getElementById("evidence-drawer").classList.add("open");
@@ -5201,35 +6019,35 @@ async function openTBExceptionAIExplanation(exJsonStr) {
     });
 
     drawerBody.innerHTML = `
-      <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <b style="color: #0f172a; font-size: 14px;">${escapeHtml(res.check_name)}</b>
+          <b style="color: var(--text-main); font-size: 14px;">${escapeHtml(res.check_name)}</b>
           <span class="badge badge-resolved">${escapeHtml(res.sa_reference)}</span>
         </div>
-        <div style="font-size: 11px; color: #64748b;">Check Code: <span class="font-mono font-bold">${escapeHtml(res.check_id)}</span></div>
+        <div style="font-size: 11px; color: var(--text-muted);">Check Code: <span class="font-mono font-bold">${escapeHtml(res.check_id)}</span></div>
       </div>
 
       <div style="margin-bottom: 16px;">
-        <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px; text-transform: uppercase;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">
           ICAI Standards & Analytical Implication:
         </div>
-        <div style="padding: 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); font-size: 13px; color: #1e3a8a; line-height: 1.6;">
+        <div style="padding: 12px; background: #eff6ff; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 13px; color: #1e3a8a; line-height: 1.6;">
           ${escapeHtml(res.explanation)}
         </div>
       </div>
 
       <div style="margin-bottom: 16px;">
-        <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px; text-transform: uppercase;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">
           Recommended Substantive Audit Procedures:
         </div>
-        <ul style="padding-left: 18px; font-size: 12.5px; color: #475569; display: flex; flex-direction: column; gap: 6px;">
+        <ul style="padding-left: 18px; font-size: 12.5px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px;">
           ${(res.suggested_audit_procedures || []).map(p => `
             <li>${escapeHtml(p)}</li>
           `).join('')}
         </ul>
       </div>
 
-      <div style="padding: 12px; background: #f1f5f9; border-radius: var(--radius-md); font-size: 11px; color: #64748b;">
+      <div style="padding: 12px; background: var(--bg-sidebar); border-radius: var(--radius-md); font-size: 11px; color: var(--text-muted);">
         🔒 <b>Deterministic Guarantee:</b> ${escapeHtml(res.compliance_note)}
       </div>
     `;
@@ -5246,27 +6064,27 @@ async function viewLedgerDrilldown(ledgerName) {
   
   drawerHeader.innerText = `Ledger Statement: ${ledgerName}`;
   drawerBody.innerHTML = `
-    <div style="margin-bottom: 14px; background: #f8fafc; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+    <div style="margin-bottom: 14px; background: var(--bg-app); padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
       <div>
-        <div style="font-size: 11px; color: #64748b;">TOTAL TRANSACTIONS</div>
-        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${drill.total_transactions} vouchers</div>
+        <div style="font-size: 11px; color: var(--text-muted);">TOTAL TRANSACTIONS</div>
+        <div style="font-size: 14px; font-weight: 700; color: var(--text-main);">${drill.total_transactions} vouchers</div>
       </div>
       <div>
-        <div style="font-size: 11px; color: #64748b;">TOTAL DEBIT</div>
+        <div style="font-size: 11px; color: var(--text-muted);">TOTAL DEBIT</div>
         <div style="font-size: 14px; font-weight: 700; color: var(--primary); font-family: monospace;">${formatINR(drill.total_debit || 0)}</div>
       </div>
       <div>
-        <div style="font-size: 11px; color: #64748b;">TOTAL CREDIT</div>
+        <div style="font-size: 11px; color: var(--text-muted);">TOTAL CREDIT</div>
         <div style="font-size: 14px; font-weight: 700; color: #059669; font-family: monospace;">${formatINR(drill.total_credit || 0)}</div>
       </div>
       <div>
-        <div style="font-size: 11px; color: #64748b;">NET BALANCE</div>
-        <div style="font-size: 14px; font-weight: 800; color: #0f172a; font-family: monospace;">${formatINR(drill.net_balance)}</div>
+        <div style="font-size: 11px; color: var(--text-muted);">NET BALANCE</div>
+        <div style="font-size: 14px; font-weight: 800; color: var(--text-main); font-family: monospace;">${formatINR(drill.net_balance)}</div>
       </div>
     </div>
 
     ${drill.transactions.length === 0 ? `
-      <div style="padding: 30px; text-align: center; color: #64748b;">No underlying transactions found for this ledger.</div>
+      <div style="padding: 30px; text-align: center; color: var(--text-muted);">No underlying transactions found for this ledger.</div>
     ` : `
       <div class="table-container">
         <table class="data-table">
@@ -5286,12 +6104,12 @@ async function viewLedgerDrilldown(ledgerName) {
                 <td class="font-mono" style="font-size: 11px;">${t.date || '—'}</td>
                 <td class="font-mono font-bold" style="font-size: 11px;">${t.voucher_no || '—'}</td>
                 <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis;">
-                  <b style="font-size: 12px; color: #0f172a;">${escapeHtml(t.party_name || '')}</b><br/>
-                  <span style="font-size: 11px; color: #64748b;">${escapeHtml(t.description || '')}</span>
+                  <b style="font-size: 12px; color: var(--text-main);">${escapeHtml(t.party_name || '')}</b><br/>
+                  <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(t.description || '')}</span>
                 </td>
                 <td class="text-right font-mono" style="font-size: 11.5px; color: var(--primary);">${t.debit > 0 ? formatINR(t.debit) : '—'}</td>
                 <td class="text-right font-mono" style="font-size: 11.5px; color: #059669;">${t.credit > 0 ? formatINR(t.credit) : '—'}</td>
-                <td class="text-right font-mono font-bold" style="font-size: 11.5px; color: #0f172a;">${formatINR(t.running_balance)}</td>
+                <td class="text-right font-mono font-bold" style="font-size: 11.5px; color: var(--text-main);">${formatINR(t.running_balance)}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -5342,11 +6160,11 @@ const GL_RULE_LABELS = {
 async function renderGeneralLedger() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
-    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: #64748b;">Please select an active audit engagement first.</div>`;
+    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">Please select an active audit engagement first.</div>`;
     return;
   }
 
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Running General Ledger 13-Point Anomaly Analysis & Scanning Vouchers...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Running General Ledger 13-Point Anomaly Analysis & Scanning Vouchers...</div>`;
 
   try {
     const [ledgersRes, partiesRes, glData] = await Promise.all([
@@ -5391,8 +6209,8 @@ async function renderGeneralLedger() {
       <!-- Header -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">General Ledger Analysis & Substantive Testing</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">General Ledger Analysis & Substantive Testing</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             13-Point deterministic anomaly detection, multi-attribute transaction filtering, and running balance audit verification
           </div>
         </div>
@@ -5447,7 +6265,7 @@ async function renderGeneralLedger() {
       <!-- Quick 13-Point Anomaly Filter Chips -->
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <div style="font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">
+          <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
             ⚡ Quick 13-Point Anomaly Filter Chips
           </div>
           ${isFilterActive ? `
@@ -5474,11 +6292,11 @@ async function renderGeneralLedger() {
 
       <!-- Multi-Attribute Search & Filter Controls -->
       <div class="card" style="margin-bottom: 20px;">
-        <div class="card-header" style="background: #f8fafc; padding: 10px 16px;">
-          <div style="font-weight: 700; font-size: 13px; color: #0f172a;">
+        <div class="card-header" style="background: var(--bg-app); padding: 10px 16px;">
+          <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">
             🔍 Multi-Attribute Ledger & Transaction Filter
           </div>
-          <div style="font-size: 12px; color: #64748b;">
+          <div style="font-size: 12px; color: var(--text-muted);">
             Filter by ledger, narration keyword, party, voucher, date window, or amount limits
           </div>
         </div>
@@ -5568,20 +6386,20 @@ async function renderGeneralLedger() {
               const t = a.transaction || {};
               const amt = floatVal(t.amount || Math.max(t.debit || 0, t.credit || 0));
               return `
-                <div style="background: #ffffff; border: 1px solid #fed7aa; border-radius: var(--radius-md); padding: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
+                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
                   <div style="flex: 1;">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                       ${getSeverityBadge(a.severity)}
-                      <span class="font-mono font-bold" style="font-size: 12px; color: #0f172a;">${escapeHtml(a.rule)}</span>
+                      <span class="font-mono font-bold" style="font-size: 12px; color: var(--text-main);">${escapeHtml(a.rule)}</span>
                       <span style="font-weight: 700; font-size: 13px; color: #1e293b;">${escapeHtml(a.rule_name)}</span>
-                      <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 10.5px;">Risk Score: ${a.risk_score}/100</span>
+                      <span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary); font-size: 10.5px;">Risk Score: ${a.risk_score}/100</span>
                     </div>
 
-                    <div style="font-size: 12.5px; color: #334155; margin-bottom: 6px;">
+                    <div style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 6px;">
                       <b>Reason:</b> ${escapeHtml(a.reason)}
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px; font-size: 11.5px; color: #64748b; background: #f8fafc; padding: 8px 10px; border-radius: 4px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px; font-size: 11.5px; color: var(--text-muted); background: var(--bg-app); padding: 8px 10px; border-radius: 4px;">
                       <div>
                         <b>Evidence:</b> <code>${escapeHtml(a.evidence)}</code>
                       </div>
@@ -5592,8 +6410,8 @@ async function renderGeneralLedger() {
                   </div>
 
                   <div style="text-align: right; min-width: 140px;">
-                    <div class="font-mono font-bold" style="font-size: 14px; color: #0f172a;">${formatINR(amt)}</div>
-                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Date: ${t.date || '—'}</div>
+                    <div class="font-mono font-bold" style="font-size: 14px; color: var(--text-main);">${formatINR(amt)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Date: ${t.date || '—'}</div>
                     <button class="btn btn-sm btn-secondary" style="margin-top: 8px; width: 100%;" onclick="openGLTransactionDrawer(${t.id})">
                       🔍 Examine Txn
                     </button>
@@ -5614,17 +6432,28 @@ async function renderGeneralLedger() {
               ${isFilterActive ? 'Filtered by active search parameters' : 'All chronological transactions with computed running balances'}
             </div>
           </div>
-          <div style="font-size: 12px; color: #64748b;">
+          <div style="font-size: 12px; color: var(--text-muted);">
             Showing <b>${transactions.length}</b> records
           </div>
         </div>
 
-        ${transactions.length === 0 ? `
-          <div style="padding: 40px; text-align: center; color: #64748b;">
-            <p>No ledger transactions match the current filter criteria.</p>
-            <button class="btn btn-secondary" style="margin-top: 10px;" onclick="resetGLFilters()">Clear Filters</button>
-          </div>
-        ` : `
+        ${transactions.length === 0 ? (
+          isFilterActive ? `
+            <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+              <p>No ledger transactions match the current filter criteria.</p>
+              <button class="btn btn-secondary" style="margin-top: 10px;" onclick="resetGLFilters()">Clear Filters</button>
+            </div>
+          ` : `
+            <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
+              <div style="font-size: 44px; margin-bottom: 10px;">📊</div>
+              <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No transactions imported yet</div>
+              <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
+                Import your client's General Ledger or Day Book CSV/Excel file to begin 13-point anomaly detection and substantive audit testing.
+              </p>
+              <button class="btn btn-primary" onclick="navigateTo('import')">+ Import Financial Data</button>
+            </div>
+          `
+        ) : `
           <div class="table-container">
             <table class="data-table">
               <thead>
@@ -5649,13 +6478,13 @@ async function renderGeneralLedger() {
                   return `
                     <tr style="${hasAnom ? 'background-color: #fffbf5;' : ''}">
                       <td class="font-mono" style="font-size: 11.5px;">${t.date || '—'}</td>
-                      <td class="font-mono font-bold" style="font-size: 11.5px; color: #0f172a;">${escapeHtml(t.voucher_no || '—')}</td>
+                      <td class="font-mono font-bold" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(t.voucher_no || '—')}</td>
                       <td>
-                        <b style="font-size: 12px; color: #0f172a;">${escapeHtml(t.ledger || 'General')}</b>
+                        <b style="font-size: 12px; color: var(--text-main);">${escapeHtml(t.ledger || 'General')}</b>
                       </td>
-                      <td style="font-size: 12px; color: #334155;">${escapeHtml(t.party_name || '—')}</td>
+                      <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(t.party_name || '—')}</td>
                       <td style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.description || '')}">
-                        <span style="font-size: 11.5px; color: #475569;">${escapeHtml(t.description || '—')}</span>
+                        <span style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(t.description || '—')}</span>
                       </td>
                       <td class="text-right font-mono font-bold" style="font-size: 12px; color: ${t.debit > 0 ? 'var(--primary)' : '#94a3b8'};">
                         ${t.debit > 0 ? formatINR(t.debit) : '—'}
@@ -5663,7 +6492,7 @@ async function renderGeneralLedger() {
                       <td class="text-right font-mono font-bold" style="font-size: 12px; color: ${t.credit > 0 ? '#059669' : '#94a3b8'};">
                         ${t.credit > 0 ? formatINR(t.credit) : '—'}
                       </td>
-                      <td class="text-right font-mono font-bold" style="font-size: 12px; color: #0f172a;">
+                      <td class="text-right font-mono font-bold" style="font-size: 12px; color: var(--text-main);">
                         ${formatINR(t.running_balance || 0)}
                       </td>
                       <td>
@@ -5753,7 +6582,7 @@ async function openGLTransactionDrawer(txId) {
   const drawerBody = document.getElementById("drawer-content");
   
   drawerHeader.innerText = `General Ledger Voucher Inspection: #${txId}`;
-  drawerBody.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading transaction details...</div>`;
+  drawerBody.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading transaction details...</div>`;
   
   document.getElementById("drawer-overlay").style.display = "block";
   document.getElementById("evidence-drawer").classList.add("open");
@@ -5772,29 +6601,29 @@ async function openGLTransactionDrawer(txId) {
 
     drawerBody.innerHTML = `
       <!-- Transaction Card -->
-      <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <div>
-            <span class="font-mono font-bold" style="font-size: 14px; color: #0f172a;">Voucher #${escapeHtml(tx.voucher_no || 'N/A')}</span>
-            <div style="font-size: 11px; color: #64748b;">Transaction ID: #${tx.id} | Date: <b>${tx.date || '—'}</b></div>
+            <span class="font-mono font-bold" style="font-size: 14px; color: var(--text-main);">Voucher #${escapeHtml(tx.voucher_no || 'N/A')}</span>
+            <div style="font-size: 11px; color: var(--text-muted);">Transaction ID: #${tx.id} | Date: <b>${tx.date || '—'}</b></div>
           </div>
-          <div class="font-mono font-bold" style="font-size: 16px; color: #0f172a;">
+          <div class="font-mono font-bold" style="font-size: 16px; color: var(--text-main);">
             ${formatINR(amt)}
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-          <div><b style="color: #475569;">Ledger Head:</b> <span style="color: #0f172a; font-weight: 600;">${escapeHtml(tx.ledger || '—')}</span></div>
-          <div><b style="color: #475569;">Party Name:</b> <span style="color: #0f172a; font-weight: 600;">${escapeHtml(tx.party_name || '—')}</span></div>
-          <div><b style="color: #475569;">Debit:</b> <span class="font-mono" style="color: var(--primary); font-weight: 700;">${tx.debit > 0 ? formatINR(tx.debit) : '—'}</span></div>
-          <div><b style="color: #475569;">Credit:</b> <span class="font-mono" style="color: #059669; font-weight: 700;">${tx.credit > 0 ? formatINR(tx.credit) : '—'}</span></div>
-          <div><b style="color: #475569;">Invoice / Ref No:</b> <span class="font-mono">${escapeHtml(tx.invoice_no || tx.reference_no || '—')}</span></div>
-          <div><b style="color: #475569;">Running Bal:</b> <span class="font-mono font-bold">${formatINR(tx.running_balance || 0)}</span></div>
+          <div><b style="color: var(--text-secondary);">Ledger Head:</b> <span style="color: var(--text-main); font-weight: 600;">${escapeHtml(tx.ledger || '—')}</span></div>
+          <div><b style="color: var(--text-secondary);">Party Name:</b> <span style="color: var(--text-main); font-weight: 600;">${escapeHtml(tx.party_name || '—')}</span></div>
+          <div><b style="color: var(--text-secondary);">Debit:</b> <span class="font-mono" style="color: var(--primary); font-weight: 700;">${tx.debit > 0 ? formatINR(tx.debit) : '—'}</span></div>
+          <div><b style="color: var(--text-secondary);">Credit:</b> <span class="font-mono" style="color: #059669; font-weight: 700;">${tx.credit > 0 ? formatINR(tx.credit) : '—'}</span></div>
+          <div><b style="color: var(--text-secondary);">Invoice / Ref No:</b> <span class="font-mono">${escapeHtml(tx.invoice_no || tx.reference_no || '—')}</span></div>
+          <div><b style="color: var(--text-secondary);">Running Bal:</b> <span class="font-mono font-bold">${formatINR(tx.running_balance || 0)}</span></div>
         </div>
 
         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 12px;">
-          <b style="color: #475569;">Narration:</b>
-          <div style="color: #1e293b; margin-top: 2px; background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #e2e8f0;">
+          <b style="color: var(--text-secondary);">Narration:</b>
+          <div style="color: #1e293b; margin-top: 2px; background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border);">
             ${escapeHtml(tx.description || 'No narration recorded')}
           </div>
         </div>
@@ -5802,18 +6631,18 @@ async function openGLTransactionDrawer(txId) {
 
       <!-- Detected Anomalies on this Item -->
       <div style="margin-bottom: 16px;">
-        <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; text-transform: uppercase;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase;">
           Audit Exception & Anomaly Checklist (${txAnomalies.length} Flag${txAnomalies.length === 1 ? '' : 's'})
         </div>
 
         ${txAnomalies.length === 0 ? `
-          <div style="padding: 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: var(--radius-md); font-size: 12.5px; color: #065f46;">
+          <div style="padding: 14px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px; color: #065f46;">
             ✓ <b>No Anomalies Detected:</b> This transaction conforms to all standard 13-point General Ledger checks (valid dates, unique voucher, supported reference, non-round normal value).
           </div>
         ` : `
           <div style="display: flex; flex-direction: column; gap: 10px;">
             ${txAnomalies.map(a => `
-              <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: var(--radius-md); padding: 12px;">
+              <div style="background: #fff1f2; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                   <div style="font-weight: 700; font-size: 13px; color: #991b1b;">
                     ${escapeHtml(a.rule_name)} (${escapeHtml(a.rule)})
@@ -5825,11 +6654,11 @@ async function openGLTransactionDrawer(txId) {
                   <b>Reason:</b> ${escapeHtml(a.reason)}
                 </div>
 
-                <div style="font-size: 11.5px; color: #475569; background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #fecdd3; margin-bottom: 6px;">
+                <div style="font-size: 11.5px; color: var(--text-secondary); background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); margin-bottom: 6px;">
                   <b>Evidence:</b> ${escapeHtml(a.evidence)}
                 </div>
 
-                <div style="font-size: 11.5px; color: #0369a1; background: #f0f9ff; padding: 6px 10px; border-radius: 4px; border: 1px solid #bae6fd;">
+                <div style="font-size: 11.5px; color: #0369a1; background: #f0f9ff; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border);">
                   <b>Recommended Review:</b> ${escapeHtml(a.recommended_review)}
                 </div>
               </div>
@@ -5839,7 +6668,7 @@ async function openGLTransactionDrawer(txId) {
       </div>
 
       <!-- Compliance Disclaimer -->
-      <div style="padding: 10px 12px; background: #f1f5f9; border-radius: var(--radius-md); font-size: 11px; color: #64748b; margin-bottom: 16px;">
+      <div style="padding: 10px 12px; background: var(--bg-sidebar); border-radius: var(--radius-md); font-size: 11px; color: var(--text-muted); margin-bottom: 16px;">
         🛡️ <b>ICAI Audit Assistant Guideline:</b> FinAuditPro flags items as <i>"Potential anomaly"</i> or <i>"Requires review"</i>. Findings do not constitute a legal determination of fraud.
       </div>
 
@@ -5912,11 +6741,11 @@ let reconGSTFilterState = {
 async function renderReconciliation() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
-    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: #64748b;">Please select an active audit engagement first.</div>`;
+    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">Please select an active audit engagement first.</div>`;
     return;
   }
 
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading Reconciliation Statements...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading Reconciliation Statements...</div>`;
 
   try {
     const recons = await FinAuditAPI.getReconciliations(state.currentEngagementId);
@@ -5928,8 +6757,8 @@ async function renderReconciliation() {
       <!-- Top Action Bar -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Cross-Record Audit Reconciliation Engine</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Cross-Record Audit Reconciliation Engine</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Deterministic verification across GST Portal datasets (GSTR-2B/1), Purchase/Sales Registers, General Ledger, and Bank Statements
           </div>
         </div>
@@ -5991,8 +6820,8 @@ function renderGSTListView(gstRecons) {
     return `
       <div class="card" style="padding: 40px; text-align: center;">
         <div style="font-size: 36px; margin-bottom: 10px;">🧾</div>
-        <h3 style="color: #0f172a; margin-bottom: 6px;">No GST Reconciliations Generated Yet</h3>
-        <p style="color: #64748b; max-width: 540px; margin: 0 auto 16px auto; font-size: 13px;">
+        <h3 style="color: var(--text-main); margin-bottom: 6px;">No GST Reconciliations Generated Yet</h3>
+        <p style="color: var(--text-muted); max-width: 540px; margin: 0 auto 16px auto; font-size: 13px;">
           Perform deterministic multi-source reconciliation between GST Portal downloads (GSTR-2B, GSTR-1, JSON/Excel) and internal Purchase/Sales Registers or Books with configurable tolerance rules.
         </p>
         <div style="display: flex; gap: 8px; justify-content: center;">
@@ -6028,8 +6857,8 @@ function renderGSTListView(gstRecons) {
             ${gstRecons.map(r => `
               <tr>
                 <td>
-                  <b style="color: #0f172a; font-size: 13px;">${escapeHtml(r.title)}</b><br/>
-                  <span style="font-size: 11px; color: #64748b;">Generated: ${r.created_at ? r.created_at.split('T')[0] : '—'}</span>
+                  <b style="color: var(--text-main); font-size: 13px;">${escapeHtml(r.title)}</b><br/>
+                  <span style="font-size: 11px; color: var(--text-muted);">Generated: ${r.created_at ? r.created_at.split('T')[0] : '—'}</span>
                 </td>
                 <td>
                   <span class="badge" style="background: #eff6ff; color: #1e40af; font-weight: 600;">
@@ -6087,17 +6916,17 @@ async function openGSTRulesModal() {
           <div class="modal-header">
             <div>
               <div class="modal-title">⚙️ Configurable GST Rule Definitions</div>
-              <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
                 Tax rules, tolerances, and statutory criteria are updateable independently from application code
               </div>
             </div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('gst-rules-modal')">✕</button>
           </div>
           <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 16px 20px;">
-            <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-app); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border);">
               <div>
                 <b style="font-size: 12px; color: #1e293b;">Active Statutory Rule Sets (${rules.length})</b>
-                <div style="font-size: 11px; color: #64748b;">Changes take effect immediately across all subsequent reconciliations</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Changes take effect immediately across all subsequent reconciliations</div>
               </div>
               <button class="btn btn-sm btn-secondary" onclick="handleResetGSTRules()">
                 ↺ Reset All to Baseline Defaults
@@ -6106,18 +6935,18 @@ async function openGSTRulesModal() {
 
             <div style="display: flex; flex-direction: column; gap: 14px;">
               ${rules.map(r => `
-                <div class="card" style="padding: 14px; border: 1px solid #cbd5e1; background: #ffffff;">
+                <div class="card" style="padding: 14px; border: 1px solid var(--border); background: var(--bg-card);">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                     <div>
                       <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size: 10.5px; font-weight: 700; margin-bottom: 4px; display: inline-block;">
                         ${escapeHtml(r.category)}
                       </span>
-                      <h4 style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin: 0;">${escapeHtml(r.title)}</h4>
-                      <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">${escapeHtml(r.description)}</div>
+                      <h4 style="font-size: 13.5px; font-weight: 700; color: var(--text-main); margin: 0;">${escapeHtml(r.title)}</h4>
+                      <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(r.description)}</div>
                     </div>
                     <div style="text-align: right;">
-                      <span class="badge" style="background:#f1f5f9; color:#475569; font-size: 10.5px;">${escapeHtml(r.version || 'v1.0')}</span>
-                      <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">Updated: ${r.updated_at ? r.updated_at.split('T')[0] : 'Today'}</div>
+                      <span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary); font-size: 10.5px;">${escapeHtml(r.version || 'v1.0')}</span>
+                      <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Updated: ${r.updated_at ? r.updated_at.split('T')[0] : 'Today'}</div>
                     </div>
                   </div>
 
@@ -6205,7 +7034,7 @@ async function openRunGSTReconModal() {
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-gst-recon-modal')">✕</button>
           </div>
           <div class="modal-body">
-            <div style="font-size: 12.5px; color: #64748b; margin-bottom: 14px;">
+            <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
               Cross-compare GST Portal filing datasets against Books/Registers to identify Section 16(2)(aa) ITC exceptions, tax rate disputes, and party mismatches.
             </div>
 
@@ -6323,7 +7152,7 @@ async function handleExecuteGSTSubmit(event) {
 
 async function viewGSTReconciliationDetails(reconId) {
   const container = document.getElementById("content-container");
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading GST Reconciliation Workbench...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading GST Reconciliation Workbench...</div>`;
 
   try {
     const details = await FinAuditAPI.getGSTReconciliationDetails(reconId, reconGSTFilterState);
@@ -6333,9 +7162,9 @@ async function viewGSTReconciliationDetails(reconId) {
     const getMatchCatBadge = (cat) => {
       const c = cat || "Mismatched";
       if (c === "Matched") return `<span class="badge badge-resolved">✓ Matched</span>`;
-      if (c === "Partially matched") return `<span class="badge" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;">⚠️ Partially Matched</span>`;
-      if (c === "Missing in source A") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border:1px solid #fecdd3;">❌ Missing in Source A</span>`;
-      if (c === "Missing in source B") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border:1px solid #fbcfe8;">📦 Missing in Source B</span>`;
+      if (c === "Partially matched") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">⚠️ Partially Matched</span>`;
+      if (c === "Missing in source A") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">❌ Missing in Source A</span>`;
+      if (c === "Missing in source B") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border: 1px solid var(--border);">📦 Missing in Source B</span>`;
       return `<span class="badge badge-critical">⚡ Mismatched</span>`;
     };
 
@@ -6352,12 +7181,12 @@ async function viewGSTReconciliationDetails(reconId) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">${escapeHtml(details.title)}</h2>
+            <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">${escapeHtml(details.title)}</h2>
             <span class="badge" style="background: #eff6ff; color: #1e40af; font-weight: 600;">
               ${escapeHtml(details.bank_account_name || 'GST Reconciliation')}
             </span>
           </div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Deterministic comparison against active configurable GST rule definitions | Generated: ${details.created_at ? details.created_at.split('T')[0] : 'Today'}
           </div>
         </div>
@@ -6424,7 +7253,7 @@ async function viewGSTReconciliationDetails(reconId) {
       <!-- Quick Filter Chips & Search Bar -->
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase;">
+          <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
             🔍 Filter by Match Categorization
           </div>
           <div style="width: 280px;">
@@ -6458,13 +7287,13 @@ async function viewGSTReconciliationDetails(reconId) {
       <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
           <div class="card-title">GST Audit Reconciliation Workbench (${items.length} Invoices)</div>
-          <div style="font-size: 11px; color: #64748b;">
+          <div style="font-size: 11px; color: var(--text-muted);">
             Actual Source A & Source B values compared side-by-side with statutory tax breakdown
           </div>
         </div>
 
         ${items.length === 0 ? `
-          <div style="padding: 30px; text-align: center; color: #64748b;">
+          <div style="padding: 30px; text-align: center; color: var(--text-muted);">
             No records match the selected filter criteria.
           </div>
         ` : `
@@ -6499,35 +7328,35 @@ async function viewGSTReconciliationDetails(reconId) {
                     <tr style="${itm.match_category !== 'Matched' ? 'background-color: #fffbf5;' : ''}">
                       <td>${getMatchCatBadge(itm.match_category)}</td>
                       <td>
-                        <div style="font-size: 12px; font-weight: 700; color: #0f172a;">${escapeHtml(invA)}</div>
-                        <div style="font-size: 11px; color: #475569;">${escapeHtml(ptyA)}</div>
-                        <div style="font-size: 10px; color: #64748b;">
+                        <div style="font-size: 12px; font-weight: 700; color: var(--text-main);">${escapeHtml(invA)}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary);">${escapeHtml(ptyA)}</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">
                           Date: <b>${itm.date_a || '—'}</b> | GSTIN: <span class="font-mono">${escapeHtml(gstA || 'N/A')}</span>
                         </div>
                       </td>
                       <td>
-                        <div style="font-size: 12px; font-weight: 700; color: #0f172a;">${escapeHtml(invB)}</div>
-                        <div style="font-size: 11px; color: #475569;">${escapeHtml(ptyB)}</div>
-                        <div style="font-size: 10px; color: #64748b;">
+                        <div style="font-size: 12px; font-weight: 700; color: var(--text-main);">${escapeHtml(invB)}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary);">${escapeHtml(ptyB)}</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">
                           Date: <b>${itm.date_b || '—'}</b> | GSTIN: <span class="font-mono">${escapeHtml(gstB || 'N/A')}</span>
                         </div>
                       </td>
-                      <td class="text-right font-mono" style="font-size: 11.5px; color: #0f172a;">
+                      <td class="text-right font-mono" style="font-size: 11.5px; color: var(--text-main);">
                         <div>A: ${formatINR(itm.taxable_a || 0)}</div>
                         <div>B: ${formatINR(itm.taxable_b || 0)}</div>
                         ${hasTaxableDiff ? `<span style="font-size:10px; color:#dc2626; font-weight:bold;">Diff: ${formatINR(itm.taxable_difference)}</span>` : '<span style="font-size:10px; color:#059669;">✓ Match</span>'}
                       </td>
-                      <td class="text-right font-mono" style="font-size: 10.5px; color: #334155;">
+                      <td class="text-right font-mono" style="font-size: 10.5px; color: var(--text-secondary);">
                         <div>A: C ₹${(itm.cgst_a||0).toFixed(0)} | S ₹${(itm.sgst_a||0).toFixed(0)} | I ₹${(itm.igst_a||0).toFixed(0)}</div>
                         <div>B: C ₹${(itm.cgst_b||0).toFixed(0)} | S ₹${(itm.sgst_b||0).toFixed(0)} | I ₹${(itm.igst_b||0).toFixed(0)}</div>
                         ${hasTaxDiff ? `<span style="font-size:10px; color:#d97706; font-weight:bold;">Tax Diff: ${formatINR(itm.tax_difference)}</span>` : '<span style="font-size:10px; color:#059669;">✓ Tax Match</span>'}
                       </td>
-                      <td class="text-right font-mono font-bold" style="font-size: 12px; color: #0f172a;">
+                      <td class="text-right font-mono font-bold" style="font-size: 12px; color: var(--text-main);">
                         <div>A: ${formatINR(itm.amount_a || 0)}</div>
                         <div>B: ${formatINR(itm.amount_b || 0)}</div>
                         ${hasDiff ? `<span style="font-size:10px; color:#dc2626;">Diff: ${formatINR(itm.difference)}</span>` : '<span style="font-size:10px; color:#059669;">✓ Match</span>'}
                       </td>
-                      <td style="font-size: 11.5px; color: #334155;">
+                      <td style="font-size: 11.5px; color: var(--text-secondary);">
                         <div>${escapeHtml(itm.match_reason || 'Reconciled GST entry')}</div>
                         ${itm.notes && itm.notes !== itm.match_reason ? `
                           <div style="font-size: 10.5px; color: #1e40af; margin-top: 2px; background: #eff6ff; padding: 2px 5px; border-radius: 3px;">
@@ -6642,8 +7471,8 @@ function renderSalesPurchaseListView(spRecons) {
     return `
       <div class="card" style="padding: 40px; text-align: center;">
         <div style="font-size: 36px; margin-bottom: 10px;">📊</div>
-        <h3 style="color: #0f172a; margin-bottom: 6px;">No Sales or Purchase Reconciliations Generated Yet</h3>
-        <p style="color: #64748b; max-width: 540px; margin: 0 auto 16px auto; font-size: 13px;">
+        <h3 style="color: var(--text-main); margin-bottom: 6px;">No Sales or Purchase Reconciliations Generated Yet</h3>
+        <p style="color: var(--text-muted); max-width: 540px; margin: 0 auto 16px auto; font-size: 13px;">
           Run comprehensive 11-point deterministic cross-matching comparing Sales/Purchase Registers against General Ledger vouchers and GSTR-1/2B tax returns to detect missing invoices, tax discrepancies, party mismatches, and duplicate GSTINs.
         </p>
         <button class="btn btn-primary" onclick="openRunSalesPurchaseReconModal()">Run Sales & Purchase Reconciliation Now</button>
@@ -6678,8 +7507,8 @@ function renderSalesPurchaseListView(spRecons) {
               return `
                 <tr>
                   <td>
-                    <b style="color: #0f172a; font-size: 13px;">${escapeHtml(r.title)}</b><br/>
-                    <span style="font-size: 11px; color: #64748b;">Generated: ${r.created_at ? r.created_at.split('T')[0] : '—'}</span>
+                    <b style="color: var(--text-main); font-size: 13px;">${escapeHtml(r.title)}</b><br/>
+                    <span style="font-size: 11px; color: var(--text-muted);">Generated: ${r.created_at ? r.created_at.split('T')[0] : '—'}</span>
                   </td>
                   <td>
                     <span class="badge" style="${isSales ? 'background: #eff6ff; color: #1e40af;' : 'background: #fdf2f8; color: #9d174d;'} font-weight: 600;">
@@ -6687,7 +7516,7 @@ function renderSalesPurchaseListView(spRecons) {
                     </span>
                   </td>
                   <td>
-                    <span style="font-size: 12px; color: #475569;">${escapeHtml(r.bank_account_name || 'All Ledgers')}</span>
+                    <span style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(r.bank_account_name || 'All Ledgers')}</span>
                   </td>
                   <td class="text-center font-mono font-bold">${r.total_bank_tx || 0}</td>
                   <td class="text-center font-mono font-bold">${r.total_book_tx || 0}</td>
@@ -6732,8 +7561,8 @@ function renderBRSListView(brsRecons) {
     return `
       <div class="card" style="padding: 40px; text-align: center;">
         <div style="font-size: 36px; margin-bottom: 10px;">🏦</div>
-        <h3 style="color: #0f172a; margin-bottom: 6px;">No Bank Reconciliation Statements Generated Yet</h3>
-        <p style="color: #64748b; max-width: 500px; margin: 0 auto 16px auto; font-size: 13px;">
+        <h3 style="color: var(--text-main); margin-bottom: 6px;">No Bank Reconciliation Statements Generated Yet</h3>
+        <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 16px auto; font-size: 13px;">
           Run automated 4-tier matching against internal bank ledger vouchers and bank statements to detect unpresented cheques, outstanding deposits, and unrecorded charges.
         </p>
         <button class="btn btn-primary" onclick="openRunBRSModal()">Run Bank BRS Now</button>
@@ -6765,8 +7594,8 @@ function renderBRSListView(brsRecons) {
             ${brsRecons.map(r => `
               <tr>
                 <td>
-                  <b style="color: #0f172a; font-size: 13px;">${escapeHtml(r.title)}</b><br/>
-                  <span style="font-size: 11px; color: #64748b;">Generated: ${r.created_at ? r.created_at.split('T')[0] : '—'}</span>
+                  <b style="color: var(--text-main); font-size: 13px;">${escapeHtml(r.title)}</b><br/>
+                  <span style="font-size: 11px; color: var(--text-muted);">Generated: ${r.created_at ? r.created_at.split('T')[0] : '—'}</span>
                 </td>
                 <td>
                   <span class="badge" style="background: #eff6ff; color: #1e40af; font-weight: 600;">
@@ -6840,7 +7669,7 @@ async function openRunSalesPurchaseReconModal() {
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-sp-recon-modal')">✕</button>
           </div>
           <div class="modal-body">
-            <div style="font-size: 12.5px; color: #64748b; margin-bottom: 14px;">
+            <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
               Deterministic cross-comparison between Register records, General Ledger transactions, and available GSTIN/tax slabs.
             </div>
 
@@ -6861,7 +7690,7 @@ async function openRunSalesPurchaseReconModal() {
                     <option value="${f.id}">${escapeHtml(f.file_name || f.filename || 'File #' + f.id)} (${f.data_category || 'File'})</option>
                   `).join('')}
                 </select>
-                <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
                   If not selected, the engine auto-reconciles against existing engagement financial records with standard audit exception tests.
                 </div>
               </div>
@@ -6938,7 +7767,7 @@ async function handleExecuteSPSubmit(event) {
 
 async function viewSalesPurchaseReconDetails(reconId) {
   const container = document.getElementById("content-container");
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading Sales & Purchase Reconciliation Workbench...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading Sales & Purchase Reconciliation Workbench...</div>`;
 
   try {
     const details = await FinAuditAPI.getSalesPurchaseReconDetails(reconId, reconSPFilterState);
@@ -6946,18 +7775,18 @@ async function viewSalesPurchaseReconDetails(reconId) {
 
     const getExceptionBadge = (type) => {
       const t = type || "MATCHED";
-      if (t === "MISSING_IN_LEDGER") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border:1px solid #fecdd3;">❌ Missing in Ledger</span>`;
-      if (t === "MISSING_IN_REGISTER") return `<span class="badge" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;">⚠️ Missing in Register</span>`;
+      if (t === "MISSING_IN_LEDGER") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">❌ Missing in Ledger</span>`;
+      if (t === "MISSING_IN_REGISTER") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">⚠️ Missing in Register</span>`;
       if (t === "DUPLICATE_INVOICE") return `<span class="badge badge-critical">📑 Duplicate Invoice</span>`;
       if (t === "AMOUNT_DIFFERENCE") return `<span class="badge badge-high">💵 Amount Difference</span>`;
-      if (t === "TAX_DIFFERENCE") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border:1px solid #fbcfe8;">⚖️ Tax Difference</span>`;
+      if (t === "TAX_DIFFERENCE") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border: 1px solid var(--border);">⚖️ Tax Difference</span>`;
       if (t === "DATE_DIFFERENCE") return `<span class="badge badge-medium">⏱️ Date Disparity (>15d)</span>`;
-      if (t === "PARTY_MISMATCH") return `<span class="badge" style="background:#f3e8ff; color:#6b21a8; border:1px solid #e9d5ff;">🏢 Party Mismatch</span>`;
+      if (t === "PARTY_MISMATCH") return `<span class="badge" style="background:#f3e8ff; color:#6b21a8; border: 1px solid var(--border);">🏢 Party Mismatch</span>`;
       if (t === "INVOICE_NUMBER_MISMATCH") return `<span class="badge badge-medium">🔢 Inv # Mismatch</span>`;
       if (t === "MISSING_GSTIN") return `<span class="badge badge-critical">🚫 Missing GSTIN</span>`;
       if (t === "DUPLICATE_GSTIN_INVOICE") return `<span class="badge badge-critical">📑 Duplicate GSTIN+Inv</span>`;
-      if (t === "CREDIT_NOTE_MISMATCH") return `<span class="badge" style="background:#fff7ed; color:#c2410c; border:1px solid #ffedd5;">📜 Credit Note Diff</span>`;
-      if (t === "DEBIT_NOTE_MISMATCH") return `<span class="badge" style="background:#fff7ed; color:#c2410c; border:1px solid #ffedd5;">📜 Debit Note Diff</span>`;
+      if (t === "CREDIT_NOTE_MISMATCH") return `<span class="badge" style="background:#fff7ed; color:#c2410c; border: 1px solid var(--border);">📜 Credit Note Diff</span>`;
+      if (t === "DEBIT_NOTE_MISMATCH") return `<span class="badge" style="background:#fff7ed; color:#c2410c; border: 1px solid var(--border);">📜 Debit Note Diff</span>`;
       return `<span class="badge badge-resolved">✓ Matched</span>`;
     };
 
@@ -6976,12 +7805,12 @@ async function viewSalesPurchaseReconDetails(reconId) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">${escapeHtml(details.title)}</h2>
+            <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">${escapeHtml(details.title)}</h2>
             <span class="badge" style="${isSales ? 'background: #eff6ff; color: #1e40af;' : 'background: #fdf2f8; color: #9d174d;'} font-weight: 600;">
               ${escapeHtml(details.recon_type || 'Reconciliation')}
             </span>
           </div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Target Ledger: <b>${escapeHtml(details.bank_account_name || 'All Ledgers')}</b> | Generated: ${details.created_at ? details.created_at.split('T')[0] : 'Today'}
           </div>
         </div>
@@ -7036,7 +7865,7 @@ async function viewSalesPurchaseReconDetails(reconId) {
       <!-- Filter Chips & Search Bar -->
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase;">
+          <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
             🔍 Filter Exceptions & Mismatches
           </div>
           <div style="width: 280px;">
@@ -7091,13 +7920,13 @@ async function viewSalesPurchaseReconDetails(reconId) {
       <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
           <div class="card-title">Reconciliation Exception Workbench (${items.length} Records)</div>
-          <div style="font-size: 11px; color: #64748b;">
+          <div style="font-size: 11px; color: var(--text-muted);">
             All 11 audit exception rules evaluated deterministically against Register, Ledger & GST data
           </div>
         </div>
 
         ${items.length === 0 ? `
-          <div style="padding: 30px; text-align: center; color: #64748b;">
+          <div style="padding: 30px; text-align: center; color: var(--text-muted);">
             No records match the selected filter.
           </div>
         ` : `
@@ -7129,26 +7958,26 @@ async function viewSalesPurchaseReconDetails(reconId) {
                   return `
                     <tr style="${itm.item_type !== 'MATCHED' ? 'background-color: #fffbf5;' : ''}">
                       <td>
-                        <span class="font-mono font-bold" style="color: #0f172a; font-size: 12px;">${escapeHtml(invNo)}</span><br/>
-                        <span style="font-size: 10px; color: #64748b;">
+                        <span class="font-mono font-bold" style="color: var(--text-main); font-size: 12px;">${escapeHtml(invNo)}</span><br/>
+                        <span style="font-size: 10px; color: var(--text-muted);">
                           Reg: ${itm.date_a || '—'} | Led: ${itm.date_b || '—'}
                         </span>
                       </td>
                       <td>
-                        <div style="font-size: 12px; font-weight: 600; color: #0f172a;">${escapeHtml(partyName)}</div>
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-main);">${escapeHtml(partyName)}</div>
                         ${itm.gstin_a || itm.gstin_b ? `
                           <span class="font-mono" style="font-size: 10px; color: #0284c7;">GSTIN: ${escapeHtml(itm.gstin_a || itm.gstin_b)}</span>
                         ` : `
                           <span style="font-size: 10px; color: #dc2626;">(No GSTIN)</span>
                         `}
                       </td>
-                      <td class="text-right font-mono" style="font-size: 12px; color: #0f172a;">
+                      <td class="text-right font-mono" style="font-size: 12px; color: var(--text-main);">
                         ${formatINR(itm.amount_a || 0)}
-                        <br/><span style="font-size: 10px; color: #64748b;">Tax: ${formatINR(itm.tax_a || 0)}</span>
+                        <br/><span style="font-size: 10px; color: var(--text-muted);">Tax: ${formatINR(itm.tax_a || 0)}</span>
                       </td>
-                      <td class="text-right font-mono" style="font-size: 12px; color: #0f172a;">
+                      <td class="text-right font-mono" style="font-size: 12px; color: var(--text-main);">
                         ${formatINR(itm.amount_b || 0)}
-                        <br/><span style="font-size: 10px; color: #64748b;">Tax: ${formatINR(itm.tax_b || 0)}</span>
+                        <br/><span style="font-size: 10px; color: var(--text-muted);">Tax: ${formatINR(itm.tax_b || 0)}</span>
                       </td>
                       <td class="text-right font-mono font-bold" style="font-size: 12px; color: ${hasDiff ? '#dc2626' : '#059669'};">
                         ${formatINR(itm.difference || 0)}
@@ -7160,7 +7989,7 @@ async function viewSalesPurchaseReconDetails(reconId) {
                         ${hasDateDiff ? `⏱️ ${itm.date_diff_days}d` : '0d'}
                       </td>
                       <td>${getExceptionBadge(itm.item_type)}</td>
-                      <td style="font-size: 11.5px; color: #334155;">
+                      <td style="font-size: 11.5px; color: var(--text-secondary);">
                         <div>${escapeHtml(itm.match_reason || 'Reconciled invoice record')}</div>
                         ${itm.notes && itm.notes !== itm.match_reason ? `
                           <div style="font-size: 10.5px; color: #1e40af; margin-top: 2px; background: #eff6ff; padding: 2px 5px; border-radius: 3px;">
@@ -7291,7 +8120,7 @@ async function openRunBRSModal() {
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-brs-modal')">✕</button>
           </div>
           <div class="modal-body">
-            <div style="font-size: 12.5px; color: #64748b; margin-bottom: 14px;">
+            <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
               Automated 4-tier matching engine will cross-compare bank ledger transactions against external statement lines.
             </div>
 
@@ -7313,7 +8142,7 @@ async function openRunBRSModal() {
                     <option value="${f.id}">${escapeHtml(f.file_name || f.filename || 'File #' + f.id)} (${f.data_category || 'File'})</option>
                   `).join('')}
                 </select>
-                <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
                   If no separate statement file is selected, the engine auto-reconciles against existing engagement financial records.
                 </div>
               </div>
@@ -7375,7 +8204,7 @@ async function handleExecuteBRSSubmit(event) {
 
 async function viewReconciliationDetails(reconId) {
   const container = document.getElementById("content-container");
-  container.innerHTML = `<div style="padding: 20px; color: #64748b;">Loading BRS Statement Details...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading BRS Statement Details...</div>`;
 
   try {
     const details = await FinAuditAPI.getReconciliationDetails(reconId, reconFilterState);
@@ -7392,10 +8221,10 @@ async function viewReconciliationDetails(reconId) {
 
     const getItemTypeBadge = (type) => {
       const t = type || "MATCHED";
-      if (t === "UNPRESENTED_CHEQUE") return `<span class="badge" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;">📤 Unpresented Cheque</span>`;
-      if (t === "OUTSTANDING_DEPOSIT") return `<span class="badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;">📥 Outstanding Deposit</span>`;
-      if (t === "BANK_CHARGES") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border:1px solid #fecdd3;">💳 Direct Bank Charges</span>`;
-      if (t === "INTEREST_CREDIT") return `<span class="badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;">💰 Interest Credited</span>`;
+      if (t === "UNPRESENTED_CHEQUE") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">📤 Unpresented Cheque</span>`;
+      if (t === "OUTSTANDING_DEPOSIT") return `<span class="badge" style="background:#eff6ff; color:#1d4ed8; border: 1px solid var(--border);">📥 Outstanding Deposit</span>`;
+      if (t === "BANK_CHARGES") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">💳 Direct Bank Charges</span>`;
+      if (t === "INTEREST_CREDIT") return `<span class="badge" style="background:#ecfdf5; color:#065f46; border: 1px solid var(--border);">💰 Interest Credited</span>`;
       if (t === "AMOUNT_MISMATCH") return `<span class="badge badge-high">⚠️ Amount Mismatch</span>`;
       if (t === "UNKNOWN_ENTRY") return `<span class="badge badge-critical">❓ Unknown Entry</span>`;
       if (t === "DUPLICATE_BOOK_ENTRY" || t === "DUPLICATE_BANK_ENTRY") return `<span class="badge badge-critical">📑 Duplicate Entry</span>`;
@@ -7407,10 +8236,10 @@ async function viewReconciliationDetails(reconId) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">${escapeHtml(details.title)}</h2>
+            <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">${escapeHtml(details.title)}</h2>
             <span class="badge badge-resolved">${details.status || 'Completed'}</span>
           </div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Bank Account: <b>${escapeHtml(details.bank_account_name || 'Bank Account')}</b> | Generated: ${details.created_at ? details.created_at.split('T')[0] : 'Today'}
           </div>
         </div>
@@ -7464,7 +8293,7 @@ async function viewReconciliationDetails(reconId) {
       </div>
 
       <!-- Formal Bank Reconciliation Statement (BRS Roll-Forward Schedule) -->
-      <div class="card" style="margin-bottom: 20px; border: 1px solid #bfdbfe; background: #f8fafc;">
+      <div class="card" style="margin-bottom: 20px; border: 1px solid var(--border); background: var(--bg-app);">
         <div class="card-header" style="background: #eff6ff; padding: 10px 16px;">
           <div style="font-weight: 700; font-size: 13.5px; color: #1e3a8a;">
             📋 Formal Bank Reconciliation Statement Computation (ICAI Standard Schedule)
@@ -7473,7 +8302,7 @@ async function viewReconciliationDetails(reconId) {
         <div style="padding: 14px 18px;">
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; font-size: 13px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
             <div><b>Balance as per Bank Statement (Closing):</b></div>
-            <div class="text-right font-mono font-bold" style="color: #0f172a;">${formatINR(details.bank_balance || 0)}</div>
+            <div class="text-right font-mono font-bold" style="color: var(--text-main);">${formatINR(details.bank_balance || 0)}</div>
           </div>
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; font-size: 12.5px; padding: 6px 0; color: #d97706;">
             <div>&nbsp;&nbsp;<b>Less:</b> Cheques issued to suppliers/parties but not presented for payment</div>
@@ -7491,9 +8320,9 @@ async function viewReconciliationDetails(reconId) {
             <div>&nbsp;&nbsp;<b>Less:</b> Direct interest / remittances credited by bank not posted in Cash Book</div>
             <div class="text-right font-mono font-bold">- ${formatINR(details.interest_credited_amount || 0)}</div>
           </div>
-          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; font-size: 13px; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; padding: 8px 0; margin-top: 4px; background: #f1f5f9; border-radius: 4px;">
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; font-size: 13px; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; padding: 8px 0; margin-top: 4px; background: var(--bg-sidebar); border-radius: 4px;">
             <div><b>&nbsp;&nbsp;Adjusted Balance as per Bank Statement:</b></div>
-            <div class="text-right font-mono font-bold" style="color: #0f172a;">${formatINR(details.adjusted_bank_balance || 0)}</div>
+            <div class="text-right font-mono font-bold" style="color: var(--text-main);">${formatINR(details.adjusted_bank_balance || 0)}</div>
           </div>
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; font-size: 13px; padding: 8px 0;">
             <div><b>Balance as per Cash Book (Bank Ledger in Books):</b></div>
@@ -7505,7 +8334,7 @@ async function viewReconciliationDetails(reconId) {
       <!-- Quick Filter Chips & Search Bar -->
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase;">
+          <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
             🔍 Filter Items by Matching Category
           </div>
           <div style="width: 260px;">
@@ -7551,7 +8380,7 @@ async function viewReconciliationDetails(reconId) {
         </div>
 
         ${items.length === 0 ? `
-          <div style="padding: 30px; text-align: center; color: #64748b;">
+          <div style="padding: 30px; text-align: center; color: var(--text-muted);">
             No reconciliation items match the selected filter.
           </div>
         ` : `
@@ -7581,28 +8410,28 @@ async function viewReconciliationDetails(reconId) {
                       <td>${getItemTypeBadge(itm.item_type)}</td>
                       <td>
                         ${itm.amount_a > 0 ? `
-                          <div style="font-size: 12px; color: #0f172a;"><b>${escapeHtml(itm.party_a || 'Cash Book Entry')}</b></div>
-                          <div style="font-size: 11px; color: #64748b;">Date: <b>${itm.date_a || '—'}</b> | Voucher: <span class="font-mono">${escapeHtml(itm.ref_a || '—')}</span></div>
-                          <div style="font-size: 11px; color: #475569; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(itm.description_a || '')}">${escapeHtml(itm.description_a || '')}</div>
-                        ` : '<span style="color:#94a3b8; font-size:11px;">(Missing in Books)</span>'}
+                          <div style="font-size: 12px; color: var(--text-main);"><b>${escapeHtml(itm.party_a || 'Cash Book Entry')}</b></div>
+                          <div style="font-size: 11px; color: var(--text-muted);">Date: <b>${itm.date_a || '—'}</b> | Voucher: <span class="font-mono">${escapeHtml(itm.ref_a || '—')}</span></div>
+                          <div style="font-size: 11px; color: var(--text-secondary); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(itm.description_a || '')}">${escapeHtml(itm.description_a || '')}</div>
+                        ` : '<span style="color: var(--text-muted); font-size:11px;">(Missing in Books)</span>'}
                       </td>
                       <td>
                         ${itm.amount_b > 0 ? `
-                          <div style="font-size: 12px; color: #0f172a;"><b>${escapeHtml(itm.party_b || itm.description_b || 'Statement Line')}</b></div>
-                          <div style="font-size: 11px; color: #64748b;">Date: <b>${itm.date_b || '—'}</b> | Ref: <span class="font-mono">${escapeHtml(itm.ref_b || '—')}</span></div>
-                          <div style="font-size: 11px; color: #475569; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(itm.description_b || '')}">${escapeHtml(itm.description_b || '')}</div>
-                        ` : '<span style="color:#94a3b8; font-size:11px;">(Missing in Bank)</span>'}
+                          <div style="font-size: 12px; color: var(--text-main);"><b>${escapeHtml(itm.party_b || itm.description_b || 'Statement Line')}</b></div>
+                          <div style="font-size: 11px; color: var(--text-muted);">Date: <b>${itm.date_b || '—'}</b> | Ref: <span class="font-mono">${escapeHtml(itm.ref_b || '—')}</span></div>
+                          <div style="font-size: 11px; color: var(--text-secondary); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(itm.description_b || '')}">${escapeHtml(itm.description_b || '')}</div>
+                        ` : '<span style="color: var(--text-muted); font-size:11px;">(Missing in Bank)</span>'}
                       </td>
-                      <td class="text-right font-mono font-bold" style="font-size: 12.5px; color: #0f172a;">
+                      <td class="text-right font-mono font-bold" style="font-size: 12.5px; color: var(--text-main);">
                         ${formatINR(amt)}
                         ${itm.difference > 0 ? `<br/><span style="font-size:10px; color:#dc2626;">Diff: ${formatINR(itm.difference)}</span>` : ''}
                       </td>
-                      <td class="text-center font-mono" style="font-size: 11.5px; color: #475569;">
+                      <td class="text-center font-mono" style="font-size: 11.5px; color: var(--text-secondary);">
                         ${itm.date_diff_days > 0 ? `⏱️ ${itm.date_diff_days}d` : 'Same Day'}
                       </td>
-                      <td style="font-size: 11.5px; color: #334155;">
+                      <td style="font-size: 11.5px; color: var(--text-secondary);">
                         <div>${escapeHtml(itm.match_reason || itm.notes || 'Reconciled item')}</div>
-                        ${itm.notes && itm.notes !== itm.match_reason ? `<div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">💬 ${escapeHtml(itm.notes)}</div>` : ''}
+                        ${itm.notes && itm.notes !== itm.match_reason ? `<div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">💬 ${escapeHtml(itm.notes)}</div>` : ''}
                       </td>
                       <td>
                         ${isConfirmed ? `
@@ -7705,7 +8534,7 @@ async function openManualMatchModal(reconId) {
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('manual-match-modal')">✕</button>
           </div>
           <div class="modal-body">
-            <div style="font-size: 12px; color: #64748b; margin-bottom: 12px;">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
               Select one unmatched Book voucher and one unmatched Bank statement line to create an auditor-confirmed reconciliation pairing.
             </div>
 
@@ -7785,8 +8614,8 @@ async function renderFinancialStatements() {
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Financial Statements (Schedule III Companies Act)</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Financial Statements (Schedule III Companies Act)</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Draft Statement of Profit & Loss and Balance Sheet for FY ${fs.financial_year}
           </div>
         </div>
@@ -7806,7 +8635,7 @@ async function renderFinancialStatements() {
                   <td class="text-right font-mono font-bold">${formatINR(r.amount)}</td>
                 </tr>
               `).join("")}
-              <tr style="background-color: #f8fafc; font-weight: 700;">
+              <tr style="background-color: var(--bg-app); font-weight: 700;">
                 <td>Total Revenue (A)</td>
                 <td class="text-right font-mono">${formatINR(fs.profit_and_loss.total_revenue)}</td>
               </tr>
@@ -7822,19 +8651,19 @@ async function renderFinancialStatements() {
                   <td class="text-right font-mono font-bold">${formatINR(e.amount)}</td>
                 </tr>
               `).join("")}
-              <tr style="background-color: #f8fafc; font-weight: 700;">
+              <tr style="background-color: var(--bg-app); font-weight: 700;">
                 <td>Total Expenses (B)</td>
                 <td class="text-right font-mono">${formatINR(fs.profit_and_loss.total_expenses)}</td>
               </tr>
             </table>
           </div>
 
-          <div style="padding: 12px; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid #bfdbfe;">
+          <div style="padding: 12px; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid var(--border);">
             <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 13px;">
               <span>Profit Before Tax:</span>
               <span class="font-mono">${formatINR(fs.profit_and_loss.net_profit_before_tax)}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #475569; margin-top: 4px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
               <span>Tax Expense @ 25%:</span>
               <span class="font-mono">${formatINR(fs.profit_and_loss.tax_provision_25pct)}</span>
             </div>
@@ -7849,7 +8678,7 @@ async function renderFinancialStatements() {
           <div class="card-header">
             <div class="card-title">Balance Sheet (Draft)</div>
           </div>
-          <div style="margin-bottom: 12px; font-size: 13px; font-weight: 700; color: #0f172a;">EQUITY AND LIABILITIES</div>
+          <div style="margin-bottom: 12px; font-size: 13px; font-weight: 700; color: var(--text-main);">EQUITY AND LIABILITIES</div>
           <div class="table-container" style="margin-bottom: 16px;">
             <table class="data-table">
               ${fs.balance_sheet.liability_items.map(l => `
@@ -7862,14 +8691,14 @@ async function renderFinancialStatements() {
                 <td>Retained Surplus (PAT for current year)</td>
                 <td class="text-right font-mono font-bold">${formatINR(fs.balance_sheet.retained_earnings_pat)}</td>
               </tr>
-              <tr style="background-color: #f8fafc; font-weight: 700;">
+              <tr style="background-color: var(--bg-app); font-weight: 700;">
                 <td>Total Equity & Liabilities</td>
                 <td class="text-right font-mono">${formatINR(fs.balance_sheet.total_equity_and_liabilities)}</td>
               </tr>
             </table>
           </div>
 
-          <div style="margin-bottom: 12px; font-size: 13px; font-weight: 700; color: #0f172a;">ASSETS</div>
+          <div style="margin-bottom: 12px; font-size: 13px; font-weight: 700; color: var(--text-main);">ASSETS</div>
           <div class="table-container">
             <table class="data-table">
               ${fs.balance_sheet.asset_items.map(a => `
@@ -7878,7 +8707,7 @@ async function renderFinancialStatements() {
                   <td class="text-right font-mono">${formatINR(a.amount)}</td>
                 </tr>
               `).join("")}
-              <tr style="background-color: #f8fafc; font-weight: 700;">
+              <tr style="background-color: var(--bg-app); font-weight: 700;">
                 <td>Total Assets</td>
                 <td class="text-right font-mono">${formatINR(fs.balance_sheet.total_assets)}</td>
               </tr>
@@ -7899,8 +8728,8 @@ async function renderAIAssistant() {
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Local AI Audit Assistant & Query Engine</h2>
-        <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Local AI Audit Assistant & Query Engine</h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
           100% Offline AI Natural Language Auditor • Evidence-backed reasoning
         </div>
       </div>
@@ -7914,7 +8743,7 @@ async function renderAIAssistant() {
         </div>
       </div>
 
-      <div style="padding: 8px 16px; background: #f1f5f9; display: flex; gap: 8px; overflow-x: auto;">
+      <div style="padding: 8px 16px; background: var(--bg-sidebar); display: flex; gap: 8px; overflow-x: auto;">
         <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Show large cash transactions above Section 40A(3) limit')">💡 Section 40A(3) Cash Violations</button>
         <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the critical risks in this engagement?')">💡 Critical Audit Risks</button>
         <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the top 5 highest value vouchers?')">💡 Top 5 Highest Vouchers</button>
@@ -7962,7 +8791,7 @@ async function submitChatMessage() {
 
     if (res.evidence && res.evidence.length > 0) {
       botHtml += `
-        <div style="margin-top: 10px; padding: 8px; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11.5px;">
+        <div style="margin-top: 10px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11.5px;">
           <b>Attached Audit Evidence:</b>
           <div style="margin-top: 4px;">
             ${res.evidence.map(e => `
@@ -7991,8 +8820,8 @@ function renderImportData() {
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Data Import & Smart Column Mapper</h2>
-        <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Data Import & Smart Column Mapper</h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
           Import General Ledger, Day Book, Bank Statements, or GST Files (.xlsx, .csv, .json)
         </div>
       </div>
@@ -8002,10 +8831,10 @@ function renderImportData() {
       <div class="card-header">
         <div class="card-title">1. Upload Financial Data File</div>
       </div>
-      <div style="padding: 24px; border: 2px dashed var(--border-dark); border-radius: var(--radius-lg); text-align: center; background: #f8fafc;" id="drop-zone">
+      <div style="padding: 24px; border: 2px dashed var(--border-dark); border-radius: var(--radius-lg); text-align: center; background: var(--bg-app);" id="drop-zone">
         <svg width="40" height="40" fill="none" stroke="#64748b" viewBox="0 0 24 24" style="margin-bottom: 8px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-        <div style="font-weight: 600; color: #0f172a;">Drag and drop Excel (.xlsx, .xls), CSV, or JSON file here</div>
-        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Supports Tally, SAP, Busy, Quickbooks, and custom ERP export files</div>
+        <div style="font-weight: 600; color: var(--text-main);">Drag and drop Excel (.xlsx, .xls), CSV, or JSON file here</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Supports Tally, SAP, Busy, Quickbooks, and custom ERP export files</div>
         <input type="file" id="file-input" style="display: none;" accept=".xlsx,.xls,.csv,.json" onchange="handleFileSelected(event)">
         <button class="btn btn-primary" style="margin-top: 14px;" onclick="document.getElementById('file-input').click()">Browse Local Files</button>
       </div>
@@ -8054,7 +8883,7 @@ async function handleFileSelected(event) {
           ${standardFields.map(f => {
             const matchedCol = Object.keys(preview.suggested_mapping).find(src => preview.suggested_mapping[src] === f.id) || "";
             return `
-              <div class="form-group" style="padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md);">
+              <div class="form-group" style="padding: 10px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
                 <label class="form-label">${f.name}</label>
                 <select class="form-control mapping-select" data-field="${f.id}">
                   <option value="">-- Ignore Field --</option>
@@ -8158,7 +8987,7 @@ async function renderChecklist() {
   if (!container) return;
 
   container.innerHTML = `
-    <div style="padding: 24px; text-align: center; color: #64748b;">
+    <div style="padding: 24px; text-align: center; color: var(--text-muted);">
       <div style="font-size: 24px; margin-bottom: 8px;">📋</div>
       Loading Audit Checklist & Substantive Procedures...
     </div>
@@ -8197,11 +9026,11 @@ async function renderChecklist() {
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0;">Audit Checklist & Substantive Workprogram</h2>
+            <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main); margin: 0;">Audit Checklist & Substantive Workprogram</h2>
             <span class="badge badge-medium">${auditType}</span>
             <span class="badge badge-low">FY ${fy}</span>
           </div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
             Dynamic 15-category substantive procedures tailored to <b>${clientType}</b>, financial year, and automated risk findings.
           </div>
         </div>
@@ -8220,7 +9049,7 @@ async function renderChecklist() {
       </div>
 
       <!-- Professional Standard Skepticism Banner -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; color: #334155;">
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--text-secondary);">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 16px;">🛡️</span>
           <span><b>Auditor Professional Skepticism Policy (SA 200/230):</b> AI audit engines automatically flag exceptions and initiate procedures as <i>'Requires Review'</i> or <i>'Not Started'</i>. Items are <b>never automatically marked Completed</b> by AI without verified auditor working paper sign-off.</span>
@@ -8232,9 +9061,9 @@ async function renderChecklist() {
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px;">
         <!-- Total & Completion -->
         <div class="card" style="padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
-          <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Total Procedures</div>
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Total Procedures</div>
           <div style="display: flex; align-items: baseline; gap: 8px; margin: 6px 0;">
-            <span style="font-size: 26px; font-weight: 700; color: #0f172a;">${totalItems}</span>
+            <span style="font-size: 26px; font-weight: 700; color: var(--text-main);">${totalItems}</span>
             <span style="font-size: 12px; color: #059669; font-weight: 600;">${completionPct}% Done</span>
           </div>
           <div style="background: #e2e8f0; border-radius: 6px; height: 6px; overflow: hidden;">
@@ -8248,7 +9077,7 @@ async function renderChecklist() {
           <div style="font-size: 26px; font-weight: 700; color: ${reqReviewItems > 0 ? '#be123c' : '#0f172a'}; margin: 6px 0;">
             ${reqReviewItems}
           </div>
-          <div style="font-size: 11px; color: #64748b;">Substantive & Risk Exceptions</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Substantive & Risk Exceptions</div>
         </div>
 
         <!-- In Progress -->
@@ -8257,7 +9086,7 @@ async function renderChecklist() {
           <div style="font-size: 26px; font-weight: 700; color: #1d4ed8; margin: 6px 0;">
             ${inProgressItems}
           </div>
-          <div style="font-size: 11px; color: #64748b;">Active Fieldwork</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Active Fieldwork</div>
         </div>
 
         <!-- Completed -->
@@ -8266,31 +9095,31 @@ async function renderChecklist() {
           <div style="font-size: 26px; font-weight: 700; color: #047857; margin: 6px 0;">
             ${completedItems}
           </div>
-          <div style="font-size: 11px; color: #64748b;">Auditor Signed Off</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Auditor Signed Off</div>
         </div>
 
         <!-- Not Started -->
         <div class="card" style="padding: 14px;">
-          <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Not Started</div>
-          <div style="font-size: 26px; font-weight: 700; color: #475569; margin: 6px 0;">
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Not Started</div>
+          <div style="font-size: 26px; font-weight: 700; color: var(--text-secondary); margin: 6px 0;">
             ${notStartedItems}
           </div>
-          <div style="font-size: 11px; color: #64748b;">Pending Staff Allocation</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Pending Staff Allocation</div>
         </div>
 
         <!-- Not Applicable -->
         <div class="card" style="padding: 14px;">
-          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase;">Not Applicable</div>
-          <div style="font-size: 26px; font-weight: 700; color: #94a3b8; margin: 6px 0;">
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Not Applicable</div>
+          <div style="font-size: 26px; font-weight: 700; color: var(--text-muted); margin: 6px 0;">
             ${naItems}
           </div>
-          <div style="font-size: 11px; color: #94a3b8;">Out of Scope</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Out of Scope</div>
         </div>
       </div>
 
       <!-- 15 Categories Tab Bar -->
       <div style="margin-bottom: 16px;">
-        <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
           Audit Scope Categories (${CHECKLIST_CATEGORIES_LIST.length} Sections)
         </div>
         <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; -webkit-overflow-scrolling: touch;">
@@ -8367,7 +9196,7 @@ async function renderChecklist() {
             <tbody>
               ${items.length === 0 ? `
                 <tr>
-                  <td colspan="10" style="text-align: center; padding: 40px; color: #64748b;">
+                  <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">
                     <div style="font-size: 28px; margin-bottom: 8px;">📂</div>
                     <div style="font-weight: 600; font-size: 14px; color: #1e293b;">No checklist items found</div>
                     <div style="font-size: 12px; margin-top: 4px;">Try clearing filters or click <b>"Regenerate / Tailor"</b> to generate standard procedures.</div>
@@ -8393,11 +9222,11 @@ async function renderChecklist() {
 
                   <!-- Question / Procedure -->
                   <td>
-                    <div style="font-weight: 600; color: #0f172a; font-size: 12.5px; line-height: 1.45;">
+                    <div style="font-weight: 600; color: var(--text-main); font-size: 12.5px; line-height: 1.45;">
                       ${item.question}
                     </div>
                     ${item.guidance ? `
-                      <div style="font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.35;">
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.35;">
                         <span style="font-weight: 600;">Guidance:</span> ${item.guidance}
                       </div>
                     ` : ''}
@@ -8422,30 +9251,30 @@ async function renderChecklist() {
                   </td>
 
                   <!-- Assigned Staff -->
-                  <td style="font-size: 12px; color: #334155;">
-                    ${item.assigned_staff ? `<span>👤 ${item.assigned_staff}</span>` : '<span style="color: #94a3b8; font-style: italic;">Unassigned</span>'}
+                  <td style="font-size: 12px; color: var(--text-secondary);">
+                    ${item.assigned_staff ? `<span>👤 ${item.assigned_staff}</span>` : '<span style="color: var(--text-muted); font-style: italic;">Unassigned</span>'}
                   </td>
 
                   <!-- Evidence -->
                   <td>
                     ${item.evidence ? `
-                      <div style="font-size: 11.5px; color: #0369a1; background: #f0f9ff; padding: 4px 6px; border-radius: 4px; border: 1px solid #bae6fd; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.evidence}">
+                      <div style="font-size: 11.5px; color: #0369a1; background: #f0f9ff; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--border); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.evidence}">
                         📎 ${item.evidence}
                       </div>
-                    ` : '<span style="color: #94a3b8; font-size: 11.5px;">None</span>'}
+                    ` : '<span style="color: var(--text-muted); font-size: 11.5px;">None</span>'}
                   </td>
 
                   <!-- Comment -->
                   <td>
                     ${item.comment ? `
-                      <div style="font-size: 11.5px; color: #475569; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.comment}">
+                      <div style="font-size: 11.5px; color: var(--text-secondary); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.comment}">
                         💬 ${item.comment}
                       </div>
-                    ` : '<span style="color: #94a3b8; font-size: 11.5px;">—</span>'}
+                    ` : '<span style="color: var(--text-muted); font-size: 11.5px;">—</span>'}
                   </td>
 
                   <!-- Due Date -->
-                  <td style="font-size: 11.5px; color: #475569; white-space: nowrap;">
+                  <td style="font-size: 11.5px; color: var(--text-secondary); white-space: nowrap;">
                     ${item.due_date || '—'}
                   </td>
 
@@ -8489,7 +9318,7 @@ async function renderChecklist() {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
         <h3>Failed to Load Audit Checklist</h3>
-        <p style="margin-top: 8px; color: #64748b;">${err.message || 'An error occurred while fetching checklist procedures.'}</p>
+        <p style="margin-top: 8px; color: var(--text-muted);">${err.message || 'An error occurred while fetching checklist procedures.'}</p>
         <button class="btn btn-primary" style="margin-top: 16px;" onclick="renderChecklist()">Retry</button>
       </div>
     `;
@@ -8659,17 +9488,17 @@ function openChecklistSignOffModal(itemId) {
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('checklist-signoff-modal')">✕</button>
         </div>
         <div class="modal-body">
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 16px;">
             <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
               <span class="badge badge-medium">${item.category}</span>
-              <span class="font-mono font-bold" style="font-size: 12px; color: #475569;">${item.item_code}</span>
+              <span class="font-mono font-bold" style="font-size: 12px; color: var(--text-secondary);">${item.item_code}</span>
               ${item.risk_finding_id ? `<span class="badge badge-critical">Linked to Risk Finding #${item.risk_finding_id}</span>` : ''}
             </div>
-            <div style="font-weight: 600; color: #0f172a; font-size: 13.5px; line-height: 1.45;">
+            <div style="font-weight: 600; color: var(--text-main); font-size: 13.5px; line-height: 1.45;">
               ${item.question}
             </div>
             ${item.guidance ? `
-              <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
                 <b>Guidance:</b> ${item.guidance}
               </div>
             ` : ''}
@@ -8717,7 +9546,7 @@ function openChecklistSignOffModal(itemId) {
             </div>
 
             <!-- Professional Skepticism Reminder -->
-            <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 4px; padding: 8px 12px; font-size: 11.5px; color: #92400e; margin-top: 10px;">
+            <div style="background: #fffbeb; border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; font-size: 11.5px; color: #92400e; margin-top: 10px;">
               🔒 <b>SA 230 Working Paper Rule:</b> Only mark 'Completed' after independent substantive testing or verification of management representations.
             </div>
 
@@ -8786,7 +9615,7 @@ function openGenerateChecklistModal() {
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('generate-checklist-modal')">✕</button>
         </div>
         <div class="modal-body">
-          <div style="font-size: 13px; color: #475569; margin-bottom: 16px;">
+          <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
             Generate tailored audit procedures across all 15 audit categories according to client entity structure, audit mandate, financial year, and automated risk findings.
           </div>
 
@@ -8845,7 +9674,7 @@ function openGenerateChecklistModal() {
               </div>
             </div>
 
-            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; margin-top: 14px;">
+            <div style="background: #eff6ff; border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 14px;">
               <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; margin: 0; font-size: 12.5px; color: #1e3a8a;">
                 <input type="checkbox" id="gen-include-risk-findings" checked style="margin-top: 2px;">
                 <div>
@@ -8976,14 +9805,14 @@ async function renderWorkingPapers() {
   if (!state.currentEngagementId) {
     container.innerHTML = `
       <div class="card" style="padding: 40px; text-align: center;">
-        <div style="font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">No Engagement Selected</div>
-        <p style="color: #64748b; font-size: 13px;">Please select an audit engagement from the top bar to manage working papers.</p>
+        <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">No Engagement Selected</div>
+        <p style="color: var(--text-muted); font-size: 13px;">Please select an audit engagement from the top bar to manage working papers.</p>
       </div>`;
     return;
   }
 
   container.innerHTML = `
-    <div style="padding: 40px; text-align: center; color: #64748b;">
+    <div style="padding: 40px; text-align: center; color: var(--text-muted);">
       <div class="spinner" style="display:inline-block; margin-bottom: 12px;"></div>
       <div>Loading SA 230 Working Papers & Audit Evidence Repository...</div>
     </div>`;
@@ -8998,10 +9827,10 @@ async function renderWorkingPapers() {
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0;">Audit Working Papers & Evidence Repository</h2>
+            <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main); margin: 0;">Audit Working Papers & Evidence Repository</h2>
             <span class="badge badge-role-auditor">SA 230 Compliant</span>
           </div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 3px;">
             Maintain audit evidence, working notes, supporting files, cross-links, and partner reviews for Engagement #${state.currentEngagementId}
           </div>
         </div>
@@ -9030,7 +9859,7 @@ async function renderWorkingPapers() {
         </div>
         <div class="metric-card" style="border-left: 4px solid #64748b; cursor: pointer;" onclick="setWpStatusFilter('Prepared')">
           <div class="metric-title">Prepared (Draft)</div>
-          <div class="metric-value" style="color: #475569;">${summary.prepared}</div>
+          <div class="metric-value" style="color: var(--text-secondary);">${summary.prepared}</div>
           <div class="metric-desc">Ready for CA review</div>
         </div>
         <div class="metric-card" style="border-left: 4px solid #2563eb; cursor: pointer;" onclick="setWpStatusFilter('Under Review')">
@@ -9078,7 +9907,7 @@ async function renderWorkingPapers() {
 
           <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 12px; font-weight: 600; color: #64748b;">Area:</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Area:</span>
               <select class="form-control" style="width: 180px; padding: 6px 10px; font-size: 12.5px;" onchange="handleWpAreaFilter(this.value)">
                 <option value="All" ${state.wpFilters.area === 'All' ? 'selected' : ''}>All Audit Areas</option>
                 ${WP_STANDARD_AREAS.map(a => `<option value="${escapeHtml(a)}" ${state.wpFilters.area === a ? 'selected' : ''}>${escapeHtml(a)}</option>`).join("")}
@@ -9086,7 +9915,7 @@ async function renderWorkingPapers() {
             </div>
 
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 12px; font-weight: 600; color: #64748b;">Status:</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Status:</span>
               <select class="form-control" style="width: 150px; padding: 6px 10px; font-size: 12.5px;" onchange="handleWpStatusFilter(this.value)">
                 <option value="All" ${state.wpFilters.status === 'All' ? 'selected' : ''}>All Statuses</option>
                 <option value="Prepared" ${state.wpFilters.status === 'Prepared' ? 'selected' : ''}>Prepared</option>
@@ -9125,11 +9954,11 @@ async function renderWorkingPapers() {
             <tbody>
               ${wps.length === 0 ? `
                 <tr>
-                  <td colspan="9" style="text-align: center; padding: 48px 20px; color: #64748b;">
+                  <td colspan="9" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
                     <svg width="40" height="40" fill="none" stroke="#cbd5e1" viewBox="0 0 24 24" style="margin: 0 auto 10px auto; display: block;">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
-                    <div style="font-weight: 600; font-size: 14px; color: #334155;">No Working Papers Found</div>
+                    <div style="font-weight: 600; font-size: 14px; color: var(--text-secondary);">No Working Papers Found</div>
                     <div style="font-size: 12px; margin-top: 4px;">Click "+ New Working Paper" to begin document indexing and SA 230 evidence collection.</div>
                   </td>
                 </tr>
@@ -9143,7 +9972,7 @@ async function renderWorkingPapers() {
                 return `
                   <tr style="cursor: pointer;" onclick="openWorkingPaperDrawer(${w.id})">
                     <td>
-                      <span class="font-mono font-bold" style="color: #2563eb; background: #eff6ff; padding: 3px 8px; border-radius: 4px; border: 1px solid #bfdbfe; font-size: 12px;">
+                      <span class="font-mono font-bold" style="color: #2563eb; background: #eff6ff; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); font-size: 12px;">
                         ${escapeHtml(w.wp_reference)}
                       </span>
                     </td>
@@ -9153,17 +9982,17 @@ async function renderWorkingPapers() {
                       </span>
                     </td>
                     <td>
-                      <div class="font-bold" style="color: #0f172a; font-size: 13.5px;">${escapeHtml(w.title)}</div>
-                      ${w.description ? `<div style="max-width: 320px; font-size: 11.5px; color: #64748b; white-space: normal; margin-top: 2px; line-height: 1.3;">${escapeHtml(w.description.length > 90 ? w.description.substring(0, 90) + '...' : w.description)}</div>` : ''}
+                      <div class="font-bold" style="color: var(--text-main); font-size: 13.5px;">${escapeHtml(w.title)}</div>
+                      ${w.description ? `<div style="max-width: 320px; font-size: 11.5px; color: var(--text-muted); white-space: normal; margin-top: 2px; line-height: 1.3;">${escapeHtml(w.description.length > 90 ? w.description.substring(0, 90) + '...' : w.description)}</div>` : ''}
                     </td>
                     <td>
                       <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                         ${attachedCount > 0 ? `
-                          <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;">
+                          <span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary); border: 1px solid var(--border);">
                             <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                             ${attachedCount} Doc${attachedCount > 1 ? 's' : ''}
                           </span>
-                        ` : '<span style="color: #94a3b8; font-size: 11px;">No files</span>'}
+                        ` : '<span style="color: var(--text-muted); font-size: 11px;">No files</span>'}
                         ${w.evidence ? `<span title="${escapeHtml(w.evidence)}" style="color: #059669; font-size: 11px; font-weight: 500;">✓ Summary</span>` : ''}
                       </div>
                     </td>
@@ -9172,20 +10001,20 @@ async function renderWorkingPapers() {
                         ${fCount > 0 ? `<span class="badge badge-high" style="font-size: 10.5px; padding: 2px 5px;" title="${fCount} Linked Audit Finding(s)">F: ${fCount}</span>` : ''}
                         ${tCount > 0 ? `<span class="badge badge-open" style="font-size: 10.5px; padding: 2px 5px;" title="${tCount} Linked GL Transaction(s)">Tx: ${tCount}</span>` : ''}
                         ${cCount > 0 ? `<span class="badge badge-low" style="font-size: 10.5px; padding: 2px 5px;" title="${cCount} Linked Checklist Item(s)">Chk: ${cCount}</span>` : ''}
-                        ${(fCount === 0 && tCount === 0 && cCount === 0) ? '<span style="color: #94a3b8; font-size: 11px;">None</span>' : ''}
+                        ${(fCount === 0 && tCount === 0 && cCount === 0) ? '<span style="color: var(--text-muted); font-size: 11px;">None</span>' : ''}
                       </div>
                     </td>
                     <td>
-                      <div style="font-weight: 600; font-size: 12px; color: #334155;">${escapeHtml(w.prepared_by || 'Staff')}</div>
-                      <div style="font-size: 10.5px; color: #94a3b8;">${escapeHtml(w.prepared_date || w.created_at ? (w.prepared_date || w.created_at.substring(0, 10)) : '')}</div>
+                      <div style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">${escapeHtml(w.prepared_by || 'Staff')}</div>
+                      <div style="font-size: 10.5px; color: var(--text-muted);">${escapeHtml(w.prepared_date || w.created_at ? (w.prepared_date || w.created_at.substring(0, 10)) : '')}</div>
                     </td>
                     <td>
-                      <div style="font-weight: 600; font-size: 12px; color: #334155;">${escapeHtml(w.reviewed_by || '-')}</div>
-                      <div style="font-size: 10.5px; color: #94a3b8;">${escapeHtml(w.review_date || '-')}</div>
+                      <div style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">${escapeHtml(w.reviewed_by || '-')}</div>
+                      <div style="font-size: 10.5px; color: var(--text-muted);">${escapeHtml(w.review_date || '-')}</div>
                     </td>
                     <td>
                       ${getWpStatusBadge(w.status)}
-                      ${commentsCount > 0 ? `<div style="font-size: 10px; color: #64748b; margin-top: 2px;">💬 ${commentsCount} note${commentsCount > 1 ? 's' : ''}</div>` : ''}
+                      ${commentsCount > 0 ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">💬 ${commentsCount} note${commentsCount > 1 ? 's' : ''}</div>` : ''}
                     </td>
                     <td style="text-align: right;" onclick="event.stopPropagation();">
                       <div style="display: flex; gap: 4px; justify-content: flex-end;">
@@ -9214,7 +10043,7 @@ async function renderWorkingPapers() {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center;">
         <div style="color: #dc2626; font-weight: 700; font-size: 15px; margin-bottom: 6px;">Error Loading Working Papers</div>
-        <p style="color: #64748b; font-size: 13px;">${escapeHtml(err.message)}</p>
+        <p style="color: var(--text-muted); font-size: 13px;">${escapeHtml(err.message)}</p>
         <button class="btn btn-secondary" onclick="renderWorkingPapers()" style="margin-top: 12px;">Try Again</button>
       </div>`;
   }
@@ -9274,7 +10103,7 @@ function openCreateWorkingPaperModal() {
               <div>
                 <label class="form-label">WP Reference (ID) *</label>
                 <input type="text" id="wp-new-ref" class="form-control font-mono font-bold" placeholder="e.g., WP-A101" required />
-                <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Unique reference code</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Unique reference code</div>
               </div>
               <div>
                 <label class="form-label">Audit Area *</label>
@@ -9391,8 +10220,8 @@ async function openWorkingPaperDrawer(wpId, defaultTab = "overview") {
       <div class="wp-detail-drawer">
         <div class="wp-drawer-header">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <span class="font-mono font-bold" id="drawer-wp-ref" style="color: #2563eb; background: #eff6ff; padding: 4px 10px; border-radius: 4px; border: 1px solid #bfdbfe; font-size: 13px;">...</span>
-            <div style="font-weight: 700; font-size: 16px; color: #0f172a; max-width: 440px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="drawer-wp-title">Loading...</div>
+            <span class="font-mono font-bold" id="drawer-wp-ref" style="color: #2563eb; background: #eff6ff; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); font-size: 13px;">...</span>
+            <div style="font-weight: 700; font-size: 16px; color: var(--text-main); max-width: 440px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="drawer-wp-title">Loading...</div>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div id="drawer-wp-status-badge"></div>
@@ -9401,7 +10230,7 @@ async function openWorkingPaperDrawer(wpId, defaultTab = "overview") {
         </div>
 
         <!-- Tab Navigation Bar -->
-        <div style="padding: 12px 24px 0 24px; background: #ffffff;">
+        <div style="padding: 12px 24px 0 24px; background: var(--bg-card);">
           <div class="wp-nav-tabs">
             <div class="wp-nav-tab ${currentDrawerTab === 'overview' ? 'active' : ''}" onclick="switchWpDrawerTab('overview')">
               📋 Overview
@@ -9425,7 +10254,7 @@ async function openWorkingPaperDrawer(wpId, defaultTab = "overview") {
         </div>
 
         <div class="wp-drawer-body" id="drawer-content-area">
-          <div style="padding: 40px; text-align: center; color: #64748b;">
+          <div style="padding: 40px; text-align: center; color: var(--text-muted);">
             <div class="spinner" style="display:inline-block; margin-bottom: 10px;"></div>
             <div>Loading working paper details & audit evidence...</div>
           </div>
@@ -9560,13 +10389,13 @@ function populateWorkingPaperDrawer() {
 function renderWpOverviewTab(wp) {
   return `
     <!-- Status Switcher Bar -->
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+    <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
       <div>
-        <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Current Review Status</div>
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Current Review Status</div>
         <div style="margin-top: 4px;">${getWpStatusBadge(wp.status)}</div>
       </div>
       <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-        <span style="font-size: 12px; color: #64748b; font-weight: 600;">Transition to:</span>
+        <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Transition to:</span>
         <button class="btn btn-secondary btn-sm ${wp.status === 'Prepared' ? 'font-bold' : ''}" onclick="quickChangeWpStatus(${wp.id}, 'Prepared')">Prepared</button>
         <button class="btn btn-secondary btn-sm ${wp.status === 'Under Review' ? 'font-bold' : ''}" onclick="quickChangeWpStatus(${wp.id}, 'Under Review')">Under Review</button>
         <button class="btn btn-success btn-sm ${wp.status === 'Reviewed' ? 'font-bold' : ''}" onclick="openReviewWorkingPaperModal(${wp.id}, '${escapeHtml(wp.wp_reference)}')">✓ Mark Reviewed</button>
@@ -9655,8 +10484,8 @@ function renderWpEvidenceTab(wp) {
 
   return `
     <div style="margin-bottom: 20px;">
-      <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">Supporting Evidence & Documents</div>
-      <div style="font-size: 12px; color: #64748b;">
+      <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Supporting Evidence & Documents</div>
+      <div style="font-size: 12px; color: var(--text-muted);">
         Upload bank statements, confirmations, certificates, sample invoices, ledger extracts, or statutory returns (SA 230).
       </div>
     </div>
@@ -9670,17 +10499,17 @@ function renderWpEvidenceTab(wp) {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
       </svg>
       <div style="font-size: 13.5px; font-weight: 700; color: #1e293b;">Click or Drag files here to attach evidence</div>
-      <div style="font-size: 11.5px; color: #64748b; margin-top: 3px;">Supports PDF, XLSX, XLS, CSV, DOCX, PNG, JPG (Auto recorded in Audit Trail)</div>
+      <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 3px;">Supports PDF, XLSX, XLS, CSV, DOCX, PNG, JPG (Auto recorded in Audit Trail)</div>
     </div>
 
     <!-- Uploaded Documents List -->
     <div style="margin-top: 24px;">
-      <div style="font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+      <div style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
         <span>Attached Supporting Files (${files.length})</span>
       </div>
 
       ${files.length === 0 ? `
-        <div style="padding: 24px; text-align: center; color: #94a3b8; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; font-size: 12.5px;">
+        <div style="padding: 24px; text-align: center; color: var(--text-muted); background: var(--bg-app); border: 1px dashed #cbd5e1; border-radius: var(--radius-md); font-size: 12.5px;">
           No supporting documents attached yet. Click above to upload evidence files.
         </div>
       ` : files.map((file, idx) => `
@@ -9690,17 +10519,17 @@ function renderWpEvidenceTab(wp) {
               ${getFileTypeIcon(file.name)}
             </div>
             <div style="min-width: 0; flex: 1;">
-              <div style="font-weight: 600; font-size: 13px; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              <div style="font-weight: 600; font-size: 13px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 ${escapeHtml(file.name)}
               </div>
-              <div style="font-size: 11px; color: #64748b; display: flex; gap: 8px; align-items: center; margin-top: 2px;">
+              <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; align-items: center; margin-top: 2px;">
                 <span>${escapeHtml(file.size_display || 'File')}</span>
                 <span>•</span>
                 <span>By ${escapeHtml(file.uploaded_by || 'Auditor')}</span>
                 <span>•</span>
                 <span>${escapeHtml(file.uploaded_at ? file.uploaded_at.substring(0, 10) : '')}</span>
               </div>
-              ${file.description ? `<div style="font-size: 11px; color: #475569; margin-top: 2px; font-style: italic;">"${escapeHtml(file.description)}"</div>` : ''}
+              ${file.description ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px; font-style: italic;">"${escapeHtml(file.description)}"</div>` : ''}
             </div>
           </div>
           <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0; margin-left: 12px;">
@@ -9789,8 +10618,8 @@ async function handleDeleteWpDoc(wpId, docId) {
 function renderWpNotesTab(wp) {
   return `
     <div style="margin-bottom: 16px;">
-      <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">Auditor Working Notes & Audit Observations</div>
-      <div style="font-size: 12px; color: #64748b;">
+      <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Auditor Working Notes & Audit Observations</div>
+      <div style="font-size: 12px; color: var(--text-muted);">
         Record substantive test notes, sample selection rationale, analytical review commentary, and management discussions.
       </div>
     </div>
@@ -9823,8 +10652,8 @@ function renderWpLinksTab(wp) {
 
   return `
     <div style="margin-bottom: 18px;">
-      <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">Audit Cross-References & Evidence Links</div>
-      <div style="font-size: 12px; color: #64748b;">
+      <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Audit Cross-References & Evidence Links</div>
+      <div style="font-size: 12px; color: var(--text-muted);">
         Bi-directionally link this working paper to specific Audit Findings, General Ledger Transactions, and Statutory Checklist Items.
       </div>
     </div>
@@ -9842,7 +10671,7 @@ function renderWpLinksTab(wp) {
       </div>
 
       ${findings.length === 0 ? `
-        <div style="padding: 14px; text-align: center; color: #94a3b8; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px;">
+        <div style="padding: 14px; text-align: center; color: var(--text-muted); background: var(--bg-app); border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px;">
           No audit findings linked to this working paper.
         </div>
       ` : findings.map(f => `
@@ -9851,9 +10680,9 @@ function renderWpLinksTab(wp) {
             <div style="display: flex; align-items: center; gap: 8px;">
               <span class="font-mono font-bold" style="font-size: 11.5px; color: #2563eb;">${escapeHtml(f.finding_code || `F#${f.id}`)}</span>
               <span class="badge badge-${(f.severity || 'medium').toLowerCase()}">${escapeHtml(f.severity || 'MEDIUM')}</span>
-              <span class="font-bold" style="font-size: 13px; color: #0f172a;">${escapeHtml(f.title)}</span>
+              <span class="font-bold" style="font-size: 13px; color: var(--text-main);">${escapeHtml(f.title)}</span>
             </div>
-            <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
               Category: ${escapeHtml(f.category || 'General')} • Status: ${escapeHtml(f.status || 'Open')}
             </div>
           </div>
@@ -9877,21 +10706,21 @@ function renderWpLinksTab(wp) {
       </div>
 
       ${txns.length === 0 ? `
-        <div style="padding: 14px; text-align: center; color: #94a3b8; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px;">
+        <div style="padding: 14px; text-align: center; color: var(--text-muted); background: var(--bg-app); border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px;">
           No transactions linked to this working paper.
         </div>
       ` : txns.map(t => `
         <div class="wp-link-card">
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="font-mono" style="font-size: 11.5px; color: #475569;">${escapeHtml(t.date || '')}</span>
+              <span class="font-mono" style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(t.date || '')}</span>
               <span class="font-mono font-bold" style="font-size: 12px; color: #2563eb;">${escapeHtml(t.voucher_no || `Tx#${t.id}`)}</span>
-              <span class="font-bold" style="font-size: 13px; color: #0f172a;">${escapeHtml(t.ledger || '')}</span>
+              <span class="font-bold" style="font-size: 13px; color: var(--text-main);">${escapeHtml(t.ledger || '')}</span>
               <span style="font-weight: 700; color: ${t.debit > 0 ? '#b91c1c' : '#047857'}; font-size: 12px;">
                 ₹ ${Number(t.amount || (t.debit || t.credit)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
               </span>
             </div>
-            ${t.description ? `<div style="font-size: 11px; color: #64748b; margin-top: 3px;">${escapeHtml(t.description)} ${t.party_name ? '• ' + escapeHtml(t.party_name) : ''}</div>` : ''}
+            ${t.description ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">${escapeHtml(t.description)} ${t.party_name ? '• ' + escapeHtml(t.party_name) : ''}</div>` : ''}
           </div>
           <button class="btn btn-secondary btn-sm" style="color: #ef4444; border: none; padding: 2px 6px;" onclick="unlinkWpEntity(${wp.id}, 'transaction', ${t.id})" title="Unlink Transaction">
             ✕
@@ -9913,7 +10742,7 @@ function renderWpLinksTab(wp) {
       </div>
 
       ${chks.length === 0 ? `
-        <div style="padding: 14px; text-align: center; color: #94a3b8; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px;">
+        <div style="padding: 14px; text-align: center; color: var(--text-muted); background: var(--bg-app); border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px;">
           No checklist items linked to this working paper.
         </div>
       ` : chks.map(c => `
@@ -9924,7 +10753,7 @@ function renderWpLinksTab(wp) {
               <span class="badge badge-medium" style="font-size: 10.5px;">${escapeHtml(c.category || 'Statutory')}</span>
               <span class="badge ${c.status === 'Completed' ? 'badge-resolved' : 'badge-open'}" style="font-size: 10.5px;">${escapeHtml(c.status || 'Pending')}</span>
             </div>
-            <div style="font-size: 12px; color: #334155; font-weight: 600; margin-top: 4px;">${escapeHtml(c.question)}</div>
+            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-top: 4px;">${escapeHtml(c.question)}</div>
           </div>
           <button class="btn btn-secondary btn-sm" style="color: #ef4444; border: none; padding: 2px 6px;" onclick="unlinkWpEntity(${wp.id}, 'checklist', ${c.id})" title="Unlink Checklist Item">
             ✕
@@ -9965,7 +10794,7 @@ async function openLinkEntityModal(wpId, entityType) {
           <div class="modal-title">Link ${entityType.toUpperCase()} to WP</div>
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('${modalId}')">✕</button>
         </div>
-        <div class="modal-body" style="padding: 30px; text-align: center; color: #64748b;">
+        <div class="modal-body" style="padding: 30px; text-align: center; color: var(--text-muted);">
           <div class="spinner" style="display:inline-block; margin-bottom: 8px;"></div>
           <div>Loading available ${entityType} records...</div>
         </div>
@@ -10006,7 +10835,7 @@ async function openLinkEntityModal(wpId, entityType) {
 
           <div id="linkable-items-list">
             ${items.length === 0 ? `
-              <div style="padding: 24px; text-align: center; color: #94a3b8;">No available records to link.</div>
+              <div style="padding: 24px; text-align: center; color: var(--text-muted);">No available records to link.</div>
             ` : items.map(item => {
               if (entityType === "finding") {
                 return `
@@ -10017,7 +10846,7 @@ async function openLinkEntityModal(wpId, entityType) {
                         <span class="badge badge-${(item.severity || 'medium').toLowerCase()}">${escapeHtml(item.severity || 'MEDIUM')}</span>
                         <span class="font-bold" style="font-size: 13px;">${escapeHtml(item.title)}</span>
                       </div>
-                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${escapeHtml(item.category || '')} • Status: ${escapeHtml(item.status || 'Open')}</div>
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(item.category || '')} • Status: ${escapeHtml(item.status || 'Open')}</div>
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="executeLinkItem(${wpId}, 'finding', ${item.id})">+ Link</button>
                   </div>
@@ -10027,12 +10856,12 @@ async function openLinkEntityModal(wpId, entityType) {
                   <div class="wp-attachment-card link-item-row" data-search="${escapeHtml((item.voucher_no + ' ' + item.ledger + ' ' + (item.description||'')).toLowerCase())}">
                     <div>
                       <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="font-mono" style="font-size: 11.5px; color: #64748b;">${escapeHtml(item.date || '')}</span>
+                        <span class="font-mono" style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(item.date || '')}</span>
                         <span class="font-mono font-bold" style="color: #2563eb;">${escapeHtml(item.voucher_no || `Tx#${item.id}`)}</span>
                         <span class="font-bold">${escapeHtml(item.ledger)}</span>
-                        <span style="font-weight: 700; color: #0f172a;">₹ ${Number(item.amount || (item.debit || item.credit)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        <span style="font-weight: 700; color: var(--text-main);">₹ ${Number(item.amount || (item.debit || item.credit)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                       </div>
-                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${escapeHtml(item.description || '')}</div>
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(item.description || '')}</div>
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="executeLinkItem(${wpId}, 'transaction', ${item.id})">+ Link</button>
                   </div>
@@ -10046,7 +10875,7 @@ async function openLinkEntityModal(wpId, entityType) {
                         <span class="badge badge-medium" style="font-size: 10.5px;">${escapeHtml(item.category || '')}</span>
                         <span class="badge ${item.status === 'Completed' ? 'badge-resolved' : 'badge-open'}" style="font-size: 10.5px;">${escapeHtml(item.status || 'Pending')}</span>
                       </div>
-                      <div style="font-size: 12px; font-weight: 600; color: #334155; margin-top: 3px;">${escapeHtml(item.question)}</div>
+                      <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-top: 3px;">${escapeHtml(item.question)}</div>
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="executeLinkItem(${wpId}, 'checklist', ${item.id})">+ Link</button>
                   </div>
@@ -10096,8 +10925,8 @@ function renderWpCommentsTab(wp) {
 
   return `
     <div style="margin-bottom: 18px;">
-      <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">Reviewer Comments & Discussion Log</div>
-      <div style="font-size: 12px; color: #64748b;">
+      <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Reviewer Comments & Discussion Log</div>
+      <div style="font-size: 12px; color: var(--text-muted);">
         Maintain an audit trail of review observations, feedback, and partner sign-off directives.
       </div>
     </div>
@@ -10105,28 +10934,28 @@ function renderWpCommentsTab(wp) {
     <!-- Comments timeline -->
     <div style="margin-bottom: 24px;">
       ${comments.length === 0 ? `
-        <div style="padding: 24px; text-align: center; color: #94a3b8; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; font-size: 12.5px;">
+        <div style="padding: 24px; text-align: center; color: var(--text-muted); background: var(--bg-app); border: 1px dashed #cbd5e1; border-radius: var(--radius-md); font-size: 12.5px;">
           No reviewer comments recorded yet.
         </div>
       ` : comments.map(c => `
         <div class="wp-comment-bubble ${c.role === 'Admin' || c.role === 'Auditor' ? 'reviewer' : ''}">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-weight: 700; font-size: 12.5px; color: #0f172a;">${escapeHtml(c.author || 'Reviewer')}</span>
+              <span style="font-weight: 700; font-size: 12.5px; color: var(--text-main);">${escapeHtml(c.author || 'Reviewer')}</span>
               <span class="badge ${c.role === 'Admin' ? 'badge-role-admin' : 'badge-role-auditor'}" style="font-size: 10px;">${escapeHtml(c.role || 'Auditor')}</span>
             </div>
-            <div style="font-size: 11px; color: #94a3b8;">
+            <div style="font-size: 11px; color: var(--text-muted);">
               ${escapeHtml(c.created_at ? c.created_at.replace('T', ' ').substring(0, 16) : '')}
             </div>
           </div>
-          <div style="font-size: 13px; color: #334155; line-height: 1.4; white-space: pre-wrap;">${escapeHtml(c.comment)}</div>
+          <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4; white-space: pre-wrap;">${escapeHtml(c.comment)}</div>
         </div>
       `).join("")}
     </div>
 
     <!-- Post Comment Box -->
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
-      <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px;">Add Reviewer Comment / Audit Note</div>
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px;">
+      <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">Add Reviewer Comment / Audit Note</div>
       <textarea id="wp-new-comment-text" class="form-control" rows="3" placeholder="Enter review observation, query for staff, or partner sign-off comment..."></textarea>
       <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
         <button class="btn btn-primary btn-sm" onclick="handlePostWpComment(${wp.id})">
@@ -10163,29 +10992,29 @@ function renderWpAuditTrailTab(wp) {
 
   return `
     <div style="margin-bottom: 18px;">
-      <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">SA 230 Audit Trail & Immutable Activity Log</div>
-      <div style="font-size: 12px; color: #64748b;">
+      <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">SA 230 Audit Trail & Immutable Activity Log</div>
+      <div style="font-size: 12px; color: var(--text-muted);">
         Complete chronological history of all creations, edits, reviews, document uploads, and deletions for this working paper.
       </div>
     </div>
 
     <div>
       ${logs.length === 0 ? `
-        <div style="padding: 24px; text-align: center; color: #94a3b8; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; font-size: 12.5px;">
+        <div style="padding: 24px; text-align: center; color: var(--text-muted); background: var(--bg-app); border: 1px dashed #cbd5e1; border-radius: var(--radius-md); font-size: 12.5px;">
           No audit logs recorded for this working paper yet.
         </div>
       ` : logs.map(l => `
         <div class="wp-timeline-item">
           <div class="wp-timeline-dot"></div>
           <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="font-weight: 700; font-size: 12.5px; color: #0f172a;">${escapeHtml(l.action)}</span>
-            <span style="font-size: 11px; color: #94a3b8;">${escapeHtml(l.timestamp ? l.timestamp.replace('T', ' ').substring(0, 19) : '')}</span>
+            <span style="font-weight: 700; font-size: 12.5px; color: var(--text-main);">${escapeHtml(l.action)}</span>
+            <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(l.timestamp ? l.timestamp.replace('T', ' ').substring(0, 19) : '')}</span>
           </div>
-          <div style="font-size: 12px; color: #475569; margin-top: 2px;">
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
             ${escapeHtml(l.details || '')}
           </div>
-          <div style="font-size: 10.5px; color: #94a3b8; margin-top: 2px;">
-            User: <strong style="color: #334155;">${escapeHtml(l.username || 'system')}</strong>
+          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
+            User: <strong style="color: var(--text-secondary);">${escapeHtml(l.username || 'system')}</strong>
           </div>
         </div>
       `).join("")}
@@ -10220,7 +11049,7 @@ function openReviewWorkingPaperModal(wpId, wpRef) {
         </div>
         <div class="modal-body">
           <form id="wp-review-form" onsubmit="handleConfirmWpReview(event, ${wpId})">
-            <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; color: #047857;">
+            <div style="background: #ecfdf5; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; color: #047857;">
               ✓ You are approving this working paper as compliant with ICAI SA 230 standard on audit documentation.
             </div>
 
@@ -10294,7 +11123,7 @@ function promptDeleteWorkingPaper(wpId, isReviewed, wpRef) {
         <div class="modal-body">
           <form id="wp-delete-form" onsubmit="handleExecuteWpDelete(event, ${wpId}, ${isReviewed})">
             ${isReviewed ? `
-              <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-bottom: 14px; font-size: 12px; color: #991b1b;">
+              <div style="background: #fef2f2; border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 14px; font-size: 12px; color: #991b1b;">
                 <strong>⚠️ Mandatory Audit Compliance Rule (SA 230):</strong><br/>
                 This is a <strong>REVIEWED</strong> working paper. In accordance with audit standards, reviewed working papers cannot be deleted without a recorded justification. This deletion will be permanently logged in the audit trail.
               </div>
@@ -10303,7 +11132,7 @@ function promptDeleteWorkingPaper(wpId, isReviewed, wpRef) {
                 <textarea id="wp-delete-reason" class="form-control" rows="3" placeholder="State explicit justification for deleting reviewed audit documentation (e.g., duplicate work paper created in error, superseded by WP-XYZ)..." required></textarea>
               </div>
             ` : `
-              <p style="font-size: 13px; color: #475569; margin-bottom: 14px;">
+              <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
                 Are you sure you want to delete Working Paper <strong>${escapeHtml(wpRef)}</strong>? All attached files and link cross-references will be removed.
               </p>
               <div class="form-group">
@@ -10457,14 +11286,14 @@ async function renderReports() {
   if (!state.currentEngagementId) {
     container.innerHTML = `
       <div class="card" style="padding: 40px; text-align: center;">
-        <div style="font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">No Engagement Selected</div>
-        <p style="color: #64748b; font-size: 13px;">Please select an audit engagement from the top bar to generate audit reports.</p>
+        <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">No Engagement Selected</div>
+        <p style="color: var(--text-muted); font-size: 13px;">Please select an audit engagement from the top bar to generate audit reports.</p>
       </div>`;
     return;
   }
 
   container.innerHTML = `
-    <div style="padding: 40px; text-align: center; color: #64748b;">
+    <div style="padding: 40px; text-align: center; color: var(--text-muted);">
       <div class="spinner" style="display:inline-block; margin-bottom: 12px;"></div>
       <div>Loading Audit Reports & PDF Generator...</div>
     </div>`;
@@ -10477,10 +11306,10 @@ async function renderReports() {
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0;">Professional Audit Reports & PDF Generator</h2>
+            <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main); margin: 0;">Professional Audit Reports & PDF Generator</h2>
             <span class="badge badge-role-auditor">ICAI SA 230 / SA 700</span>
           </div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 3px;">
             Generate formal, verifiable AI-assisted audit analysis PDF reports with traceable Finding IDs for Engagement #${state.currentEngagementId}
           </div>
         </div>
@@ -10491,16 +11320,16 @@ async function renderReports() {
       </div>
 
       <!-- Statutory Quality Control Notice Banner -->
-      <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #2563eb; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 12px; color: #334155; line-height: 1.45;">
-        <strong style="color: #0f172a;">⚖️ ICAI Quality Control & SA 230 Compliance Note:</strong><br/>
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-left: 4px solid #2563eb; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 24px; font-size: 12px; color: var(--text-secondary); line-height: 1.45;">
+        <strong style="color: var(--text-main);">⚖️ ICAI Quality Control & SA 230 Compliance Note:</strong><br/>
         All generated PDF reports provide an <em>AI-assisted audit analysis report</em> with fully traceable <strong>Finding IDs</strong>. In accordance with professional standards (SA 200/SA 700), reports include formal review sign-off blocks and do not replace the final independent professional audit opinion rendered by the Practicing Chartered Accountant.
       </div>
 
       <!-- 10 Report Types Grid -->
       <div style="margin-bottom: 28px;">
-        <div style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
           <span>Available Audit Report Modules (10 Specialized PDF Reports)</span>
-          <span style="font-size: 12px; font-weight: 500; color: #64748b;">Click 'Generate PDF' on any report</span>
+          <span style="font-size: 12px; font-weight: 500; color: var(--text-muted);">Click 'Generate PDF' on any report</span>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
@@ -10512,12 +11341,12 @@ async function renderReports() {
                     <span style="font-size: 20px;">${rt.icon}</span>
                     <span class="badge ${rt.badgeClass}">${escapeHtml(rt.badge)}</span>
                   </div>
-                  <span style="font-size: 10.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">${escapeHtml(rt.category)}</span>
+                  <span style="font-size: 10.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(rt.category)}</span>
                 </div>
-                <div style="font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 4px;">
+                <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 4px;">
                   ${escapeHtml(rt.title)}
                 </div>
-                <div style="font-size: 11.5px; color: #475569; line-height: 1.35; margin-bottom: 14px;">
+                <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.35; margin-bottom: 14px;">
                   ${escapeHtml(rt.description)}
                 </div>
               </div>
@@ -10534,7 +11363,7 @@ async function renderReports() {
 
       <!-- Generated Audit Reports History Card -->
       <div class="card" style="padding: 0; overflow: hidden;">
-        <div class="card-header" style="padding: 14px 18px; margin-bottom: 0; background: #f8fafc;">
+        <div class="card-header" style="padding: 14px 18px; margin-bottom: 0; background: var(--bg-app);">
           <div class="card-title" style="font-size: 14px;">
             <svg width="16" height="16" fill="none" stroke="#2563eb" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             Generated Audit Reports History (${reports.length})
@@ -10542,11 +11371,11 @@ async function renderReports() {
         </div>
 
         ${reports.length === 0 ? `
-          <div style="padding: 36px 20px; text-align: center; color: #64748b;">
+          <div style="padding: 36px 20px; text-align: center; color: var(--text-muted);">
             <svg width="36" height="36" fill="none" stroke="#cbd5e1" viewBox="0 0 24 24" style="margin: 0 auto 8px auto; display: block;">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
-            <div style="font-weight: 600; font-size: 13.5px; color: #334155;">No Reports Generated Yet</div>
+            <div style="font-weight: 600; font-size: 13.5px; color: var(--text-secondary);">No Reports Generated Yet</div>
             <div style="font-size: 12px; margin-top: 2px;">Click 'Generate PDF' on any report module above to create and download formal PDF documentation.</div>
           </div>
         ` : `
@@ -10565,7 +11394,7 @@ async function renderReports() {
                 ${reports.map(rep => `
                   <tr>
                     <td>
-                      <div class="font-bold" style="color: #0f172a; font-size: 13px;">${escapeHtml(rep.report_title)}</div>
+                      <div class="font-bold" style="color: var(--text-main); font-size: 13px;">${escapeHtml(rep.report_title)}</div>
                     </td>
                     <td>
                       <span class="badge badge-medium" style="font-size: 11px;">
@@ -10573,10 +11402,10 @@ async function renderReports() {
                       </span>
                     </td>
                     <td>
-                      <div style="font-weight: 600; font-size: 12px; color: #334155;">${escapeHtml(rep.generated_by || 'Auditor')}</div>
+                      <div style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">${escapeHtml(rep.generated_by || 'Auditor')}</div>
                     </td>
                     <td>
-                      <div class="font-mono" style="font-size: 11.5px; color: #64748b;">
+                      <div class="font-mono" style="font-size: 11.5px; color: var(--text-muted);">
                         ${escapeHtml(rep.created_at ? rep.created_at.replace('T', ' ').substring(0, 19) : '')}
                       </div>
                     </td>
@@ -10598,7 +11427,7 @@ async function renderReports() {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center;">
         <div style="color: #dc2626; font-weight: 700; font-size: 15px; margin-bottom: 6px;">Error Loading Reports</div>
-        <p style="color: #64748b; font-size: 13px;">${escapeHtml(err.message)}</p>
+        <p style="color: var(--text-muted); font-size: 13px;">${escapeHtml(err.message)}</p>
         <button class="btn btn-secondary" onclick="renderReports()" style="margin-top: 12px;">Try Again</button>
       </div>`;
   }
@@ -10637,8 +11466,8 @@ async function renderAuditTrail() {
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Audit Trail & Activity Log</h2>
-        <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Audit Trail & Activity Log</h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
           Immutable MCA / Companies Act Rule 11(g) compliant audit log
         </div>
       </div>
@@ -10657,13 +11486,21 @@ async function renderAuditTrail() {
             </tr>
           </thead>
           <tbody>
-            ${logs.map(log => `
+            ${logs.length === 0 ? `
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                  <div style="font-size: 36px; margin-bottom: 8px;">🛡️</div>
+                  <div style="font-weight: 600; color: var(--text-secondary);">No audit activity yet</div>
+                  <div style="font-size: 12px; margin-top: 4px;">System and user actions will be cryptographically chained and recorded here in compliance with MCA Rule 11(g).</div>
+                </td>
+              </tr>
+            ` : logs.map(log => `
               <tr>
                 <td class="font-mono" style="font-size: 11.5px;">${log.timestamp.replace('T', ' ').split('.')[0]}</td>
                 <td class="font-bold">${log.username}</td>
                 <td><span class="badge badge-open">${log.action}</span></td>
                 <td>${log.entity_type} (#${log.entity_id || '0'})</td>
-                <td style="font-size: 12px; color: #475569;">${log.details || ''}</td>
+                <td style="font-size: 12px; color: var(--text-secondary);">${log.details || ''}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -10687,8 +11524,8 @@ async function renderClients() {
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Client Master Database</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Client Master Database</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Corporate entities, statutory PAN/GSTIN registration, industry categories, and historical audit records
           </div>
         </div>
@@ -10743,7 +11580,7 @@ async function renderClients() {
               ${clients.map(c => `
                 <tr data-name="${(c.name || '').toLowerCase()}" data-pan="${(c.pan || '').toLowerCase()}" data-gstin="${(c.gstin || '').toLowerCase()}" data-entity="${c.entity_type || ''}" data-industry="${c.industry || ''}">
                   <td>
-                    <div style="font-weight: 700; color: #0f172a; font-size: 13.5px;">${c.name}</div>
+                    <div style="font-weight: 700; color: var(--text-main); font-size: 13.5px;">${c.name}</div>
                     <span class="badge badge-medium" style="margin-top: 2px;">${c.entity_type || 'Private Limited Company'}</span>
                   </td>
                   <td class="font-mono font-bold" style="color: var(--primary);">${c.pan || '—'}</td>
@@ -10751,13 +11588,13 @@ async function renderClients() {
                   <td><span class="badge badge-open">${c.industry || 'General'}</span></td>
                   <td>
                     <b>${c.contact_person || '—'}</b><br/>
-                    <span style="font-size: 11px; color: #64748b;">${c.email || ''} ${c.phone ? `(${c.phone})` : ''}</span>
+                    <span style="font-size: 11px; color: var(--text-muted);">${c.email || ''} ${c.phone ? `(${c.phone})` : ''}</span>
                   </td>
                   <td>
                     <div style="display: flex; gap: 4px; flex-wrap: wrap;">
                       ${c.financial_years && c.financial_years.length > 0 ? c.financial_years.map(fy => `
                         <span class="badge badge-role-auditor font-mono" style="font-size: 10px;">${fy}</span>
-                      `).join("") : '<span style="color: #94a3b8; font-size: 11px;">None</span>'}
+                      `).join("") : '<span style="color: var(--text-muted); font-size: 11px;">None</span>'}
                     </div>
                   </td>
                   <td class="text-center font-bold" style="font-size: 13px;">${c.engagements_count || 0}</td>
@@ -11025,7 +11862,7 @@ async function openClientHistoryDrawer(clientId) {
 
   drawerHeader.innerText = `Client History: ${client.name}`;
   drawerBody.innerHTML = `
-    <div style="padding: 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px;">
+    <div style="padding: 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <span class="badge badge-medium">${client.entity_type}</span>
         <span class="badge badge-open">${client.industry}</span>
@@ -11036,12 +11873,12 @@ async function openClientHistoryDrawer(clientId) {
       </div>
     </div>
 
-    <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 10px;">
+    <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 10px;">
       📅 Multi-Year Audit Engagement History (${history.length}):
     </div>
 
     ${history.length === 0 ? `
-      <div style="padding: 20px; text-align: center; color: #64748b;">
+      <div style="padding: 20px; text-align: center; color: var(--text-muted);">
         No engagements recorded for this client yet.
       </div>
     ` : `
@@ -11051,11 +11888,11 @@ async function openClientHistoryDrawer(clientId) {
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <span class="badge badge-role-auditor font-mono font-bold" style="font-size: 12px;">FY ${h.financial_year}</span>
-                <span style="font-weight: 700; color: #0f172a; margin-left: 6px;">${h.title}</span>
+                <span style="font-weight: 700; color: var(--text-main); margin-left: 6px;">${h.title}</span>
               </div>
               <span class="badge ${h.status === 'Completed' ? 'badge-resolved' : (h.status === 'Archived' ? 'badge-disabled' : 'badge-open')}">${h.status}</span>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; font-size: 12px; color: #475569;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--text-secondary);">
               <div>Turnover: <b class="font-mono">${formatINR(h.turnover)}</b></div>
               <div>Audit Type: <b>${h.audit_type}</b></div>
               <div>Exceptions: <b style="color: ${h.critical_findings > 0 ? '#dc2626' : '#0f172a'};">${h.total_findings} (${h.critical_findings} Critical)</b></div>
@@ -11093,8 +11930,8 @@ async function renderEngagements() {
     container.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Audit Engagements Directory</h2>
-          <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Audit Engagements Directory</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
             Statutory, Tax Audit (3CD), Internal, and Special Audit engagements with strict data isolation
           </div>
         </div>
@@ -11137,8 +11974,18 @@ async function renderEngagements() {
         <div class="card-header">
           <div class="card-title">All Engagements (${engagements.length})</div>
         </div>
-        <div class="table-container">
-          <table class="data-table" id="engagements-table">
+        ${engagements.length === 0 ? `
+          <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
+            <div style="font-size: 44px; margin-bottom: 10px;">📁</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No engagements yet</div>
+            <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
+              Create an audit engagement for your registered client to establish the audit mandate, financial year, and materiality benchmark.
+            </p>
+            ${canCreate ? `<button class="btn btn-primary" onclick="openCreateEngagementModal()">+ Create First Engagement</button>` : ''}
+          </div>
+        ` : `
+          <div class="table-container">
+            <table class="data-table" id="engagements-table">
             <thead>
               <tr>
                 <th>Engagement & Client</th>
@@ -11155,11 +12002,11 @@ async function renderEngagements() {
               ${engagements.map(e => `
                 <tr style="${e.id === state.currentEngagementId ? 'background-color: var(--primary-light);' : ''}" data-title="${(e.title || '').toLowerCase()}" data-client="${(e.client_name || '').toLowerCase()}" data-fy="${e.financial_year || ''}" data-type="${e.audit_type || ''}" data-status="${e.status || ''}">
                   <td>
-                    <div style="font-weight: 700; color: #0f172a; font-size: 13.5px;">
+                    <div style="font-weight: 700; color: var(--text-main); font-size: 13.5px;">
                       ${e.title}
                       ${e.id === state.currentEngagementId ? '<span class="badge badge-open" style="margin-left: 6px;">Active Context</span>' : ''}
                     </div>
-                    <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">
+                    <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
                       <b>${e.client_name}</b> (PAN: ${e.client_pan || '—'})
                     </div>
                   </td>
@@ -11167,7 +12014,7 @@ async function renderEngagements() {
                   <td class="font-mono font-bold" style="color: var(--primary);">${e.financial_year}</td>
                   <td>
                     <div><b>Auditor:</b> ${e.lead_auditor_name || 'Partner'}</div>
-                    <div style="font-size: 11px; color: #64748b;"><b>Staff:</b> ${e.assigned_staff_name || 'Unassigned'}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);"><b>Staff:</b> ${e.assigned_staff_name || 'Unassigned'}</div>
                   </td>
                   <td>
                     <select class="form-control" style="font-size: 11.5px; padding: 3px 6px; width: 115px;" onchange="updateEngagementStatusDirect(${e.id}, this.value)">
@@ -11202,6 +12049,7 @@ async function renderEngagements() {
             </tbody>
           </table>
         </div>
+        `}
       </div>
     `;
   } catch (err) {
@@ -11481,7 +12329,7 @@ async function openDuplicateEngagementModal(sourceEngagementId) {
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('duplicate-eng-modal')">✕</button>
         </div>
         <div class="modal-body">
-          <div style="padding: 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); font-size: 12px; margin-bottom: 14px; color: #1e3a8a;">
+          <div style="padding: 10px; background: #eff6ff; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; margin-bottom: 14px; color: #1e3a8a;">
             <b>Cloning Source:</b> ${eng.client_name} — ${eng.title} (FY ${eng.financial_year})<br/>
             This creates an isolated new engagement while carrying over your customized CARO/3CD checklists and working paper index.
           </div>
@@ -11495,7 +12343,7 @@ async function openDuplicateEngagementModal(sourceEngagementId) {
               <label class="form-label">New Engagement Title *</label>
               <input type="text" id="dup-title" class="form-control" value="${eng.audit_type} FY ${nextFY}" required>
             </div>
-            <div class="form-group" style="padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md);">
+            <div class="form-group" style="padding: 10px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
               <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 12.5px; cursor: pointer;">
                 <input type="checkbox" id="dup-copy-checklists" checked> Copy CARO & Tax Audit Checklist Templates
               </label>
@@ -11548,8 +12396,8 @@ async function renderSettings() {
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Application Settings & Local Security</h2>
-        <div style="font-size: 13px; color: #64748b; margin-top: 2px;">
+        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Application Settings & Local Security</h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
           Offline SQLite Database, Backup/Restore, and Audit User Roles
         </div>
       </div>
@@ -11589,8 +12437,8 @@ async function renderSettings() {
               ${(state.currentUser?.full_name || 'Admin').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
             </div>
             <div>
-              <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${state.currentUser?.full_name}</div>
-              <div style="font-size: 12px; color: #64748b;">${state.currentUser?.email}</div>
+              <div style="font-size: 15px; font-weight: 700; color: var(--text-main);">${state.currentUser?.full_name}</div>
+              <div style="font-size: 12px; color: var(--text-muted);">${state.currentUser?.email}</div>
               <div style="margin-top: 4px;">${getRoleBadge(state.currentUser?.role)}</div>
             </div>
           </div>
@@ -11642,11 +12490,11 @@ async function openEvidenceDrawer(findingId) {
 
   body.innerHTML = `
     <div style="margin-bottom: 16px;">
-      <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">${finding.title}</h3>
-      <div style="font-size: 12.5px; color: #475569; line-height: 1.5;">${finding.description}</div>
+      <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">${finding.title}</h3>
+      <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">${finding.description}</div>
     </div>
 
-    <div style="padding: 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px; font-size: 12px;">
+    <div style="padding: 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px; font-size: 12px;">
       <div><b>Rule & Statutory Standard:</b> ${finding.rule_used}</div>
       <div style="margin-top: 4px;"><b>Engine Type:</b> <span class="badge badge-open">${finding.engine_type}</span></div>
       <div style="margin-top: 4px;"><b>Risk Score:</b> <span class="font-mono font-bold">${finding.risk_score} / 10</span></div>
@@ -11654,23 +12502,23 @@ async function openEvidenceDrawer(findingId) {
     </div>
 
     <div style="margin-bottom: 16px;">
-      <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 4px;">💡 Local AI Audit Commentary & Analysis:</div>
-      <div style="font-size: 12px; color: #334155; padding: 10px; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid #bfdbfe; line-height: 1.5;">
+      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">💡 Local AI Audit Commentary & Analysis:</div>
+      <div style="font-size: 12px; color: var(--text-secondary); padding: 10px; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid var(--border); line-height: 1.5;">
         ${finding.ai_explanation || 'Detailed review required.'}
       </div>
     </div>
 
     <div style="margin-bottom: 16px;">
-      <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 4px;">📋 Recommended Auditor Action:</div>
-      <div style="font-size: 12px; color: #065f46; padding: 10px; background: #ecfdf5; border-radius: var(--radius-md); border: 1px solid #a7f3d0; line-height: 1.5;">
+      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">📋 Recommended Auditor Action:</div>
+      <div style="font-size: 12px; color: #065f46; padding: 10px; background: #ecfdf5; border-radius: var(--radius-md); border: 1px solid var(--border); line-height: 1.5;">
         ${finding.recommended_action || 'Inspect supporting invoice.'}
       </div>
     </div>
 
     <div style="margin-bottom: 16px;">
-      <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 6px;">Associated Transactions & Vouchers (${finding.affected_transactions?.length || 0}):</div>
+      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 6px;">Associated Transactions & Vouchers (${finding.affected_transactions?.length || 0}):</div>
       ${(!finding.affected_transactions || finding.affected_transactions.length === 0) ? `
-        <div style="font-size: 12px; color: #64748b;">No individual transactions linked directly.</div>
+        <div style="font-size: 12px; color: var(--text-muted);">No individual transactions linked directly.</div>
       ` : `
         <div class="table-container">
           <table class="data-table">
@@ -11698,7 +12546,7 @@ async function openEvidenceDrawer(findingId) {
     </div>
 
     <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px;">
-      <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 8px;">Auditor Review & Decision:</div>
+      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 8px;">Auditor Review & Decision:</div>
       <div class="form-group">
         <label class="form-label">Review Status</label>
         <select class="form-control" id="drawer-finding-status">
@@ -11742,12 +12590,12 @@ let cachedFSData = null;
 async function renderFinancialStatements() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
-    container.innerHTML = `<div class="card" style="padding: 24px; text-align: center; color: #64748b;">Please select an engagement to analyze financial statements.</div>`;
+    container.innerHTML = `<div class="card" style="padding: 24px; text-align: center; color: var(--text-muted);">Please select an engagement to analyze financial statements.</div>`;
     return;
   }
 
   container.innerHTML = `
-    <div style="display: flex; align-items: center; justify-content: center; height: 300px; color: #64748b;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 300px; color: var(--text-muted);">
       <div style="text-align: center;">
         <div style="font-size: 28px; margin-bottom: 8px;">⏳</div>
         <div>Generating Schedule III Financial Statements & Computing Analytical Ratios...</div>
@@ -11764,7 +12612,7 @@ async function renderFinancialStatements() {
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
         <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
         <h3>Financial Statement Analysis Error</h3>
-        <p style="margin-top: 6px; color: #64748b;">${err.message || "Failed to load financial statement data."}</p>
+        <p style="margin-top: 6px; color: var(--text-muted);">${err.message || "Failed to load financial statement data."}</p>
         <button class="btn btn-secondary" style="margin-top: 14px;" onclick="renderFinancialStatements()">Retry Analysis</button>
       </div>
     `;
@@ -11784,12 +12632,12 @@ function renderFSContent(data) {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px;">
       <div>
         <div style="display: flex; align-items: center; gap: 10px;">
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Financial Statement Analysis & SA 520 Analytical Review</h2>
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Financial Statement Analysis & SA 520 Analytical Review</h2>
           <span class="badge ${sigCount > 0 ? 'badge-high' : 'badge-low'}" style="font-size: 12px;">
             ${sigCount} Significant Movements
           </span>
         </div>
-        <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 3px;">
           Deterministic Schedule III Financials, Ratio Analytics, and Comparative Multi-Year Variance Workbench
         </div>
       </div>
@@ -11811,13 +12659,13 @@ function renderFSContent(data) {
       <div style="display: flex; align-items: flex-start; gap: 14px;">
         <div style="font-size: 24px; line-height: 1;">📋</div>
         <div style="flex: 1;">
-          <div style="font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 4px;">
+          <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 4px;">
             Executive Audit & Management Analysis Summary (FY ${cyYear} vs FY ${pyYear})
           </div>
-          <p style="font-size: 13px; color: #334155; line-height: 1.6; margin: 0;">
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0;">
             ${summary.management_commentary || 'Analysis generated based on transaction ledgers and Schedule III classification.'}
           </p>
-          <div style="display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: #64748b;">
+          <div style="display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: var(--text-muted);">
             <span><b>Auditing Standard:</b> SA 520 (Analytical Procedures)</span>
             <span>•</span>
             <span><b>Significant Threshold:</b> |Δ%| ≥ 20% or |Δ| ≥ ₹5,00,000</span>
@@ -11906,14 +12754,14 @@ function renderRatiosDashboardHtml(data, cyYear, pyYear) {
       <div class="card" style="padding: 16px; border: 1px solid var(--border); transition: transform 0.15s, box-shadow 0.15s;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
           <div>
-            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">${category}</div>
-            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 2px;">${title}</div>
+            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">${category}</div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-top: 2px;">${title}</div>
           </div>
           ${benchmark ? `<span class="badge badge-low" style="font-size: 10px;">Target: ${benchmark}</span>` : ''}
         </div>
 
         <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 10px;">
-          <span style="font-size: 24px; font-weight: 800; color: #0f172a; font-family: monospace;">
+          <span style="font-size: 24px; font-weight: 800; color: var(--text-main); font-family: monospace;">
             ${typeof cyVal === 'number' ? cyVal.toFixed(2) : (cyVal || 0)}${unit === '%' ? '%' : (unit === 'x' ? 'x' : (unit === 'days' ? ' d' : ''))}
           </span>
           <span style="font-size: 12px; font-weight: 600; color: ${diffColor};">
@@ -11921,9 +12769,9 @@ function renderRatiosDashboardHtml(data, cyYear, pyYear) {
           </span>
         </div>
 
-        <div style="display: flex; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 11.5px; color: #64748b;">
-          <span>PY (FY ${pyYear}): <b style="color: #334155; font-family: monospace;">${typeof pyVal === 'number' ? pyVal.toFixed(2) : (pyVal || 0)}${unit === '%' ? '%' : (unit === 'x' ? 'x' : (unit === 'days' ? ' d' : ''))}</b></span>
-          <span>CY (FY ${cyYear}): <b style="color: #0f172a; font-family: monospace;">${typeof cyVal === 'number' ? cyVal.toFixed(2) : (cyVal || 0)}${unit === '%' ? '%' : (unit === 'x' ? 'x' : (unit === 'days' ? ' d' : ''))}</b></span>
+        <div style="display: flex; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 11.5px; color: var(--text-muted);">
+          <span>PY (FY ${pyYear}): <b style="color: var(--text-secondary); font-family: monospace;">${typeof pyVal === 'number' ? pyVal.toFixed(2) : (pyVal || 0)}${unit === '%' ? '%' : (unit === 'x' ? 'x' : (unit === 'days' ? ' d' : ''))}</b></span>
+          <span>CY (FY ${cyYear}): <b style="color: var(--text-main); font-family: monospace;">${typeof cyVal === 'number' ? cyVal.toFixed(2) : (cyVal || 0)}${unit === '%' ? '%' : (unit === 'x' ? 'x' : (unit === 'days' ? ' d' : ''))}</b></span>
         </div>
       </div>
     `;
@@ -11931,7 +12779,7 @@ function renderRatiosDashboardHtml(data, cyYear, pyYear) {
 
   return `
     <div style="margin-bottom: 24px;">
-      <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+      <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         <span>💧</span> Liquidity & Solvency Ratios
       </h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
@@ -11943,7 +12791,7 @@ function renderRatiosDashboardHtml(data, cyYear, pyYear) {
     </div>
 
     <div style="margin-bottom: 24px;">
-      <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+      <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         <span>📈</span> Profitability & Operating Margins
       </h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
@@ -11955,7 +12803,7 @@ function renderRatiosDashboardHtml(data, cyYear, pyYear) {
     </div>
 
     <div style="margin-bottom: 24px;">
-      <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+      <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         <span>⚙️</span> Turnover Ratios & Working Capital Days
       </h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
@@ -11979,8 +12827,8 @@ function renderBalanceSheetHtml(data, cyYear, pyYear) {
   function rowHtml(label, cyVal, pyVal, isHeader = false, isTotal = false) {
     if (isHeader) {
       return `
-        <tr style="background: #f8fafc; font-weight: 700;">
-          <td colspan="5" style="color: #0f172a; font-size: 13px; padding: 10px 12px;">${label}</td>
+        <tr style="background: var(--bg-app); font-weight: 700;">
+          <td colspan="5" style="color: var(--text-main); font-size: 13px; padding: 10px 12px;">${label}</td>
         </tr>
       `;
     }
@@ -11990,8 +12838,8 @@ function renderBalanceSheetHtml(data, cyYear, pyYear) {
     const pctColor = isSig ? '#ea580c' : '#64748b';
 
     return `
-      <tr style="${isTotal ? 'font-weight: 700; background: #f1f5f9; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border);' : ''}">
-        <td style="padding-left: ${isTotal ? '12px' : '24px'}; color: #0f172a;">${label}</td>
+      <tr style="${isTotal ? 'font-weight: 700; background: var(--bg-sidebar); border-top: 2px solid var(--border); border-bottom: 2px solid var(--border);' : ''}">
+        <td style="padding-left: ${isTotal ? '12px' : '24px'}; color: var(--text-main);">${label}</td>
         <td class="font-mono text-right">${formatINR(pyVal || 0)}</td>
         <td class="font-mono text-right" style="font-weight: 600;">${formatINR(cyVal || 0)}</td>
         <td class="font-mono text-right" style="color: ${diff >= 0 ? '#0f172a' : '#dc2626'};">${diff >= 0 ? '+' : ''}${formatINR(diff)}</td>
@@ -12006,7 +12854,7 @@ function renderBalanceSheetHtml(data, cyYear, pyYear) {
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div class="card-title">Schedule III Balance Sheet (Comparative)</div>
-        <div style="font-size: 12px; color: #64748b;">Figures in INR (₹)</div>
+        <div style="font-size: 12px; color: var(--text-muted);">Figures in INR (₹)</div>
       </div>
       <div class="table-container">
         <table class="data-table">
@@ -12067,8 +12915,8 @@ function renderPnLHtml(data, cyYear, pyYear) {
   function rowHtml(label, cyVal, pyVal, isHeader = false, isTotal = false) {
     if (isHeader) {
       return `
-        <tr style="background: #f8fafc; font-weight: 700;">
-          <td colspan="5" style="color: #0f172a; font-size: 13px; padding: 10px 12px;">${label}</td>
+        <tr style="background: var(--bg-app); font-weight: 700;">
+          <td colspan="5" style="color: var(--text-main); font-size: 13px; padding: 10px 12px;">${label}</td>
         </tr>
       `;
     }
@@ -12078,8 +12926,8 @@ function renderPnLHtml(data, cyYear, pyYear) {
     const pctColor = isSig ? '#ea580c' : '#64748b';
 
     return `
-      <tr style="${isTotal ? 'font-weight: 700; background: #f1f5f9; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border);' : ''}">
-        <td style="padding-left: ${isTotal ? '12px' : '24px'}; color: #0f172a;">${label}</td>
+      <tr style="${isTotal ? 'font-weight: 700; background: var(--bg-sidebar); border-top: 2px solid var(--border); border-bottom: 2px solid var(--border);' : ''}">
+        <td style="padding-left: ${isTotal ? '12px' : '24px'}; color: var(--text-main);">${label}</td>
         <td class="font-mono text-right">${formatINR(pyVal || 0)}</td>
         <td class="font-mono text-right" style="font-weight: 600;">${formatINR(cyVal || 0)}</td>
         <td class="font-mono text-right" style="color: ${diff >= 0 ? '#0f172a' : '#dc2626'};">${diff >= 0 ? '+' : ''}${formatINR(diff)}</td>
@@ -12094,7 +12942,7 @@ function renderPnLHtml(data, cyYear, pyYear) {
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div class="card-title">Schedule III Statement of Profit and Loss (Comparative)</div>
-        <div style="font-size: 12px; color: #64748b;">Figures in INR (₹)</div>
+        <div style="font-size: 12px; color: var(--text-muted);">Figures in INR (₹)</div>
       </div>
       <div class="table-container">
         <table class="data-table">
@@ -12144,15 +12992,15 @@ function renderCashFlowHtml(data, cyYear, pyYear) {
   function rowHtml(label, val, isHeader = false, isTotal = false) {
     if (isHeader) {
       return `
-        <tr style="background: #f8fafc; font-weight: 700;">
-          <td colspan="2" style="color: #0f172a; font-size: 13px; padding: 10px 12px;">${label}</td>
+        <tr style="background: var(--bg-app); font-weight: 700;">
+          <td colspan="2" style="color: var(--text-main); font-size: 13px; padding: 10px 12px;">${label}</td>
         </tr>
       `;
     }
     const num = val || 0;
     return `
-      <tr style="${isTotal ? 'font-weight: 700; background: #f1f5f9; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border);' : ''}">
-        <td style="padding-left: ${isTotal ? '12px' : '24px'}; color: #0f172a;">${label}</td>
+      <tr style="${isTotal ? 'font-weight: 700; background: var(--bg-sidebar); border-top: 2px solid var(--border); border-bottom: 2px solid var(--border);' : ''}">
+        <td style="padding-left: ${isTotal ? '12px' : '24px'}; color: var(--text-main);">${label}</td>
         <td class="font-mono text-right" style="font-weight: ${isTotal ? '700' : '500'}; color: ${num >= 0 ? '#0f172a' : '#dc2626'};">
           ${num >= 0 ? '' : '-'}${formatINR(Math.abs(num))}
         </td>
@@ -12165,7 +13013,7 @@ function renderCashFlowHtml(data, cyYear, pyYear) {
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div>
           <div class="card-title">Cash Flow Statement (Indirect Method — AS 3)</div>
-          <div style="font-size: 12px; color: #64748b; margin-top: 2px;">FY ${cyYear} Derived Statement</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">FY ${cyYear} Derived Statement</div>
         </div>
         <span class="badge badge-low" style="font-size: 11px;">Status: Available & Reconciled</span>
       </div>
@@ -12218,7 +13066,7 @@ function renderSignificantMovementsHtml(data, cyYear, pyYear) {
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div>
           <div class="card-title">Comparative Movement & Auditor Working Paper Documentation</div>
-          <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
             Auditor review workbench for significant variances (|Δ%| ≥ 20% or |Δ| ≥ ₹5,00,000)
           </div>
         </div>
@@ -12253,8 +13101,8 @@ function renderSignificantMovementsHtml(data, cyYear, pyYear) {
               return `
                 <tr style="${isSig ? 'background: #fffdfa;' : ''}">
                   <td>
-                    <div style="font-weight: 700; color: #0f172a;">${c.metric_name}</div>
-                    <div style="font-size: 11px; color: #64748b;">Key: ${c.item_key}</div>
+                    <div style="font-weight: 700; color: var(--text-main);">${c.metric_name}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Key: ${c.item_key}</div>
                   </td>
                   <td><span class="badge badge-low" style="font-size: 10px;">${c.category}</span></td>
                   <td class="font-mono text-right">${fmt(c.previous_year_value)}</td>
@@ -12309,7 +13157,7 @@ function openFSExplanationModal(itemKey, metricName, cyVal, pyVal, absDiff, pctD
         <div class="modal-header">
           <div>
             <div class="modal-title">Auditor Working Paper: ${metricName}</div>
-            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
               SA 520 Analytical Review Documentation
             </div>
           </div>
@@ -12317,23 +13165,23 @@ function openFSExplanationModal(itemKey, metricName, cyVal, pyVal, absDiff, pctD
         </div>
 
         <div class="modal-body">
-          <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; text-align: center;">
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; text-align: center;">
             <div>
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Previous Year</div>
-              <div style="font-size: 13px; font-weight: 700; color: #0f172a; font-family: monospace; margin-top: 2px;">${fmt(pyVal)}</div>
+              <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Previous Year</div>
+              <div style="font-size: 13px; font-weight: 700; color: var(--text-main); font-family: monospace; margin-top: 2px;">${fmt(pyVal)}</div>
             </div>
             <div>
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Current Year</div>
-              <div style="font-size: 13px; font-weight: 700; color: #0f172a; font-family: monospace; margin-top: 2px;">${fmt(cyVal)}</div>
+              <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Current Year</div>
+              <div style="font-size: 13px; font-weight: 700; color: var(--text-main); font-family: monospace; margin-top: 2px;">${fmt(cyVal)}</div>
             </div>
             <div>
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Difference (Δ)</div>
+              <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Difference (Δ)</div>
               <div style="font-size: 13px; font-weight: 700; color: ${absDiff >= 0 ? '#0f172a' : '#dc2626'}; font-family: monospace; margin-top: 2px;">
                 ${absDiff >= 0 ? '+' : ''}${fmt(absDiff)}
               </div>
             </div>
             <div>
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Movement (%)</div>
+              <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Movement (%)</div>
               <div style="font-size: 13px; font-weight: 800; color: #ea580c; font-family: monospace; margin-top: 2px;">
                 ${pctDiff >= 0 ? '+' : ''}${pctDiff.toFixed(1)}%
               </div>
@@ -12349,7 +13197,7 @@ function openFSExplanationModal(itemKey, metricName, cyVal, pyVal, absDiff, pctD
                 `).join("")}
                 <option value="Other Industry Factor">Other Industry Factor / Custom Driver</option>
               </select>
-              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
                 Select suggested business hypothesis based on deterministic ratio analysis.
               </div>
             </div>
@@ -12416,12 +13264,12 @@ let dupStatusFilter = "ALL";
 async function renderDuplicateAndMissing() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
-    container.innerHTML = `<div class="card" style="padding: 24px; text-align: center; color: #64748b;">Please select an engagement to inspect duplicates and sequence gaps.</div>`;
+    container.innerHTML = `<div class="card" style="padding: 24px; text-align: center; color: var(--text-muted);">Please select an engagement to inspect duplicates and sequence gaps.</div>`;
     return;
   }
 
   container.innerHTML = `
-    <div style="display: flex; align-items: center; justify-content: center; height: 300px; color: #64748b;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 300px; color: var(--text-muted);">
       <div style="text-align: center;">
         <div style="font-size: 28px; margin-bottom: 8px;">🔍</div>
         <div>Scanning ledgers for exact & fuzzy duplicates and missing sequence gaps...</div>
@@ -12438,7 +13286,7 @@ async function renderDuplicateAndMissing() {
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
         <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
         <h3>Duplicate & Sequence Gap Detection Error</h3>
-        <p style="margin-top: 6px; color: #64748b;">${err.message || "Failed to scan transactions."}</p>
+        <p style="margin-top: 6px; color: var(--text-muted);">${err.message || "Failed to scan transactions."}</p>
         <button class="btn btn-secondary" style="margin-top: 14px;" onclick="renderDuplicateAndMissing()">Retry Analysis</button>
       </div>
     `;
@@ -12454,7 +13302,7 @@ function renderDupContent(data) {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px;">
       <div>
         <div style="display: flex; align-items: center; gap: 10px;">
-          <h2 style="font-size: 20px; font-weight: 700; color: #0f172a;">Duplicate & Missing Transaction Detection</h2>
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Duplicate & Missing Transaction Detection</h2>
           <span class="badge ${summary.total_duplicate_groups > 0 ? 'badge-high' : 'badge-low'}" style="font-size: 12px;">
             ${summary.total_duplicate_groups} Duplicate Groups
           </span>
@@ -12462,7 +13310,7 @@ function renderDupContent(data) {
             ${summary.total_sequence_gaps} Sequence Gaps
           </span>
         </div>
-        <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 3px;">
           Exact and fuzzy duplicate grouping with non-destructive auditor review & sequence continuity tracking
         </div>
       </div>
@@ -12482,35 +13330,35 @@ function renderDupContent(data) {
     <!-- Top KPI Cards -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
       <div class="card" style="padding: 14px; border-left: 4px solid var(--primary);">
-        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600;">Total Duplicate Groups</div>
-        <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px; font-family: monospace;">
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Total Duplicate Groups</div>
+        <div style="font-size: 22px; font-weight: 800; color: var(--text-main); margin-top: 4px; font-family: monospace;">
           ${summary.total_duplicate_groups || 0}
         </div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${summary.unreviewed_duplicate_groups || 0} pending review</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${summary.unreviewed_duplicate_groups || 0} pending review</div>
       </div>
 
       <div class="card" style="padding: 14px; border-left: 4px solid #dc2626;">
-        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600;">Potential Financial Exposure</div>
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Potential Financial Exposure</div>
         <div style="font-size: 22px; font-weight: 800; color: #dc2626; margin-top: 4px; font-family: monospace;">
           ${formatINR(summary.potential_financial_exposure || 0)}
         </div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Across unverified duplicate groups</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Across unverified duplicate groups</div>
       </div>
 
       <div class="card" style="padding: 14px; border-left: 4px solid #059669;">
-        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600;">Confirmed Duplicates</div>
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Confirmed Duplicates</div>
         <div style="font-size: 22px; font-weight: 800; color: #059669; margin-top: 4px; font-family: monospace;">
           ${summary.confirmed_duplicate_count || 0}
         </div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Actioned by auditor</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Actioned by auditor</div>
       </div>
 
       <div class="card" style="padding: 14px; border-left: 4px solid #d97706;">
-        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600;">Missing Sequence Gaps</div>
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Missing Sequence Gaps</div>
         <div style="font-size: 22px; font-weight: 800; color: #d97706; margin-top: 4px; font-family: monospace;">
           ${summary.total_sequence_gaps || 0}
         </div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${summary.open_sequence_gaps_count || 0} open exceptions</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${summary.open_sequence_gaps_count || 0} open exceptions</div>
       </div>
     </div>
 
@@ -12592,15 +13440,15 @@ function renderDuplicateGroupsHtml(data) {
         </button>
       </div>
 
-      <div style="font-size: 12px; color: #64748b;">
+      <div style="font-size: 12px; color: var(--text-muted);">
         Showing <b>${filteredGroups.length}</b> of ${groups.length} groups
       </div>
     </div>
 
     ${filteredGroups.length === 0 ? `
-      <div class="card" style="padding: 40px; text-align: center; color: #64748b;">
+      <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
         <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
-        <div style="font-weight: 700; font-size: 15px; color: #0f172a;">No Duplicate Groups Found</div>
+        <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No Duplicate Groups Found</div>
         <p style="margin-top: 4px; font-size: 12px;">No transaction pairs matched the selected filter criteria.</p>
       </div>
     ` : `
@@ -12627,26 +13475,26 @@ function renderSingleDuplicateGroupCard(g) {
       <!-- Group Header -->
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-weight: 800; font-size: 14px; color: #0f172a; font-family: monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">
+          <span style="font-weight: 800; font-size: 14px; color: var(--text-main); font-family: monospace; background: var(--bg-sidebar); padding: 4px 8px; border-radius: 4px;">
             Group #${g.group_code}
           </span>
           <span class="badge badge-role-auditor" style="font-size: 11px;">${g.group_type}</span>
-          <span style="font-weight: 700; font-size: 12px; color: ${simColor}; background: #fff7ed; padding: 2px 8px; border-radius: 12px; border: 1px solid #ffedd5;">
+          <span style="font-weight: 700; font-size: 12px; color: ${simColor}; background: #fff7ed; padding: 2px 8px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
             ⚡ ${g.similarity_pct}% Similarity
           </span>
           ${statusBadge}
         </div>
 
         <div style="text-align: right;">
-          <span style="font-size: 11px; color: #64748b;">Financial Exposure:</span>
-          <span style="font-weight: 700; font-size: 14px; color: #0f172a; font-family: monospace; margin-left: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted);">Financial Exposure:</span>
+          <span style="font-weight: 700; font-size: 14px; color: var(--text-main); font-family: monospace; margin-left: 4px;">
             ${formatINR(g.financial_exposure)}
           </span>
         </div>
       </div>
 
       <!-- Reason Banner -->
-      <div style="background: #f8fafc; border-left: 3px solid var(--primary); padding: 8px 12px; border-radius: 0 4px 4px 0; margin-bottom: 14px; font-size: 12px; color: #334155;">
+      <div style="background: var(--bg-app); border-left: 3px solid var(--primary); padding: 8px 12px; border-radius: 0 4px 4px 0; margin-bottom: 14px; font-size: 12px; color: var(--text-secondary);">
         <b>Detection Reason:</b> ${g.detection_reason}
       </div>
 
@@ -12662,44 +13510,44 @@ function renderSingleDuplicateGroupCard(g) {
           </thead>
           <tbody>
             <tr>
-              <td style="font-weight: 600; color: #64748b;">Posting Date</td>
+              <td style="font-weight: 600; color: var(--text-muted);">Posting Date</td>
               <td class="font-mono">${txA.date}</td>
               <td class="font-mono ${txA.date !== txB.date ? 'font-bold' : ''}" style="${txA.date !== txB.date ? 'color: #ea580c;' : ''}">${txB.date}</td>
             </tr>
             <tr>
-              <td style="font-weight: 600; color: #64748b;">Ledger Account</td>
+              <td style="font-weight: 600; color: var(--text-muted);">Ledger Account</td>
               <td><b>${txA.ledger}</b></td>
               <td><b>${txB.ledger}</b></td>
             </tr>
             <tr>
-              <td style="font-weight: 600; color: #64748b;">Party Name</td>
+              <td style="font-weight: 600; color: var(--text-muted);">Party Name</td>
               <td>${txA.party_name}</td>
               <td style="${txA.party_name !== txB.party_name ? 'color: #ea580c; font-weight: 600;' : ''}">${txB.party_name}</td>
             </tr>
             <tr>
-              <td style="font-weight: 600; color: #64748b;">Amount / Debit / Credit</td>
+              <td style="font-weight: 600; color: var(--text-muted);">Amount / Debit / Credit</td>
               <td class="font-mono font-bold">${formatINR(txA.amount)}</td>
               <td class="font-mono font-bold" style="${txA.amount !== txB.amount ? 'color: #ea580c;' : ''}">${formatINR(txB.amount)}</td>
             </tr>
             <tr>
-              <td style="font-weight: 600; color: #64748b;">Voucher Number</td>
+              <td style="font-weight: 600; color: var(--text-muted);">Voucher Number</td>
               <td class="font-mono">${txA.voucher_no}</td>
               <td class="font-mono">${txB.voucher_no}</td>
             </tr>
             <tr>
-              <td style="font-weight: 600; color: #64748b;">Invoice Number</td>
+              <td style="font-weight: 600; color: var(--text-muted);">Invoice Number</td>
               <td class="font-mono">${txA.invoice_no}</td>
               <td class="font-mono" style="${txA.invoice_no !== txB.invoice_no ? 'color: #ea580c;' : ''}">${txB.invoice_no}</td>
             </tr>
             <tr>
-              <td style="font-weight: 600; color: #64748b;">Reference / Cheque No</td>
+              <td style="font-weight: 600; color: var(--text-muted);">Reference / Cheque No</td>
               <td class="font-mono">${txA.reference_no}</td>
               <td class="font-mono">${txB.reference_no}</td>
             </tr>
             <tr>
-              <td style="font-weight: 600; color: #64748b;">Narration / Description</td>
-              <td style="color: #475569;">${txA.description}</td>
-              <td style="color: #475569;">${txB.description}</td>
+              <td style="font-weight: 600; color: var(--text-muted);">Narration / Description</td>
+              <td style="color: var(--text-secondary);">${txA.description}</td>
+              <td style="color: var(--text-secondary);">${txB.description}</td>
             </tr>
           </tbody>
         </table>
@@ -12707,7 +13555,7 @@ function renderSingleDuplicateGroupCard(g) {
 
       <!-- Existing Auditor Documentation Banner (if reviewed) -->
       ${g.auditor_comment ? `
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px;">
+        <div style="background: #f0fdf4; border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px;">
           <div style="font-weight: 700; color: #166534; margin-bottom: 2px;">
             Auditor Working Paper Documentation (${g.reviewed_by || 'Auditor'} on ${g.reviewed_at || 'Recently'}):
           </div>
@@ -12717,7 +13565,7 @@ function renderSingleDuplicateGroupCard(g) {
 
       <!-- Action Buttons -->
       <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
-        <div style="font-size: 11px; color: #64748b;">
+        <div style="font-size: 11px; color: var(--text-muted);">
           ${g.reviewed_by ? `Last actioned by <b>${g.reviewed_by}</b>` : 'Pending professional auditor review'}
         </div>
 
@@ -12820,10 +13668,10 @@ function renderSequenceGapsHtml(data) {
 
   return `
     <!-- Disclaimer / Guidance Banner -->
-    <div class="card" style="margin-bottom: 18px; border-left: 4px solid var(--primary); background: #f8fafc;">
+    <div class="card" style="margin-bottom: 18px; border-left: 4px solid var(--primary); background: var(--bg-app);">
       <div style="display: flex; gap: 12px; align-items: flex-start;">
         <div style="font-size: 20px;">💡</div>
-        <div style="font-size: 12.5px; color: #334155; line-height: 1.5;">
+        <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
           <b>ICAI Standard Audit Guidance on Sequence Gaps:</b>
           Sequence gaps in invoice, voucher, or cheque numbering are treated as <i>exceptions requiring professional inquiry</i> 
           (such as verifying cancellation registers, spoiled cheque leaves, or multi-branch series) rather than conclusive proof of unrecorded transactions or errors.
@@ -12832,9 +13680,9 @@ function renderSequenceGapsHtml(data) {
     </div>
 
     ${gaps.length === 0 ? `
-      <div class="card" style="padding: 40px; text-align: center; color: #64748b;">
+      <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
         <div style="font-size: 32px; margin-bottom: 8px;">✅</div>
-        <div style="font-weight: 700; font-size: 15px; color: #0f172a;">No Sequence Gaps Detected</div>
+        <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No Sequence Gaps Detected</div>
         <p style="margin-top: 4px; font-size: 12px;">All invoice, voucher, and cheque number series exhibit strict continuity.</p>
       </div>
     ` : `
@@ -12859,10 +13707,10 @@ function renderSingleSequenceGapCard(gap, idx) {
     <div class="card" style="padding: 16px; border: 1px solid var(--border);">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-weight: 800; font-size: 13px; color: #0f172a; font-family: monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">
+          <span style="font-weight: 800; font-size: 13px; color: var(--text-main); font-family: monospace; background: var(--bg-sidebar); padding: 4px 8px; border-radius: 4px;">
             ${gap.sequence_type}
           </span>
-          <span style="font-weight: 700; font-size: 13px; color: #0f172a;">
+          <span style="font-weight: 700; font-size: 13px; color: var(--text-main);">
             ${gap.item_label} Series: <span class="font-mono" style="color: var(--primary);">${gap.series_prefix || 'Default'}</span>
           </span>
           ${sevBadge}
@@ -12876,25 +13724,25 @@ function renderSingleSequenceGapCard(gap, idx) {
         </div>
       </div>
 
-      <div style="font-size: 12.5px; color: #334155; margin-bottom: 10px;">
+      <div style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px;">
         <b>Exception:</b> ${gap.exception_reason}
       </div>
 
       <!-- Expected Range & Sample Missing Items -->
-      <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 12px;">
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
           <span>Expected Range: <b class="font-mono">${gap.expected_from}</b> to <b class="font-mono">${gap.expected_to}</b></span>
-          <span style="color: #64748b;">Missing count: <b>${gap.missing_count}</b></span>
+          <span style="color: var(--text-muted);">Missing count: <b>${gap.missing_count}</b></span>
         </div>
 
         <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
           ${(gap.missing_items || []).map(item => `
-            <span class="font-mono" style="font-size: 11px; background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 3px; border: 1px solid #fecaca;">
+            <span class="font-mono" style="font-size: 11px; background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 3px; border: 1px solid var(--border);">
               ${item}
             </span>
           `).join("")}
           ${gap.missing_count > (gap.missing_items?.length || 0) ? `
-            <span style="font-size: 11px; color: #64748b; padding: 2px 6px;">
+            <span style="font-size: 11px; color: var(--text-muted); padding: 2px 6px;">
               + ${gap.missing_count - gap.missing_items.length} more in series
             </span>
           ` : ''}
@@ -12903,9 +13751,9 @@ function renderSingleSequenceGapCard(gap, idx) {
 
       <!-- Auditor Comment Display -->
       ${gap.auditor_comment ? `
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; color: #166534;">
+        <div style="background: #f0fdf4; border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; color: #166534;">
           <b>Auditor Working Paper Remark:</b> ${gap.auditor_comment}
-          ${gap.reviewed_by ? `<span style="color: #64748b; font-size: 11px;"> (by ${gap.reviewed_by})</span>` : ''}
+          ${gap.reviewed_by ? `<span style="color: var(--text-muted); font-size: 11px;"> (by ${gap.reviewed_by})</span>` : ''}
         </div>
       ` : ''}
 
@@ -12992,7 +13840,7 @@ async function renderAnomalyDetection() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
     container.innerHTML = `
-      <div class="card" style="padding: 40px; text-align: center; color: #64748b;">
+      <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
         <h3>No Engagement Selected</h3>
         <p style="margin-top: 8px;">Please select an audit engagement from the top navigation bar to analyze anomalies.</p>
       </div>
@@ -13001,10 +13849,10 @@ async function renderAnomalyDetection() {
   }
 
   container.innerHTML = `
-    <div style="padding: 30px; text-align: center; color: #64748b;">
+    <div style="padding: 30px; text-align: center; color: var(--text-muted);">
       <div class="loading-spinner" style="margin: 0 auto 16px auto;"></div>
       <p style="font-weight: 600; font-size: 15px;">Executing 3-Tier Hybrid Anomaly Detection Engine...</p>
-      <p style="font-size: 12px; color: #94a3b8; margin-top: 4px;">Evaluating Level 1 Deterministic Rules, Level 2 Statistical Z-Scores & Benford MAD, Level 3 Isolation Forest & LOF</p>
+      <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Evaluating Level 1 Deterministic Rules, Level 2 Statistical Z-Scores & Benford MAD, Level 3 Isolation Forest & LOF</p>
     </div>
   `;
 
@@ -13016,7 +13864,7 @@ async function renderAnomalyDetection() {
     container.innerHTML = `
       <div class="card" style="padding: 30px; border-left: 4px solid #dc2626;">
         <h3 style="color: #dc2626;">Anomaly Detection Engine Error</h3>
-        <p style="margin-top: 8px; color: #475569;">${escapeHTML(err.message)}</p>
+        <p style="margin-top: 8px; color: var(--text-secondary);">${escapeHTML(err.message)}</p>
         <button class="btn btn-primary" style="margin-top: 16px;" onclick="renderAnomalyDetection()">Retry Execution</button>
       </div>
     `;
@@ -13033,11 +13881,11 @@ function renderAnomalyDetectionUI(data) {
     <!-- Top Header -->
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
       <div>
-        <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 10px;">
+        <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
           <span>🤖 AI-Assisted Anomaly Detection Engine</span>
           <span class="badge" style="background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 700;">HYBRID 3-TIER</span>
         </h2>
-        <p style="font-size: 13px; color: #64748b; margin-top: 4px;">
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
           Deep audit anomaly detection combining Level 1 Deterministic Rules, Level 2 Statistical Outliers, and Level 3 Local Machine Learning.
         </p>
       </div>
@@ -13053,7 +13901,7 @@ function renderAnomalyDetectionUI(data) {
     </div>
 
     <!-- Professional Standard Disclaimer Banner -->
-    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #3b82f6; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+    <div style="background: #eff6ff; border: 1px solid var(--border); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
       <span style="font-size: 20px;">🛡️</span>
       <div style="font-size: 12.5px; color: #1e40af;">
         <b>Professional Auditing Safeguard:</b> <i>Potential anomaly detected. Auditor review recommended.</i> An anomaly does not constitute proof of fraud; it indicates empirical deviation requiring substantive audit inquiry (SA 240, SA 315, SA 520).
@@ -13063,31 +13911,31 @@ function renderAnomalyDetectionUI(data) {
     <!-- Summary KPI Cards -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
       <div class="card" style="padding: 16px; border-left: 4px solid var(--primary);">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Detected Anomalies</div>
-        <div style="font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px;">${s.total_anomalies || 0}</div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Evaluated ${data.total_transactions || 0} transactions</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Detected Anomalies</div>
+        <div style="font-size: 24px; font-weight: 800; color: var(--text-main); margin-top: 4px;">${s.total_anomalies || 0}</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Evaluated ${data.total_transactions || 0} transactions</div>
       </div>
 
       <div class="card" style="padding: 16px; border-left: 4px solid #dc2626;">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Critical & High Severity</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Critical & High Severity</div>
         <div style="font-size: 24px; font-weight: 800; color: #dc2626; margin-top: 4px;">${(s.critical_count || 0) + (s.high_count || 0)}</div>
         <div style="font-size: 11px; color: #dc2626; margin-top: 4px;">${s.critical_count || 0} Critical | ${s.high_count || 0} High</div>
       </div>
 
       <div class="card" style="padding: 16px; border-left: 4px solid #7c3aed;">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Level 3: ML Outliers</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Level 3: ML Outliers</div>
         <div style="font-size: 24px; font-weight: 800; color: #7c3aed; margin-top: 4px;">${s.level_3_ml || 0}</div>
         <div style="font-size: 11px; color: #7c3aed; margin-top: 4px;">Isolation Forest, LOF & DBSCAN</div>
       </div>
 
       <div class="card" style="padding: 16px; border-left: 4px solid #0284c7;">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Level 2: Statistical Spikes</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Level 2: Statistical Spikes</div>
         <div style="font-size: 24px; font-weight: 800; color: #0284c7; margin-top: 4px;">${s.level_2_statistical || 0}</div>
         <div style="font-size: 11px; color: #0284c7; margin-top: 4px;">Z-Scores, IQR & Surges</div>
       </div>
 
       <div class="card" style="padding: 16px; border-left: 4px solid #059669;">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Reviewed / Documented</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Reviewed / Documented</div>
         <div style="font-size: 24px; font-weight: 800; color: #059669; margin-top: 4px;">${s.reviewed_count || 0}</div>
         <div style="font-size: 11px; color: #059669; margin-top: 4px;">${s.open_count || 0} Open Items Pending</div>
       </div>
@@ -13098,21 +13946,21 @@ function renderAnomalyDetectionUI(data) {
       <div class="card" style="padding: 16px 20px; margin-bottom: 20px; background: #fafafa; border: 1px solid var(--border);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">📊 Benford's Law Leading Digit Diagnostic (Nigrini Standard)</span>
+            <span style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">📊 Benford's Law Leading Digit Diagnostic (Nigrini Standard)</span>
             <span class="badge ${benford.mad > 0.015 ? 'badge-critical' : 'badge-low'}" style="font-size: 11px;">
               ${benford.conformity} (MAD = ${benford.mad})
             </span>
           </div>
-          <span style="font-size: 11.5px; color: #64748b;">Theoretical vs Empirical First Digit Distribution</span>
+          <span style="font-size: 11.5px; color: var(--text-muted);">Theoretical vs Empirical First Digit Distribution</span>
         </div>
         <div style="display: flex; gap: 8px; overflow-x: auto; padding-top: 6px;">
           ${Object.entries(benford.distribution || {}).map(([d, stat]) => `
             <div style="flex: 1; min-width: 60px; background: white; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; text-align: center;">
-              <div style="font-weight: 800; font-size: 13px; color: #0f172a;">Digit ${d}</div>
+              <div style="font-weight: 800; font-size: 13px; color: var(--text-main);">Digit ${d}</div>
               <div style="font-size: 12px; font-weight: 700; color: ${Math.abs(stat.diff_pct) > 5 ? '#dc2626' : '#059669'}; margin-top: 2px;">
                 ${stat.actual_pct}%
               </div>
-              <div style="font-size: 10px; color: #94a3b8;">Exp: ${stat.expected_pct}%</div>
+              <div style="font-size: 10px; color: var(--text-muted);">Exp: ${stat.expected_pct}%</div>
             </div>
           `).join("")}
         </div>
@@ -13163,17 +14011,17 @@ function renderAnomalyDetectionUI(data) {
 
     <!-- Anomalies List / Cards -->
     <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-      <h3 style="font-size: 15px; font-weight: 700; color: #0f172a;">
+      <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">
         Showing ${anomalies.length} Flagged Anomalies
       </h3>
-      <span style="font-size: 12px; color: #64748b;">Sorted by Anomaly Risk Score Descending</span>
+      <span style="font-size: 12px; color: var(--text-muted);">Sorted by Anomaly Risk Score Descending</span>
     </div>
 
     ${anomalies.length === 0 ? `
-      <div class="card" style="padding: 40px; text-align: center; color: #64748b;">
+      <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
         <div style="font-size: 32px; margin-bottom: 8px;">✓</div>
         <p style="font-size: 15px; font-weight: 600;">No anomalies matched the selected filters.</p>
-        <p style="font-size: 12px; color: #94a3b8; margin-top: 4px;">Adjust the filter criteria or re-run the anomaly engine to inspect all findings.</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Adjust the filter criteria or re-run the anomaly engine to inspect all findings.</p>
       </div>
     ` : `
       <div style="display: flex; flex-direction: column; gap: 16px;">
@@ -13197,16 +14045,16 @@ function renderSingleAnomalyCard(anom, idx) {
                       (anom.status === "Ignored" ? '<span class="badge badge-secondary">Ignored</span>' :
                       '<span class="badge badge-high">Open</span>'));
 
-  const levelPill = anom.level.includes("LEVEL 3") ? '<span class="badge" style="background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe;">LEVEL 3: ML</span>' :
-                    (anom.level.includes("LEVEL 2") ? '<span class="badge" style="background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd;">LEVEL 2: STATISTICAL</span>' :
-                    '<span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;">LEVEL 1: DETERMINISTIC</span>');
+  const levelPill = anom.level.includes("LEVEL 3") ? '<span class="badge" style="background: #f5f3ff; color: #6d28d9; border: 1px solid var(--border);">LEVEL 3: ML</span>' :
+                    (anom.level.includes("LEVEL 2") ? '<span class="badge" style="background: #f0f9ff; color: #0369a1; border: 1px solid var(--border);">LEVEL 2: STATISTICAL</span>' :
+                    '<span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid var(--border);">LEVEL 1: DETERMINISTIC</span>');
 
   return `
-    <div class="card" style="padding: 18px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <div class="card" style="padding: 18px; border: 1px solid var(--border); ">
       <!-- Card Header -->
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          <span style="font-weight: 800; font-size: 13px; color: #0f172a; font-family: monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">
+          <span style="font-weight: 800; font-size: 13px; color: var(--text-main); font-family: monospace; background: var(--bg-sidebar); padding: 4px 8px; border-radius: 4px;">
             ${anom.anomaly_id}
           </span>
           <span class="badge" style="background: #fee2e2; color: #991b1b; font-weight: 800; font-size: 12px;">
@@ -13225,29 +14073,29 @@ function renderSingleAnomalyCard(anom, idx) {
       </div>
 
       <!-- Detected Pattern & Core Transaction Info -->
-      <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin-bottom: 12px;">
-        <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin-bottom: 12px;">
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
           Detected Pattern: <span style="color: var(--primary);">${anom.pattern_type}</span>
         </div>
         
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; font-size: 12px; color: #334155;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; font-size: 12px; color: var(--text-secondary);">
           <div><b>Date:</b> <span class="font-mono">${tx.date || '—'}</span></div>
           <div><b>Voucher #:</b> <span class="font-mono">${tx.voucher_no || '—'}</span></div>
           <div><b>Ledger Head:</b> <span>${tx.ledger || '—'}</span></div>
           <div><b>Party / Payee:</b> <span>${tx.party_name || '—'}</span></div>
-          <div><b>Amount:</b> <b class="font-mono" style="color: #0f172a;">₹${Number(tx.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</b></div>
-          <div><b>Narration:</b> <span style="color: #64748b;">${tx.description || '—'}</span></div>
+          <div><b>Amount:</b> <b class="font-mono" style="color: var(--text-main);">₹${Number(tx.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</b></div>
+          <div><b>Narration:</b> <span style="color: var(--text-muted);">${tx.description || '—'}</span></div>
         </div>
       </div>
 
       <!-- Evidence & Metric Highlights -->
-      <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
-        <div style="font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px; text-transform: uppercase;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">
           🔍 Quantifiable Evidence Trail:
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px;">
           ${Object.entries(ev).map(([k, v]) => `
-            <span style="font-size: 11.5px; background: #f1f5f9; padding: 3px 8px; border-radius: 4px; color: #1e293b;">
+            <span style="font-size: 11.5px; background: var(--bg-sidebar); padding: 3px 8px; border-radius: 4px; color: #1e293b;">
               <b>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</b> ${typeof v === 'number' ? Number(v).toLocaleString('en-IN', {maximumFractionDigits: 2}) : v}
             </span>
           `).join("")}
@@ -13260,21 +14108,21 @@ function renderSingleAnomalyCard(anom, idx) {
       </div>
 
       <!-- Recommended Substantive Review -->
-      <div style="font-size: 12px; color: #0369a1; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
+      <div style="font-size: 12px; color: #0369a1; background: #f0f9ff; border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
         <b>Recommended Substantive Procedure:</b> ${anom.recommended_review}
       </div>
 
       <!-- Auditor Comment Display -->
       ${anom.auditor_comment ? `
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; color: #166534;">
+        <div style="background: #f0fdf4; border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; color: #166534;">
           <b>Auditor Working Paper Remark:</b> ${anom.auditor_comment}
-          ${anom.reviewed_by ? `<span style="color: #64748b; font-size: 11px;"> (Reviewed by ${anom.reviewed_by} at ${anom.reviewed_at || ''})</span>` : ''}
+          ${anom.reviewed_by ? `<span style="color: var(--text-muted); font-size: 11px;"> (Reviewed by ${anom.reviewed_by} at ${anom.reviewed_at || ''})</span>` : ''}
         </div>
       ` : ''}
 
       <!-- Auditor Action Bar -->
       <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px; flex-wrap: wrap; gap: 8px;">
-        <span style="font-size: 11.5px; color: #64748b;">Auditor Verification Actions:</span>
+        <span style="font-size: 11.5px; color: var(--text-muted);">Auditor Verification Actions:</span>
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-sm btn-danger" onclick="quickUpdateAnomalyStatus('${anom.anomaly_id}', 'Confirmed Anomaly')" ${anom.status === 'Confirmed Anomaly' ? 'disabled' : ''}>
             ⚠️ Confirm Anomaly
@@ -13431,7 +14279,7 @@ async function renderYoYComparison() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
     container.innerHTML = `
-      <div class="card" style="padding: 40px; text-align: center; color: #64748b;">
+      <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
         <h3>No Engagement Selected</h3>
         <p style="margin-top: 8px;">Please select an active audit engagement from the top navigation bar.</p>
       </div>
@@ -13440,10 +14288,10 @@ async function renderYoYComparison() {
   }
 
   container.innerHTML = `
-    <div style="padding: 30px; text-align: center; color: #64748b;">
+    <div style="padding: 30px; text-align: center; color: var(--text-muted);">
       <div class="loading-spinner" style="margin: 0 auto 16px auto;"></div>
       <p style="font-weight: 600; font-size: 15px;">Computing Year-on-Year Financial Comparison & Variances...</p>
-      <p style="font-size: 12px; color: #94a3b8; margin-top: 4px;">Evaluating comparative balances with ${state.yoyConfig.threshold_pct}% materiality threshold</p>
+      <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Evaluating comparative balances with ${state.yoyConfig.threshold_pct}% materiality threshold</p>
     </div>
   `;
 
@@ -13465,7 +14313,7 @@ async function renderYoYComparison() {
     container.innerHTML = `
       <div class="card" style="padding: 30px; border-left: 4px solid #dc2626;">
         <h3 style="color: #dc2626;">YoY Comparison Engine Error</h3>
-        <p style="margin-top: 8px; color: #475569;">${escapeHTML(err.message)}</p>
+        <p style="margin-top: 8px; color: var(--text-secondary);">${escapeHTML(err.message)}</p>
         <button class="btn btn-primary" style="margin-top: 16px;" onclick="renderYoYComparison()">Retry</button>
       </div>
     `;
@@ -13485,13 +14333,13 @@ function renderYoYComparisonUI(data) {
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
       <div>
-        <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 10px;">
+        <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
           <span>📈 Year-on-Year Financial Comparison</span>
           <span class="badge" style="background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 700;">
             ${prevFy} ➔ ${currentFy}
           </span>
         </h2>
-        <p style="font-size: 13px; color: #64748b; margin-top: 4px;">
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
           Comprehensive multi-year comparative analytics across Revenue, Expenses, Profit, Assets, Liabilities, Ledgers, Party Balances, and Volumes.
         </p>
       </div>
@@ -13506,35 +14354,35 @@ function renderYoYComparisonUI(data) {
     <!-- Summary KPI Cards -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
       <div class="card" style="padding: 16px; border-left: 4px solid var(--primary);">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Compared Items</div>
-        <div style="font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px;">${s.total_comparison_items || 0}</div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Across 4 Comparison Sections</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Compared Items</div>
+        <div style="font-size: 24px; font-weight: 800; color: var(--text-main); margin-top: 4px;">${s.total_comparison_items || 0}</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Across 4 Comparison Sections</div>
       </div>
 
       <div class="card" style="padding: 16px; border-left: 4px solid #f59e0b;">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Significant Movements</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Significant Movements</div>
         <div style="font-size: 24px; font-weight: 800; color: #b45309; margin-top: 4px;">${s.significant_movements_count || 0}</div>
         <div style="font-size: 11px; color: #b45309; margin-top: 4px;">Exceeding ${data.configured_threshold_pct}% threshold</div>
       </div>
 
       <div class="card" style="padding: 16px; border-left: 4px solid ${s.revenue_growth_pct >= 0 ? '#059669' : '#dc2626'};">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Revenue Shift</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Revenue Shift</div>
         <div style="font-size: 24px; font-weight: 800; color: ${s.revenue_growth_pct >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">
           ${s.revenue_growth_pct >= 0 ? '+' : ''}${s.revenue_growth_pct.toFixed(1)}%
         </div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Revenue from Operations</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Revenue from Operations</div>
       </div>
 
       <div class="card" style="padding: 16px; border-left: 4px solid ${s.net_profit_growth_pct >= 0 ? '#059669' : '#dc2626'};">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Net Profit Shift</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Net Profit Shift</div>
         <div style="font-size: 24px; font-weight: 800; color: ${s.net_profit_growth_pct >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">
           ${s.net_profit_growth_pct >= 0 ? '+' : ''}${s.net_profit_growth_pct.toFixed(1)}%
         </div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Net Profit After Tax</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Net Profit After Tax</div>
       </div>
 
       <div class="card" style="padding: 16px; border-left: 4px solid #0284c7;">
-        <div style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase;">Auditor Documented</div>
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Auditor Documented</div>
         <div style="font-size: 24px; font-weight: 800; color: #0284c7; margin-top: 4px;">${s.reviewed_count || 0}</div>
         <div style="font-size: 11px; color: #0284c7; margin-top: 4px;">Working Paper Remarks Saved</div>
       </div>
@@ -13545,7 +14393,7 @@ function renderYoYComparisonUI(data) {
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
         <!-- Threshold Presets -->
         <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 12.5px; font-weight: 700; color: #334155;">Variance Threshold:</span>
+          <span style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary);">Variance Threshold:</span>
           <div style="display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;">
             ${[5, 10, 15, 20].map(pct => `
               <button class="btn btn-sm ${state.yoyConfig.threshold_pct === pct ? 'btn-primary' : 'btn-secondary'}" style="border: none; border-radius: 0; padding: 5px 12px; font-weight: 700;" onclick="setYoYThreshold(${pct})">
@@ -13558,7 +14406,7 @@ function renderYoYComparisonUI(data) {
         <!-- Previous Year Engagement Selector -->
         ${clientEngs.length > 0 ? `
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 12px; font-weight: 600; color: #64748b;">Compare With:</span>
+            <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Compare With:</span>
             <select class="form-control" style="font-size: 12px; padding: 4px 8px; width: auto;" onchange="handleYoYPrevEngagementChange(this.value)">
               <option value="" ${!state.yoyConfig.py_engagement_id ? 'selected' : ''}>Auto-Detect Previous Year</option>
               ${clientEngs.map(e => `
@@ -13572,7 +14420,7 @@ function renderYoYComparisonUI(data) {
 
         <!-- Significant Only Toggle -->
         <div style="display: flex; align-items: center; gap: 6px;">
-          <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: #334155; cursor: pointer;">
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">
             <input type="checkbox" ${state.yoyConfig.only_significant ? 'checked' : ''} onchange="toggleYoYSignificantOnly(this.checked)" />
             Highlight Significant Movements Only (≥ ${state.yoyConfig.threshold_pct}%)
           </label>
@@ -13635,25 +14483,25 @@ function renderActiveYoYSectionTable(data) {
 
   if (items.length === 0) {
     return `
-      <div class="card" style="padding: 40px; text-align: center; color: #64748b;">
+      <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
         <div style="font-size: 30px; margin-bottom: 8px;">✓</div>
         <p style="font-size: 15px; font-weight: 600;">No items found in this section for the selected filters.</p>
-        <p style="font-size: 12px; color: #94a3b8; margin-top: 4px;">Try lowering the variance threshold or clearing the search filter.</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Try lowering the variance threshold or clearing the search filter.</p>
       </div>
     `;
   }
 
   return `
     <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border);">
-      <div style="padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">${sectionTitle}</span>
-        <span style="font-size: 12px; color: #64748b;">${items.length} item(s)</span>
+      <div style="padding: 14px 20px; background: var(--bg-app); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">${sectionTitle}</span>
+        <span style="font-size: 12px; color: var(--text-muted);">${items.length} item(s)</span>
       </div>
 
       <div style="overflow-x: auto;">
         <table class="table" style="width: 100%; margin: 0; font-size: 12.5px;">
           <thead>
-            <tr style="background: #f1f5f9; color: #334155; font-size: 11.5px; text-transform: uppercase;">
+            <tr style="background: var(--bg-sidebar); color: var(--text-secondary); font-size: 11.5px; text-transform: uppercase;">
               <th style="padding: 10px 14px; text-align: left;">Account / Metric</th>
               <th style="padding: 10px 14px; text-align: left;">Category</th>
               <th style="padding: 10px 14px; text-align: right;">PY (${prevFy})</th>
@@ -13683,7 +14531,7 @@ function renderYoYTableRow(row, idx) {
 
   const dirBadge = dir === "Increase" ? `<span style="color: #059669; font-weight: 700;">▲ Increase</span>` :
                    (dir === "Decrease" ? `<span style="color: #dc2626; font-weight: 700;">▼ Decrease</span>` :
-                   `<span style="color: #64748b;">— No Change</span>`);
+                   `<span style="color: var(--text-muted);">— No Change</span>`);
 
   const riskBadge = row.risk === "CRITICAL" ? '<span class="badge badge-critical">CRITICAL</span>' :
                     (row.risk === "HIGH" ? '<span class="badge badge-high">HIGH</span>' :
@@ -13697,18 +14545,18 @@ function renderYoYTableRow(row, idx) {
 
   return `
     <tr style="background: ${isSig ? '#fffbeb' : (idx % 2 === 0 ? '#ffffff' : '#fafafa')}; border-bottom: 1px solid var(--border);">
-      <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">
+      <td style="padding: 10px 14px; font-weight: 700; color: var(--text-main);">
         ${row.account_name}
         ${row.ai_reason ? `<div style="font-size: 11px; font-weight: 400; color: #0369a1; margin-top: 3px; max-width: 320px; line-height: 1.35;"><b>AI Note:</b> ${row.ai_reason}</div>` : ''}
         ${row.auditor_comment ? `<div style="font-size: 11px; font-weight: 500; color: #166534; margin-top: 3px; background: #f0fdf4; padding: 2px 6px; border-radius: 3px;"><b>Auditor WP:</b> ${row.auditor_comment}</div>` : ''}
       </td>
-      <td style="padding: 10px 14px; color: #64748b; font-size: 11.5px;">
-        <span class="badge" style="background: #f1f5f9; color: #475569;">${row.group || row.category}</span>
+      <td style="padding: 10px 14px; color: var(--text-muted); font-size: 11.5px;">
+        <span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary);">${row.group || row.category}</span>
       </td>
-      <td style="padding: 10px 14px; text-align: right; font-family: monospace; color: #334155;">
+      <td style="padding: 10px 14px; text-align: right; font-family: monospace; color: var(--text-secondary);">
         ₹${Number(row.previous_year || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
       </td>
-      <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">
+      <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700; color: var(--text-main);">
         ₹${Number(row.current_year || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
       </td>
       <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700; color: ${absD > 0 ? '#059669' : (absD < 0 ? '#dc2626' : '#334155')};">
@@ -13841,10 +14689,10 @@ async function triggerYoYFactualAI(itemKey) {
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('yoy-ai-modal')">✕</button>
           </div>
           <div class="modal-body">
-            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-size: 13px; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">${res.ai_reason}</div>
+            <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-size: 13px; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">${res.ai_reason}</div>
             
             <div class="modal-footer" style="padding: 12px 0 0 0; margin-top: 14px; display: flex; justify-content: space-between;">
-              <span style="font-size: 11.5px; color: #64748b;">Zero-Hallucination Policy: Generated strictly from recorded ledger entries.</span>
+              <span style="font-size: 11.5px; color: var(--text-muted);">Zero-Hallucination Policy: Generated strictly from recorded ledger entries.</span>
               <button class="btn btn-primary" onclick="closeModal('yoy-ai-modal'); renderYoYComparison();">Close</button>
             </div>
           </div>
@@ -13947,7 +14795,7 @@ Choose one of the quick prompt chips below or type your specific question:`,
       </div>
 
       <!-- Mandatory Disclaimer Alert -->
-      <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #b45309;">
+      <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #b45309;">
         <span style="font-size: 16px;">🛡️</span>
         <div>
           <strong>Statutory Compliance Disclaimer:</strong> <em>AI-generated assistance. Verify findings against source records before making audit decisions.</em>
@@ -13960,12 +14808,12 @@ Choose one of the quick prompt chips below or type your specific question:`,
       </div>
 
       <!-- Chat Messages Container -->
-      <div id="assistant-chat-stream" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 12px 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;">
+      <div id="assistant-chat-stream" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 12px 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md);">
         ${messagesHtml}
         ${state.assistantState.isLoading ? `
           <div style="display: flex; gap: 12px; align-items: flex-start;">
             <div style="width: 34px; height: 34px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0;">AI</div>
-            <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: 8px; font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 10px;">
+            <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 10px;">
               <span class="spinner-inline"></span>
               <span>Evaluating query deterministically across local database & audit rules...</span>
             </div>
@@ -13974,7 +14822,7 @@ Choose one of the quick prompt chips below or type your specific question:`,
       </div>
 
       <!-- Input Bar -->
-      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; display: flex; gap: 8px; align-items: center;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; display: flex; gap: 8px; align-items: center;">
         <input 
           type="text" 
           id="assistant-query-input" 
@@ -14012,7 +14860,7 @@ function renderAssistantMessageItem(msg, idx) {
   if (isUser) {
     return `
       <div style="display: flex; justify-content: flex-end; gap: 10px; margin-left: 60px;">
-        <div style="background: #4f46e5; color: #ffffff; padding: 12px 16px; border-radius: 12px 12px 2px 12px; font-size: 13.5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <div style="background: #4f46e5; color: #ffffff; padding: 12px 16px; border-radius: 12px 12px 2px 12px; font-size: 13.5px; ">
           ${escapeHtml(msg.content)}
           <div style="font-size: 10.5px; color: rgba(255,255,255,0.7); text-align: right; margin-top: 4px;">${msg.timestamp}</div>
         </div>
@@ -14089,8 +14937,8 @@ function renderAssistantMessageItem(msg, idx) {
 
   return `
     <div style="display: flex; gap: 12px; align-items: flex-start; margin-right: 40px;">
-      <div style="width: 34px; height: 34px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);">AI</div>
-      <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: 2px 12px 12px 12px; flex: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+      <div style="width: 34px; height: 34px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; ">AI</div>
+      <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: 2px 12px 12px 12px; flex: 1; ">
         <div style="font-size: 13.5px; color: var(--text-primary); line-height: 1.6;">
           ${formattedContent}
         </div>
@@ -14109,10 +14957,10 @@ function formatAssistantMarkdown(text) {
   if (!text) return "";
   let html = text
     .replace(/^### (.*$)/gim, '<h3 style="font-size: 15px; font-weight: 700; margin: 10px 0 6px 0; color: #1e293b;">$1</h3>')
-    .replace(/^#### (.*$)/gim, '<h4 style="font-size: 13.5px; font-weight: 600; margin: 8px 0 4px 0; color: #334155;">$1</h4>')
+    .replace(/^#### (.*$)/gim, '<h4 style="font-size: 13.5px; font-weight: 600; margin: 8px 0 4px 0; color: var(--text-secondary);">$1</h4>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code style="background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-size: 12px; color: #475569;">$1</code>')
+    .replace(/`([^`]+)`/g, '<code style="background: var(--bg-sidebar); padding: 2px 5px; border-radius: 4px; font-size: 12px; color: var(--text-secondary);">$1</code>')
     .replace(/^\s*-\s+(.*$)/gim, '<div style="margin-left: 14px; margin-bottom: 4px; position: relative;"><span style="position: absolute; left: -12px;">•</span>$1</div>')
     .replace(/\n\n/g, '<div style="height: 8px;"></div>');
 
@@ -14219,7 +15067,7 @@ function inspectAssistantTransaction(item) {
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('assistant-inspect-modal')">✕</button>
         </div>
         <div class="modal-body">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; background: #f8fafc; border: 1px solid var(--border); padding: 14px; border-radius: 6px; font-size: 12.5px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; background: var(--bg-app); border: 1px solid var(--border); padding: 14px; border-radius: 6px; font-size: 12.5px;">
             <div><strong>Transaction ID:</strong> #${item.id || item.transaction_id || 'N/A'}</div>
             <div><strong>Posting Date:</strong> ${item.date || item.doc_date || '—'}</div>
             <div><strong>Voucher Number:</strong> <span style="font-family: monospace; font-weight: 600; color: #4f46e5;">${item.voucher_no || item.invoice_no || '—'}</span></div>
@@ -14228,13 +15076,13 @@ function inspectAssistantTransaction(item) {
             <div><strong>Account Group:</strong> ${item.group || item.account_group || 'General'}</div>
             <div><strong>Counterparty Name:</strong> ${item.party_name || item.vendor_name || 'Direct'}</div>
             <div><strong>GSTIN:</strong> ${item.gstin || '—'}</div>
-            <div><strong>Transaction Amount:</strong> <span style="font-weight: 700; color: #0f172a;">${item.amount_formatted || (item.amount ? formatINR(item.amount) : '—')}</span></div>
+            <div><strong>Transaction Amount:</strong> <span style="font-weight: 700; color: var(--text-main);">${item.amount_formatted || (item.amount ? formatINR(item.amount) : '—')}</span></div>
             <div><strong>Severity Assessment:</strong> ${item.severity ? getSeverityBadge(item.severity) : '<span class="badge badge-low">LOW</span>'}</div>
           </div>
 
           ${item.reason || item.description ? `
             <div style="margin-bottom: 14px;">
-              <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: #64748b;">Audit Exception / Flagging Explanation</label>
+              <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: var(--text-muted);">Audit Exception / Flagging Explanation</label>
               <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.2); padding: 10px 14px; border-radius: 6px; font-size: 12.5px; color: #991b1b; line-height: 1.5;">
                 ${item.reason || item.description}
               </div>
@@ -14243,7 +15091,7 @@ function inspectAssistantTransaction(item) {
 
           ${item.recommended_action ? `
             <div style="margin-bottom: 14px;">
-              <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: #64748b;">Recommended Substantive Procedure (ICAI Standards)</label>
+              <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: var(--text-muted);">Recommended Substantive Procedure (ICAI Standards)</label>
               <div style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.2); padding: 10px 14px; border-radius: 6px; font-size: 12.5px; color: #3730a3; line-height: 1.5;">
                 ${item.recommended_action}
               </div>
@@ -14251,7 +15099,7 @@ function inspectAssistantTransaction(item) {
           ` : ''}
 
           <div class="modal-footer" style="padding: 10px 0 0 0; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 11px; color: #64748b;">🛡️ Sourced deterministically from local audit database.</span>
+            <span style="font-size: 11px; color: var(--text-muted);">🛡️ Sourced deterministically from local audit database.</span>
             <button class="btn btn-primary" onclick="closeModal('assistant-inspect-modal')">Done Reviewing</button>
           </div>
         </div>
@@ -14300,7 +15148,7 @@ async function renderFindings() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
     container.innerHTML = `
-      <div class="card" style="padding: 40px; text-align: center; color: #64748b;">
+      <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
         <h3>No Engagement Selected</h3>
         <p style="margin-top: 8px;">Please select an audit engagement from the top navigation to view the findings repository.</p>
       </div>
@@ -14308,7 +15156,7 @@ async function renderFindings() {
     return;
   }
 
-  container.innerHTML = `<div style="padding: 24px; color: #64748b;">Loading centralized findings and risk metrics...</div>`;
+  container.innerHTML = `<div style="padding: 24px; color: var(--text-muted);">Loading centralized findings and risk metrics...</div>`;
 
   try {
     const [summary, findings] = await Promise.all([
@@ -14324,10 +15172,10 @@ async function renderFindings() {
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="font-size: 22px; font-weight: 700; color: #0f172a; margin: 0;">Audit Risk & Findings Repository</h2>
+            <h2 style="font-size: 22px; font-weight: 700; color: var(--text-main); margin: 0;">Audit Risk & Findings Repository</h2>
             <span class="badge badge-module-pill">Centralized Engine</span>
           </div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
             Aggregated exception management with 100% explainable, deterministic risk scoring • Benchmark Materiality: <strong>${formatINR(materialityVal)}</strong>
           </div>
         </div>
@@ -14349,7 +15197,7 @@ async function renderFindings() {
         <div class="stat-card" style="border-left: 4px solid #3b82f6;">
           <div class="stat-label">Total Findings</div>
           <div class="stat-value" style="color: #1e293b;">${summary.total_findings || 0}</div>
-          <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Avg Risk: <strong>${summary.average_risk_score || '0.0'}/10</strong></div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Avg Risk: <strong>${summary.average_risk_score || '0.0'}/10</strong></div>
         </div>
         <div class="stat-card" style="border-left: 4px solid #dc2626;">
           <div class="stat-label">Open Findings</div>
@@ -14422,7 +15270,7 @@ async function renderFindings() {
 
           <!-- Sort Order -->
           <div style="display: flex; align-items: center; gap: 6px;">
-            <label style="font-size: 11.5px; color: #64748b; white-space: nowrap;">Sort by:</label>
+            <label style="font-size: 11.5px; color: var(--text-muted); white-space: nowrap;">Sort by:</label>
             <select id="findings-sort-select" class="form-control" style="width: 175px;" onchange="handleFindingsFilterChange()">
               <option value="risk_score_desc" ${state.findingsFilter.sort_by === 'risk_score_desc' ? 'selected' : ''}>Risk Score (High → Low)</option>
               <option value="severity_desc" ${state.findingsFilter.sort_by === 'severity_desc' ? 'selected' : ''}>Severity (Critical → Low)</option>
@@ -14437,15 +15285,15 @@ async function renderFindings() {
       <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
           <div class="card-title">
-            Centralized Findings Register <span style="font-size: 12px; color: #64748b; font-weight: normal;">(${findings.length} records match filter)</span>
+            Centralized Findings Register <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(${findings.length} records match filter)</span>
           </div>
-          <div style="font-size: 11.5px; color: #64748b;">
+          <div style="font-size: 11.5px; color: var(--text-muted);">
             💡 Click on any risk score to inspect deterministic formula breakdown
           </div>
         </div>
 
         ${findings.length === 0 ? `
-          <div style="padding: 48px; text-align: center; color: #64748b;">
+          <div style="padding: 48px; text-align: center; color: var(--text-muted);">
             <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
             <div style="font-size: 15px; font-weight: 600; color: #1e293b;">No findings matching current criteria</div>
             <p style="font-size: 12.5px; margin-top: 4px;">Click <strong>"Sync All Modules"</strong> above to aggregate exceptions across all audit subsystems.</p>
@@ -14473,11 +15321,11 @@ async function renderFindings() {
                     </td>
                     <td>
                       <span class="badge-module-pill" style="margin-bottom: 2px;">${f.module || 'General'}</span><br/>
-                      <span style="font-size: 11px; color: #64748b;">${f.category || 'General Audit'}</span>
+                      <span style="font-size: 11px; color: var(--text-muted);">${f.category || 'General Audit'}</span>
                     </td>
                     <td>
-                      <div style="font-weight: 600; color: #0f172a; margin-bottom: 2px;">${f.title}</div>
-                      <div style="font-size: 12px; color: #475569; max-width: 480px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      <div style="font-weight: 600; color: var(--text-main); margin-bottom: 2px;">${f.title}</div>
+                      <div style="font-size: 12px; color: var(--text-secondary); max-width: 480px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${f.description || f.reason || '—'}
                       </div>
                       ${f.rule_used ? `<div style="font-size: 11px; color: #6366f1; margin-top: 2px;">📜 ${f.rule_used}</div>` : ''}
@@ -14493,9 +15341,9 @@ async function renderFindings() {
                     </td>
                     <td>
                       <div style="font-size: 11.5px;">
-                        ${f.reviewed_by ? `<b>${f.reviewed_by}</b>` : '<span style="color: #94a3b8;">Unreviewed</span>'}
+                        ${f.reviewed_by ? `<b>${f.reviewed_by}</b>` : '<span style="color: var(--text-muted);">Unreviewed</span>'}
                       </div>
-                      <div style="font-size: 10.5px; color: #64748b;">
+                      <div style="font-size: 10.5px; color: var(--text-muted);">
                         ${f.reviewed_at ? f.reviewed_at.split('T')[0] : (f.created_at ? 'Created ' + f.created_at.split('T')[0] : '—')}
                       </div>
                     </td>
@@ -14589,13 +15437,13 @@ async function openFindingDetailModal(findingId) {
 
           <div class="modal-body">
             <!-- Deterministic Risk Score Breakdown Card -->
-            <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; ">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                 <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e293b;">
                   ⚡ Deterministic Risk Calculation Breakdown
                 </div>
-                <div style="font-size: 11px; color: #64748b;">
-                  Equation: <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #4338ca;">${factors.equation || `${finding.risk_score}/10.0`}</code>
+                <div style="font-size: 11px; color: var(--text-muted);">
+                  Equation: <code style="background: var(--bg-sidebar); padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #4338ca;">${factors.equation || `${finding.risk_score}/10.0`}</code>
                 </div>
               </div>
 
@@ -14644,7 +15492,7 @@ async function openFindingDetailModal(findingId) {
             </div>
 
             <!-- Finding Fact Summary -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; background: #f8fafc; border: 1px solid var(--border); padding: 12px 14px; border-radius: 6px; font-size: 12.5px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; background: var(--bg-app); border: 1px solid var(--border); padding: 12px 14px; border-radius: 6px; font-size: 12.5px;">
               <div><strong>Audited Rule:</strong> ${finding.rule_used || 'Standard Audit Procedure'}</div>
               <div><strong>Engine Sourced:</strong> <span class="badge badge-low">${finding.engine_type || 'DETERMINISTIC'}</span></div>
               <div><strong>Expected Value:</strong> ${finding.expected_value || 'Compliant with standards'}</div>
@@ -14655,11 +15503,11 @@ async function openFindingDetailModal(findingId) {
 
             <!-- Description & AI Explanation -->
             <div style="margin-bottom: 14px;">
-              <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: #64748b;">Finding Description & Analysis</label>
-              <div style="background: #ffffff; border: 1px solid var(--border); padding: 12px 14px; border-radius: 6px; font-size: 12.5px; line-height: 1.6; color: #1e293b;">
+              <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: var(--text-muted);">Finding Description & Analysis</label>
+              <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 12px 14px; border-radius: 6px; font-size: 12.5px; line-height: 1.6; color: #1e293b;">
                 ${finding.description}
                 ${finding.ai_explanation ? `
-                  <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9; color: #334155;">
+                  <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9; color: var(--text-secondary);">
                     ${formatAssistantMarkdown(finding.ai_explanation)}
                   </div>
                 ` : ''}
@@ -14668,7 +15516,7 @@ async function openFindingDetailModal(findingId) {
 
             <!-- Recommended Action -->
             <div style="margin-bottom: 14px;">
-              <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: #64748b;">Recommended ICAI Substantive Audit Procedure</label>
+              <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: var(--text-muted);">Recommended ICAI Substantive Audit Procedure</label>
               <div style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.2); padding: 10px 14px; border-radius: 6px; font-size: 12.5px; color: #3730a3; line-height: 1.5;">
                 ${finding.recommended_action || 'Inspect primary source documentation, verify authorizations, and cross-check ledger postings.'}
               </div>
@@ -14677,7 +15525,7 @@ async function openFindingDetailModal(findingId) {
             <!-- Affected Transactions Drill-Down -->
             ${affTxs.length > 0 ? `
               <div style="margin-bottom: 16px;">
-                <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: #64748b;">Affected Transaction Records (${affTxs.length})</label>
+                <label class="form-label" style="font-size: 11.5px; text-transform: uppercase; color: var(--text-muted);">Affected Transaction Records (${affTxs.length})</label>
                 <div class="table-container" style="max-height: 180px; overflow-y: auto;">
                   <table class="data-table" style="font-size: 11.5px;">
                     <thead>
@@ -14710,8 +15558,8 @@ async function openFindingDetailModal(findingId) {
             ` : ''}
 
             <!-- Auditor Action & Status Update Section -->
-            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-top: 14px;">
-              <div style="font-size: 12.5px; font-weight: 700; color: #0f172a; margin-bottom: 10px;">
+            <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-top: 14px;">
+              <div style="font-size: 12.5px; font-weight: 700; color: var(--text-main); margin-bottom: 10px;">
                 ✍️ Auditor Review & Working Paper Sign-off
               </div>
               
@@ -14927,12 +15775,12 @@ async function renderAuditTrail() {
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-            <h1 style="font-size: 24px; font-weight: 700; color: #0f172a; margin: 0;">Immutable Audit Trail & System Log</h1>
-            <span class="badge" style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-weight: 600; padding: 4px 10px; border-radius: 9999px;">
+            <h1 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0;">Immutable Audit Trail & System Log</h1>
+            <span class="badge" style="background: #ecfdf5; color: #059669; border: 1px solid var(--border); font-weight: 600; padding: 4px 10px; border-radius: 9999px;">
               🔒 Append-Only Protected
             </span>
           </div>
-          <p style="color: #64748b; font-size: 14px; margin: 0;">
+          <p style="color: var(--text-muted); font-size: 14px; margin: 0;">
             Comprehensive, tamper-resistant trail of all user logins, data modifications, finding status transitions, checklist updates, working papers, and report exports.
           </p>
         </div>
@@ -14961,30 +15809,30 @@ async function renderAuditTrail() {
 
       <!-- Audit Metrics Summary Cards -->
       <div id="audit-stats-cards-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px;">
-        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Total Audit Records</div>
+        <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; ">
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Total Audit Records</div>
           <div id="stat-total-logs" style="font-size: 24px; font-weight: 700; color: #1e293b; margin-top: 4px;">...</div>
           <div style="font-size: 11px; color: #059669; margin-top: 2px;">● Full append-only history</div>
         </div>
-        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Today's Activity</div>
+        <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; ">
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Today's Activity</div>
           <div id="stat-today-logs" style="font-size: 24px; font-weight: 700; color: #2563eb; margin-top: 4px;">...</div>
-          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Operations recorded today</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Operations recorded today</div>
         </div>
-        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Engine Immutability</div>
+        <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; ">
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Engine Immutability</div>
           <div style="font-size: 20px; font-weight: 700; color: #059669; margin-top: 4px;">SQLite Enforced</div>
-          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Triggers block UPDATE/DELETE</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Triggers block UPDATE/DELETE</div>
         </div>
-        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-          <div style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Local Storage Mode</div>
+        <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; ">
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Local Storage Mode</div>
           <div style="font-size: 20px; font-weight: 700; color: #7c3aed; margin-top: 4px;">100% Offline</div>
-          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Zero external data transmission</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Zero external data transmission</div>
         </div>
       </div>
 
       <!-- Filter Controls Panel -->
-      <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+      <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px; ">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: flex-end;">
           <div>
             <label class="form-label" style="font-size: 12px; margin-bottom: 4px;">Search Text</label>
@@ -15051,8 +15899,8 @@ async function renderAuditTrail() {
       </div>
 
       <!-- Audit Logs Table Container -->
-      <div id="audit-trail-table-wrap" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden;">
-        <div style="padding: 30px; text-align: center; color: #64748b;">Loading audit trail records...</div>
+      <div id="audit-trail-table-wrap" style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md);  overflow: hidden;">
+        <div style="padding: 30px; text-align: center; color: var(--text-muted);">Loading audit trail records...</div>
       </div>
 
       <!-- Pagination Container -->
@@ -15095,7 +15943,7 @@ async function refreshAuditTrailTable() {
   const pagWrap = document.getElementById("audit-pagination-wrap");
   if (!tableWrap) return;
 
-  tableWrap.innerHTML = `<div style="padding: 40px; text-align: center; color: #64748b;">Fetching audit logs...</div>`;
+  tableWrap.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-muted);">Fetching audit logs...</div>`;
 
   try {
     const params = {
@@ -15117,7 +15965,7 @@ async function refreshAuditTrailTable() {
         <div style="padding: 50px 20px; text-align: center;">
           <div style="font-size: 32px; margin-bottom: 10px;">📋</div>
           <div style="font-size: 16px; font-weight: 600; color: #1e293b;">No audit records found</div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Try broadening your filter criteria or search keyword.</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Try broadening your filter criteria or search keyword.</div>
         </div>
       `;
       if (pagWrap) pagWrap.innerHTML = "";
@@ -15136,11 +15984,11 @@ async function refreshAuditTrailTable() {
       const hasDiff = Boolean(log.old_value || log.new_value);
       const diffButton = hasDiff
         ? `<button class="btn btn-sm btn-secondary" onclick="openAuditDiffModal(${log.id})" style="padding: 3px 8px; font-size: 11px;">🔍 Inspect Diff</button>`
-        : `<span style="color: #94a3b8; font-size: 11px;">N/A</span>`;
+        : `<span style="color: var(--text-muted); font-size: 11px;">N/A</span>`;
 
       return `
         <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s ease;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
-          <td style="padding: 10px 14px; font-family: monospace; font-size: 12px; color: #475569; white-space: nowrap;">
+          <td style="padding: 10px 14px; font-family: monospace; font-size: 12px; color: var(--text-secondary); white-space: nowrap;">
             ${formattedDate}
           </td>
           <td style="padding: 10px 14px;">
@@ -15153,10 +16001,10 @@ async function refreshAuditTrailTable() {
           </td>
           <td style="padding: 10px 14px;">${actionBadge}</td>
           <td style="padding: 10px 14px;">${moduleBadge}</td>
-          <td style="padding: 10px 14px; font-family: monospace; font-size: 12px; color: #64748b;">
+          <td style="padding: 10px 14px; font-family: monospace; font-size: 12px; color: var(--text-muted);">
             ${log.record_id || (log.entity_id ? '#' + log.entity_id : '—')}
           </td>
-          <td style="padding: 10px 14px; font-size: 13px; color: #334155; max-width: 400px; word-break: break-word;">
+          <td style="padding: 10px 14px; font-size: 13px; color: var(--text-secondary); max-width: 400px; word-break: break-word;">
             ${escapeHtml(log.details || '')}
           </td>
           <td style="padding: 10px 14px; text-align: center;">
@@ -15170,7 +16018,7 @@ async function refreshAuditTrailTable() {
       <div style="overflow-x: auto;">
         <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left;">
           <thead>
-            <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #475569; text-transform: uppercase;">
+            <tr style="background: var(--bg-app); border-bottom: 1px solid #e2e8f0; font-size: 12px; color: var(--text-secondary); text-transform: uppercase;">
               <th style="padding: 12px 14px;">Timestamp (Local)</th>
               <th style="padding: 12px 14px;">User</th>
               <th style="padding: 12px 14px;">Action</th>
@@ -15190,14 +16038,14 @@ async function refreshAuditTrailTable() {
     // Render Pagination Controls
     if (pagWrap) {
       pagWrap.innerHTML = `
-        <div style="font-size: 13px; color: #64748b;">
-          Showing <span style="font-weight: 600; color: #0f172a;">${((res.page - 1) * res.page_size) + 1}</span> - <span style="font-weight: 600; color: #0f172a;">${Math.min(res.page * res.page_size, res.total)}</span> of <span style="font-weight: 600; color: #0f172a;">${res.total}</span> audit records
+        <div style="font-size: 13px; color: var(--text-muted);">
+          Showing <span style="font-weight: 600; color: var(--text-main);">${((res.page - 1) * res.page_size) + 1}</span> - <span style="font-weight: 600; color: var(--text-main);">${Math.min(res.page * res.page_size, res.total)}</span> of <span style="font-weight: 600; color: var(--text-main);">${res.total}</span> audit records
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button class="btn btn-secondary btn-sm" onclick="changeAuditPage(${res.page - 1})" ${res.page <= 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
             ← Previous
           </button>
-          <span style="font-size: 12px; font-weight: 600; color: #475569; padding: 0 8px;">
+          <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 0 8px;">
             Page ${res.page} of ${res.total_pages}
           </span>
           <button class="btn btn-secondary btn-sm" onclick="changeAuditPage(${res.page + 1})" ${res.page >= res.total_pages ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
@@ -15215,26 +16063,26 @@ async function refreshAuditTrailTable() {
 function getAuditActionBadge(action) {
   const act = (action || "").toUpperCase();
   if (act.includes("LOGIN") || act.includes("LOGOUT")) {
-    return `<span class="badge" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
+    return `<span class="badge" style="background: #eff6ff; color: #2563eb; border: 1px solid var(--border); font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
   }
   if (act.includes("CREATE")) {
-    return `<span class="badge" style="background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
+    return `<span class="badge" style="background: #f0fdf4; color: #16a34a; border: 1px solid var(--border); font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
   }
   if (act.includes("DELETE") || act.includes("REMOVE")) {
-    return `<span class="badge" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
+    return `<span class="badge" style="background: #fef2f2; color: #dc2626; border: 1px solid var(--border); font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
   }
   if (act.includes("BACKUP") || act.includes("RESTORE")) {
-    return `<span class="badge" style="background: #faf5ff; color: #9333ea; border: 1px solid #e9d5ff; font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
+    return `<span class="badge" style="background: #faf5ff; color: #9333ea; border: 1px solid var(--border); font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
   }
   if (act.includes("EXPORT") || act.includes("GENERATE")) {
-    return `<span class="badge" style="background: #fffbeb; color: #d97706; border: 1px solid #fde68a; font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
+    return `<span class="badge" style="background: #fffbeb; color: #d97706; border: 1px solid var(--border); font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
   }
-  return `<span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
+  return `<span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary); border: 1px solid var(--border); font-size: 11px; padding: 3px 8px; border-radius: 4px;">${act}</span>`;
 }
 
 function getAuditModuleBadge(mod) {
   const m = (mod || "").toUpperCase();
-  return `<span style="display: inline-block; padding: 2px 6px; font-size: 11px; font-weight: 600; color: #334155; background: #e2e8f0; border-radius: 4px;">${m}</span>`;
+  return `<span style="display: inline-block; padding: 2px 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #e2e8f0; border-radius: 4px;">${m}</span>`;
 }
 
 function escapeHtml(str) {
@@ -15333,8 +16181,8 @@ function openAuditDiffModal(logId) {
       <div class="modal-card" style="width: 850px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column;">
         <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e2e8f0;">
           <div>
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">Audit Value Diff Inspector</h3>
-            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-main);">Audit Value Diff Inspector</h3>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
               Log #${log.id} • Action: <strong>${log.action}</strong> • Module: <strong>${log.module}</strong> • User: <strong>${log.username}</strong>
             </div>
           </div>
@@ -15342,8 +16190,8 @@ function openAuditDiffModal(logId) {
         </div>
 
         <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
-          <div style="margin-bottom: 16px; padding: 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <div style="font-size: 12px; font-weight: 600; color: #475569; text-transform: uppercase;">Event Description</div>
+          <div style="margin-bottom: 16px; padding: 12px; background: var(--bg-app); border-radius: 6px; border: 1px solid var(--border);">
+            <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Event Description</div>
             <div style="font-size: 13px; color: #1e293b; margin-top: 4px;">${escapeHtml(log.details || '')}</div>
           </div>
 
@@ -15351,17 +16199,17 @@ function openAuditDiffModal(logId) {
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <span style="font-size: 12px; font-weight: 700; color: #dc2626; text-transform: uppercase;">◀ Previous / Old Value</span>
-                <span style="font-size: 11px; color: #94a3b8;">Pre-modification</span>
+                <span style="font-size: 11px; color: var(--text-muted);">Pre-modification</span>
               </div>
-              <pre style="background: #fff5f5; border: 1px solid #fecaca; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; color: #991b1b; max-height: 350px; overflow: auto; white-space: pre-wrap;">${escapeHtml(formattedOld)}</pre>
+              <pre style="background: #fff5f5; border: 1px solid var(--border); padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; color: #991b1b; max-height: 350px; overflow: auto; white-space: pre-wrap;">${escapeHtml(formattedOld)}</pre>
             </div>
 
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <span style="font-size: 12px; font-weight: 700; color: #16a34a; text-transform: uppercase;">▶ New / Updated Value</span>
-                <span style="font-size: 11px; color: #94a3b8;">Post-modification</span>
+                <span style="font-size: 11px; color: var(--text-muted);">Post-modification</span>
               </div>
-              <pre style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; color: #166534; max-height: 350px; overflow: auto; white-space: pre-wrap;">${escapeHtml(formattedNew)}</pre>
+              <pre style="background: #f0fdf4; border: 1px solid var(--border); padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; color: #166534; max-height: 350px; overflow: auto; white-space: pre-wrap;">${escapeHtml(formattedNew)}</pre>
             </div>
           </div>
         </div>
@@ -15386,8 +16234,8 @@ async function renderSettings() {
     <div style="padding: 24px; max-width: 1400px; margin: 0 auto;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
         <div>
-          <h1 style="font-size: 24px; font-weight: 700; color: #0f172a; margin: 0;">Settings & Local Database Center</h1>
-          <p style="color: #64748b; font-size: 14px; margin-top: 4px;">
+          <h1 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0;">Settings & Local Database Center</h1>
+          <p style="color: var(--text-muted); font-size: 14px; margin-top: 4px;">
             Manage audit thresholds, firm practice configuration, and create immutable point-in-time local database backups.
           </p>
         </div>
@@ -15395,15 +16243,15 @@ async function renderSettings() {
 
       <!-- System Environment & Offline Status -->
       <div id="system-info-card-wrap" style="margin-bottom: 24px;">
-        <div style="padding: 20px; text-align: center; color: #64748b;">Loading system information...</div>
+        <div style="padding: 20px; text-align: center; color: var(--text-muted);">Loading system information...</div>
       </div>
 
       <!-- Backup & Restore Center -->
-      <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+      <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; margin-bottom: 24px; ">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h3 style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0;">Local Database Backup & Restore</h3>
-            <p style="font-size: 13px; color: #64748b; margin: 2px 0 0 0;">
+            <h3 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin: 0;">Local Database Backup & Restore</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin: 2px 0 0 0;">
               All backups are kept strictly locally on this PC in SQLite format with SHA-256 integrity checksums.
             </p>
           </div>
@@ -15425,13 +16273,13 @@ async function renderSettings() {
         </div>
 
         <div id="backups-list-table-wrap">
-          <div style="padding: 20px; text-align: center; color: #64748b;">Loading backup history...</div>
+          <div style="padding: 20px; text-align: center; color: var(--text-muted);">Loading backup history...</div>
         </div>
       </div>
 
       <!-- Practice & Engine Configuration -->
-      <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-        <h3 style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 16px 0;">Audit Engine & Practice Configuration</h3>
+      <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; ">
+        <h3 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin: 0 0 16px 0;">Audit Engine & Practice Configuration</h3>
         
         <form id="practice-settings-form" onsubmit="handleSaveSettings(event)">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
@@ -15509,21 +16357,21 @@ async function loadSystemInfo() {
   try {
     const info = await FinAuditAPI.getSystemInfo();
     wrap.innerHTML = `
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
         <div>
-          <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Application Build</div>
-          <div style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 2px;">${info.app_name} v${info.version}</div>
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Application Build</div>
+          <div style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-top: 2px;">${info.app_name} v${info.version}</div>
           <div style="font-size: 12px; color: #059669; font-weight: 600; margin-top: 2px;">${info.mode}</div>
         </div>
         <div>
-          <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Active Database</div>
-          <div style="font-size: 14px; font-weight: 600; color: #0f172a; margin-top: 2px;">${info.database_size_kb} KB (${(info.database_size_kb / 1024).toFixed(2)} MB)</div>
-          <div style="font-size: 11px; color: #64748b; font-family: monospace; word-break: break-all;">${info.database_path}</div>
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Active Database</div>
+          <div style="font-size: 14px; font-weight: 600; color: var(--text-main); margin-top: 2px;">${info.database_size_kb} KB (${(info.database_size_kb / 1024).toFixed(2)} MB)</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: monospace; word-break: break-all;">${info.database_path}</div>
         </div>
         <div>
-          <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Database Engine</div>
-          <div style="font-size: 14px; font-weight: 600; color: #0f172a; margin-top: 2px;">${info.database_engine}</div>
-          <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Transactions: <strong>${info.statistics.total_transactions}</strong> | Logs: <strong>${info.statistics.audit_logs}</strong></div>
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Database Engine</div>
+          <div style="font-size: 14px; font-weight: 600; color: var(--text-main); margin-top: 2px;">${info.database_engine}</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Transactions: <strong>${info.statistics.total_transactions}</strong> | Logs: <strong>${info.statistics.audit_logs}</strong></div>
         </div>
       </div>
     `;
@@ -15540,7 +16388,7 @@ async function loadBackupsList() {
     const backups = await FinAuditAPI.getBackupsList();
     if (!backups || backups.length === 0) {
       wrap.innerHTML = `
-        <div style="padding: 24px; text-align: center; color: #64748b; background: #f8fafc; border-radius: 6px; border: 1px dashed #cbd5e1;">
+        <div style="padding: 24px; text-align: center; color: var(--text-muted); background: var(--bg-app); border-radius: 6px; border: 1px dashed #cbd5e1;">
           No database backup snapshots found yet. Click <strong>"Create Local Backup Now"</strong> above to take your first local snapshot.
         </div>
       `;
@@ -15554,22 +16402,22 @@ async function loadBackupsList() {
       });
 
       const typeBadge = b.is_safety_snapshot
-        ? `<span class="badge" style="background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; font-size: 10px;">Pre-Restore Safety</span>`
-        : `<span class="badge" style="background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; font-size: 10px;">Manual Snapshot</span>`;
+        ? `<span class="badge" style="background: #fff7ed; color: #c2410c; border: 1px solid var(--border); font-size: 10px;">Pre-Restore Safety</span>`
+        : `<span class="badge" style="background: #f0fdf4; color: #16a34a; border: 1px solid var(--border); font-size: 10px;">Manual Snapshot</span>`;
 
       return `
         <tr style="border-bottom: 1px solid #f1f5f9;">
           <td style="padding: 10px 14px; font-family: monospace; font-size: 12px; font-weight: 600; color: #1e293b;">
             ${b.filename}
           </td>
-          <td style="padding: 10px 14px; font-size: 12px; color: #64748b;">
+          <td style="padding: 10px 14px; font-size: 12px; color: var(--text-muted);">
             ${dateFormatted}
           </td>
-          <td style="padding: 10px 14px; font-size: 12px; color: #475569;">
+          <td style="padding: 10px 14px; font-size: 12px; color: var(--text-secondary);">
             ${b.size_kb} KB
           </td>
           <td style="padding: 10px 14px;">${typeBadge}</td>
-          <td style="padding: 10px 14px; font-family: monospace; font-size: 11px; color: #94a3b8;" title="${b.checksum_sha256}">
+          <td style="padding: 10px 14px; font-family: monospace; font-size: 11px; color: var(--text-muted);" title="${b.checksum_sha256}">
             ${b.checksum_sha256.substring(0, 16)}...
           </td>
           <td style="padding: 10px 14px; text-align: right;">
@@ -15590,7 +16438,7 @@ async function loadBackupsList() {
       <div style="overflow-x: auto;">
         <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left;">
           <thead>
-            <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #475569; text-transform: uppercase;">
+            <tr style="background: var(--bg-app); border-bottom: 1px solid #e2e8f0; font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">
               <th style="padding: 10px 14px;">Backup Filename</th>
               <th style="padding: 10px 14px;">Created Date</th>
               <th style="padding: 10px 14px;">File Size</th>
@@ -15754,23 +16602,23 @@ async function refreshTopBarAIStatus() {
   try {
     const status = await FinAuditAPI.getAIStatus();
     if (!status.is_enabled) {
-      el.innerHTML = `<span style="color: #94a3b8;">🤖 AI: Disabled</span>`;
+      el.innerHTML = `<span style="color: var(--text-muted);">🤖 AI: Disabled</span>`;
     } else if (status.is_available) {
       el.innerHTML = `<span style="color: #10b981; font-weight: 700;">🤖 LM Studio: Connected</span>`;
     } else {
       el.innerHTML = `<span style="color: #f59e0b;">🤖 LM Studio: Offline</span>`;
     }
   } catch (e) {
-    el.innerHTML = `<span style="color: #94a3b8;">🤖 LM Studio: Offline</span>`;
+    el.innerHTML = `<span style="color: var(--text-muted);">🤖 LM Studio: Offline</span>`;
   }
 }
 
 async function renderAIManager() {
   const container = document.getElementById("content-container");
   container.innerHTML = `
-    <div style="padding: 40px; text-align: center; color: #64748b;">
+    <div style="padding: 40px; text-align: center; color: var(--text-muted);">
       <div class="spinner" style="margin: 0 auto 16px auto;"></div>
-      <div style="font-size: 15px; font-weight: 600; color: #0f172a;">Connecting to LM Studio Local AI Service...</div>
+      <div style="font-size: 15px; font-weight: 600; color: var(--text-main);">Connecting to LM Studio Local AI Service...</div>
       <div style="font-size: 12px; margin-top: 4px;">Checking local LM Studio server status at http://localhost:1234...</div>
     </div>
   `;
@@ -15787,11 +16635,11 @@ async function renderAIManager() {
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
           <div>
             <div style="display: flex; align-items: center; gap: 10px;">
-              <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin: 0;">LM Studio Local AI Settings</h1>
+              <h1 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0;">LM Studio Local AI Settings</h1>
               <span class="badge" style="background: #065f46; color: #ffffff; font-weight: 700;">🔒 100% OFFLINE</span>
               <span class="badge" style="background: #1e3a8a; color: #ffffff; font-weight: 700;">ZERO CLOUD TRANSMISSION</span>
             </div>
-            <p style="color: #64748b; font-size: 13.5px; margin-top: 4px;">
+            <p style="color: var(--text-muted); font-size: 13.5px; margin-top: 4px;">
               Configure LM Studio local server endpoint, loaded models, sampling parameters, and local data privacy guard.
             </p>
           </div>
@@ -15829,17 +16677,17 @@ async function renderAIManager() {
 
         <!-- LM Studio Connection Status Banner -->
         ${!isEnabled ? `
-          <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #64748b; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-left: 5px solid #64748b; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
             <div>
-              <div style="font-weight: 700; color: #334155; font-size: 13.5px;">Local AI Disabled by Auditor</div>
-              <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+              <div style="font-weight: 700; color: var(--text-secondary); font-size: 13.5px;">Local AI Disabled by Auditor</div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
                 <strong>${st.fallback_notice}</strong> (Rules engine, BRS/2B reconciliation, math validations, Isolation Forest anomaly detection, and reports remain 100% active).
               </div>
             </div>
             <span class="badge badge-medium">Deterministic Mode</span>
           </div>
         ` : !isAvail ? `
-          <div style="background: #fffbeb; border: 1px solid #fef08a; border-left: 5px solid #d97706; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div style="background: #fffbeb; border: 1px solid var(--border); border-left: 5px solid #d97706; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <div>
               <div style="font-weight: 700; color: #92400e; font-size: 13.5px;">⚠️ LM Studio Disconnected (${st.model_location})</div>
               <div style="font-size: 12px; color: #b45309; margin-top: 2px;">
@@ -15854,7 +16702,7 @@ async function renderAIManager() {
             </div>
           </div>
         ` : `
-          <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-left: 5px solid #059669; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="background: #ecfdf5; border: 1px solid var(--border); border-left: 5px solid #059669; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
             <div>
               <div style="font-weight: 700; color: #065f46; font-size: 13.5px;">🟢 LM Studio Connected & Ready for Local Inference</div>
               <div style="font-size: 12px; color: #047857; margin-top: 2px;">
@@ -15870,12 +16718,12 @@ async function renderAIManager() {
           <div class="ai-manager-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 14px;">
               <div>
-                <h3 style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0;">LM Studio Configuration</h3>
-                <p style="font-size: 12.5px; color: #64748b; margin: 2px 0 0 0;">Configure server URL, detected models, sampling temperature, and context window</p>
+                <h3 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin: 0;">LM Studio Configuration</h3>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0 0;">Configure server URL, detected models, sampling temperature, and context window</p>
               </div>
               <!-- Enable / Disable AI Switch -->
               <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 13px; font-weight: 700; color: #0f172a;">Enable AI:</span>
+                <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">Enable AI:</span>
                 <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px; margin: 0;">
                   <input type="checkbox" id="ai-toggle-enable" ${isEnabled ? 'checked' : ''} onchange="toggleAIEnableSwitch(this.checked)">
                   <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 24px;"></span>
@@ -15888,7 +16736,7 @@ async function renderAIManager() {
               <div class="form-group">
                 <label class="form-label" style="font-weight: 700;">LM Studio Server URL</label>
                 <input type="text" id="ai-model-location" class="form-control" value="${escapeHtml(st.model_location || 'http://localhost:1234')}" placeholder="http://localhost:1234">
-                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Default LM Studio OpenAI-compatible endpoint: <code>http://localhost:1234</code></div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Default LM Studio OpenAI-compatible endpoint: <code>http://localhost:1234</code></div>
               </div>
               <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -15898,7 +16746,7 @@ async function renderAIManager() {
                   </button>
                 </div>
                 <input type="text" id="ai-model-name" class="form-control" value="${escapeHtml(st.model_name || 'local-model')}" placeholder="e.g. meta-llama-3-8b-instruct or local-model">
-                <div style="font-size: 11px; color: #64748b; margin-top: 4px;" id="available-models-hint">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;" id="available-models-hint">
                   ${st.available_models && st.available_models.length > 0 ? `Loaded in LM Studio: <b>${st.available_models.join(", ")}</b>` : 'Type loaded model ID or click "Refresh Models"'}
                 </div>
               </div>
@@ -15918,31 +16766,31 @@ async function renderAIManager() {
               <div class="form-group">
                 <label class="form-label" style="font-weight: 700;">Sampling Temperature: <span id="temp-display" class="font-mono font-bold">${st.temperature || 0.2}</span></label>
                 <input type="range" id="ai-temperature" class="form-control" min="0.0" max="1.0" step="0.05" value="${st.temperature || 0.2}" oninput="document.getElementById('temp-display').innerText = this.value">
-                <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">0.1–0.2 recommended for deterministic factual audit analysis</div>
+                <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">0.1–0.2 recommended for deterministic factual audit analysis</div>
               </div>
             </div>
 
             <!-- Live Test Generation Output Box -->
-            <div id="ai-test-output-box" style="display: none; margin-bottom: 20px; padding: 14px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;">
-              <div style="font-weight: 700; color: #0f172a; font-size: 13px; margin-bottom: 6px;">
+            <div id="ai-test-output-box" style="display: none; margin-bottom: 20px; padding: 14px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
+              <div style="font-weight: 700; color: var(--text-main); font-size: 13px; margin-bottom: 6px;">
                 🧪 Live AI Test Response:
               </div>
-              <div id="ai-test-response-text" style="font-family: ui-monospace, monospace; font-size: 12px; color: #334155; line-height: 1.5; white-space: pre-wrap;"></div>
+              <div id="ai-test-response-text" style="font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap;"></div>
             </div>
 
             <!-- Redaction & Privacy Guard Demo Box -->
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-              <div style="font-weight: 700; color: #0f172a; font-size: 13px; margin-bottom: 6px;">
+            <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px;">
+              <div style="font-weight: 700; color: var(--text-main); font-size: 13px; margin-bottom: 6px;">
                 🔍 Live Data Sanitization & PII Redaction Preview
               </div>
-              <div style="font-size: 12px; color: #64748b; margin-bottom: 10px;">
+              <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
                 Test how confidential client data (PAN, GSTIN, Bank Accounts) is automatically redacted before local LM Studio ingestion:
               </div>
               <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                 <input type="text" id="sanitize-test-input" class="form-control" value="Verified invoice from Apex Engineering PAN AAAFE1234G GSTIN 27AAAFE1234G1Z8 paid to HDFC A/C 50200012345678" placeholder="Type test notes containing PAN, GSTIN, or Bank Account...">
                 <button class="btn btn-secondary" style="white-space: nowrap;" onclick="handleSanitizePreviewTest()">Test Redaction</button>
               </div>
-              <div id="sanitize-result-box" style="padding: 10px 12px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 12px; color: #334155; min-height: 38px;">
+              <div id="sanitize-result-box" style="padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); min-height: 38px;">
                 Click "Test Redaction" to preview sanitized output.
               </div>
             </div>
@@ -15951,19 +16799,19 @@ async function renderAIManager() {
           <!-- Right Column: Architecture & Instructions -->
           <div style="display: flex; flex-direction: column; gap: 20px;">
             <div class="ai-manager-card">
-              <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">🏛️ LM Studio Architecture</h3>
-              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; font-size: 12px; line-height: 1.6;">
+              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">🏛️ LM Studio Architecture</h3>
+              <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; font-size: 12px; line-height: 1.6;">
                 <div style="font-weight: 700; color: #2563eb;">1. FinAuditPro Application</div>
-                <div style="color: #64748b; margin-left: 14px;">↓ Local PII Redactor (Zero Cloud)</div>
+                <div style="color: var(--text-muted); margin-left: 14px;">↓ Local PII Redactor (Zero Cloud)</div>
                 <div style="font-weight: 700; color: #7c3aed;">2. Local AI Service Layer</div>
-                <div style="color: #64748b; margin-left: 14px;">↓ Localhost API (http://localhost:1234)</div>
+                <div style="color: var(--text-muted); margin-left: 14px;">↓ Localhost API (http://localhost:1234)</div>
                 <div style="font-weight: 700; color: #059669;">3. LM Studio & Loaded Local Model</div>
               </div>
             </div>
 
             <div class="ai-manager-card">
-              <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">📖 How to Run LM Studio</h3>
-              <ol style="padding-left: 18px; font-size: 12px; color: #475569; line-height: 1.6; margin: 0;">
+              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">📖 How to Run LM Studio</h3>
+              <ol style="padding-left: 18px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0;">
                 <li>Download & launch <b>LM Studio</b> from <code>lmstudio.ai</code>.</li>
                 <li>Download any compatible instruction model (e.g. <i>Llama-3-8B-Instruct</i> or <i>Mistral-7B-Instruct</i>).</li>
                 <li>Go to the <b>Local Server</b> tab (↔️ icon) in LM Studio.</li>
@@ -15973,10 +16821,10 @@ async function renderAIManager() {
             </div>
 
             <div class="ai-manager-card">
-              <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">⚙️ Deterministic Guarantee</h3>
-              <div style="font-size: 12.5px; color: #475569; line-height: 1.6;">
+              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">⚙️ Deterministic Guarantee</h3>
+              <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.6;">
                 <div style="margin-bottom: 8px;">✅ <b>100% Core Audit Reliability:</b></div>
-                <ul style="padding-left: 20px; color: #64748b; font-size: 12px; margin-bottom: 12px;">
+                <ul style="padding-left: 20px; color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
                   <li>General Ledger & Trial Balance math</li>
                   <li>Section 40A(3) & 269ST statutory rules</li>
                   <li>Bank BRS & GST 2B reconciliations</li>
@@ -15984,7 +16832,7 @@ async function renderAIManager() {
                   <li>PDF master audit reports & exports</li>
                   <li>ICAI compliance checklists</li>
                 </ul>
-                <div style="padding: 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11.5px; color: #1e40af;">
+                <div style="padding: 10px; background: #eff6ff; border: 1px solid var(--border); border-radius: 6px; font-size: 11.5px; color: #1e40af;">
                   <b>Audit Safety:</b> If LM Studio is not running, all audit calculations, reconciliations, findings, and reports remain completely functional.
                 </div>
               </div>
@@ -16000,7 +16848,7 @@ async function renderAIManager() {
       styleTag.id = "slider-styles";
       styleTag.innerHTML = `
         .switch input:checked + .slider { background-color: #2563eb !important; }
-        .switch input:focus + .slider { box-shadow: 0 0 1px #2563eb; }
+        .switch input:focus + .slider {  }
         .switch input:checked + .slider:before { transform: translateX(20px); }
         .slider.round:before {
           position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
@@ -16014,7 +16862,7 @@ async function renderAIManager() {
     container.innerHTML = `
       <div style="padding: 40px; text-align: center; color: #dc2626;">
         <div style="font-size: 16px; font-weight: 700;">Failed to load LM Studio AI Settings</div>
-        <div style="font-size: 13px; color: #64748b; margin-top: 6px;">${escapeHTML(err.message)}</div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">${escapeHTML(err.message)}</div>
         <button class="btn btn-primary" style="margin-top: 14px;" onclick="renderAIManager()">Retry</button>
       </div>
     `;
@@ -16163,8 +17011,8 @@ async function handleSanitizePreviewTest() {
     const res = await FinAuditAPI.previewSanitization(text, state.activeEngagement?.client_name);
     resultBox.innerHTML = `
       <div style="color: #059669; font-weight: 700; margin-bottom: 4px;">✅ Sanitized Prompt (Safe for LM Studio):</div>
-      <div style="background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px solid #e2e8f0;">${escapeHtml(res.sanitized_text)}</div>
-      <div style="font-size: 11px; color: #64748b; margin-top: 6px;">
+      <div style="background: var(--bg-app); padding: 6px; border-radius: 4px; border: 1px solid var(--border);">${escapeHtml(res.sanitized_text)}</div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
         Redacted: <b>${res.redaction_counts.pan || 0} PAN</b>, <b>${res.redaction_counts.gstin || 0} GSTIN</b>, <b>${res.redaction_counts.bank_account || 0} Bank A/C</b>, <b>${res.redaction_counts.client_name || 0} Client Name</b>
       </div>
     `;

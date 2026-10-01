@@ -41,13 +41,19 @@ class FinAuditAPI {
         let errorMsg = `HTTP Error ${response.status}`;
         try {
           const errData = await response.json();
-          errorMsg = errData.detail || errorMsg;
+          if (Array.isArray(errData.detail)) {
+            errorMsg = errData.detail.map(d => `${d.loc.slice(-1)[0]}: ${d.msg}`).join(", ");
+          } else {
+            errorMsg = errData.detail || errorMsg;
+          }
         } catch (e) {}
         
-        if (response.status === 401 && !endpoint.includes("/api/auth/login")) {
+        if (response.status === 401 && !endpoint.includes("/api/auth/login") && !endpoint.includes("/api/auth/setup-status")) {
           // Token expired or invalid
           this.setToken(null);
-          if (typeof window.showLoginScreen === "function") {
+          if (typeof window.checkAuthSession === "function") {
+            window.checkAuthSession();
+          } else if (typeof window.showLoginScreen === "function") {
             window.showLoginScreen("Session expired. Please log in again.");
           }
         }
@@ -87,6 +93,57 @@ class FinAuditAPI {
     return this.request("/api/auth/initial-setup", {
       method: "POST",
       body: JSON.stringify(userData)
+    });
+  }
+
+  static setupFirmProfile(profile) {
+    return this.request("/api/auth/setup/firm-profile", {
+      method: "POST",
+      body: JSON.stringify(profile)
+    });
+  }
+
+  static setupSecurityConfig(sec) {
+    return this.request("/api/auth/setup/security-config", {
+      method: "POST",
+      body: JSON.stringify(sec)
+    });
+  }
+
+  static setupBackupConfig(backup) {
+    return this.request("/api/auth/setup/backup-config", {
+      method: "POST",
+      body: JSON.stringify(backup)
+    });
+  }
+
+  static setupComplete() {
+    return this.request("/api/auth/setup/complete", {
+      method: "POST"
+    });
+  }
+
+  static getActivationInfo(token) {
+    return this.request(`/api/auth/activation-info/${encodeURIComponent(token)}`);
+  }
+
+  static activateUser(payload) {
+    return this.request("/api/auth/activate-user", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  }
+
+  static inviteUser(userData) {
+    return this.request("/api/auth/users/invite", {
+      method: "POST",
+      body: JSON.stringify(userData)
+    });
+  }
+
+  static resetUserActivation(userId) {
+    return this.request(`/api/auth/users/${userId}/reset-activation`, {
+      method: "POST"
     });
   }
 

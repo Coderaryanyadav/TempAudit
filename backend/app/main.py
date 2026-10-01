@@ -10,7 +10,7 @@ from backend.app.routers import (
     auth, clients, engagements, import_data, data_cleaning, transactions,
     trial_balance, financial_statements, yoy_comparison, reconciliation, gst_reconciliation,
     duplicates_and_gaps, anomalies, audit_findings, assistant, checklist, working_papers,
-    reports, audit_trail, settings, ai_manager
+    reports, audit_trail, settings, ai_manager, evidence, jobs, system
 )
 
 @asynccontextmanager
@@ -66,6 +66,9 @@ app.include_router(reports.router)
 app.include_router(audit_trail.router)
 app.include_router(settings.router)
 app.include_router(ai_manager.router)
+app.include_router(evidence.router)
+app.include_router(jobs.router)
+app.include_router(system.router)
 
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend")
 

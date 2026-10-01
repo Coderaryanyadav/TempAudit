@@ -30,8 +30,8 @@ class BulkSettingsUpdate(BaseModel):
 
 
 DEFAULT_SETTINGS = {
-    "firm_name": "Sharma & Associates, Chartered Accountants",
-    "firm_icai_reg": "FRN-012948N",
+    "firm_name": "",
+    "firm_icai_reg": "",
     "materiality_percentage": 0.5,
     "materiality_benchmark": "Turnover",
     "cash_threshold_40a3": 10000.0,

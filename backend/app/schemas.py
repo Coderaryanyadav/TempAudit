@@ -52,6 +52,65 @@ class ChangePasswordRequest(BaseModel):
 class AdminResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
 
+class InitialAdminCreate(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=100)
+    username: str = Field(..., min_length=3, max_length=50)
+    email: str
+    password: str = Field(..., min_length=10)
+    phone: Optional[str] = None
+    designation: Optional[str] = "Engagement Partner (FCA)"
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not re.match(EMAIL_REGEX, v):
+            raise ValueError("Invalid email format.")
+        return v
+
+class FirmProfileSetup(BaseModel):
+    firm_name: str = Field(..., min_length=2, max_length=200)
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = "Maharashtra"
+    country: Optional[str] = "India"
+    pin_code: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    icai_reg_number: Optional[str] = None
+
+class SecuritySetup(BaseModel):
+    session_timeout_minutes: int = Field(60, ge=5, le=480)
+    local_ai_mode: Literal["LOCAL_ONLY", "ALLOW_CONFIGURED"] = "LOCAL_ONLY"
+
+class BackupSetup(BaseModel):
+    backup_location: Optional[str] = "backups"
+    auto_backup_enabled: bool = True
+    backup_retention_days: int = Field(30, ge=1, le=365)
+
+class UserInviteCreate(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=100)
+    username: str = Field(..., min_length=3, max_length=50)
+    email: str
+    role: Literal["Admin", "Auditor", "Audit Staff"] = "Audit Staff"
+    phone: Optional[str] = None
+    designation: Optional[str] = "Audit Staff"
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not re.match(EMAIL_REGEX, v):
+            raise ValueError("Invalid email format.")
+        return v
+
+class UserActivationSubmit(BaseModel):
+    activation_token: str
+    password: str = Field(..., min_length=8)
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+
 class UserResponse(BaseModel):
     id: int
     username: str
@@ -62,6 +121,9 @@ class UserResponse(BaseModel):
     created_at: str
     last_login: Optional[str] = None
     phone: Optional[str] = None
+    designation: Optional[str] = None
+    status: Optional[str] = "ACTIVE"
+    activation_token: Optional[str] = None
 
 # --- CLIENT SCHEMAS ---
 class ClientCreate(BaseModel):

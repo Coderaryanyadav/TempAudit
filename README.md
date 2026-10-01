@@ -8,8 +8,8 @@ audit seniors, and audit practitioners in India.
 
 ## 📚 Complete Documentation Suite
 
-| Document                             | Purpose                                                 | File Link                                                                                                                               |
-| :----------------------------------- | :------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------- |
+| Document                             | Purpose                                                 | File Link                                                                         |
+| :----------------------------------- | :------------------------------------------------------ | :-------------------------------------------------------------------------------- |
 | **1. Installation Instructions**     | System requirements, offline prerequisites, setup steps | [01_INSTALLATION_INSTRUCTIONS.md](docs/01_INSTALLATION_INSTRUCTIONS.md)           |
 | **2. User Manual**                   | Complete 16-step auditor workflow and module guide      | [02_USER_MANUAL.md](docs/02_USER_MANUAL.md)                                       |
 | **3. Developer Documentation**       | Codebase architecture, service extensions, AI interface | [03_DEVELOPER_DOCUMENTATION.md](docs/03_DEVELOPER_DOCUMENTATION.md)               |
@@ -124,9 +124,12 @@ FinAuditPro implements a 3-tier hybrid audit architecture:
 - **100% Offline Authentication:** Zero cloud API or external server reliance.
   All authentication runs locally against SQLite.
 - **Cryptographic Password Hashing:** Uses `PBKDF2-HMAC-SHA256` with 100,000
-  iterations and random per-user salt. Plain text passwords are never stored.
+  iterations and random per-user salt. Plain text passwords are never stored or
+  logged.
 - **Session Management:** Local JSON Web Tokens (JWT) signed with secure local
-  secret key.
+  secret key. Configurable session timeout and automatic logout.
+- **Brute-Force & Lockout Protection:** Exponential lockout cooldown on repeated
+  failed attempts with generic authentication error messages.
 - **Account Disabling:** Admins can enable or disable user accounts at any time.
   Disabled accounts are immediately blocked from logging in.
 - **Self-Disable Protection:** Admins cannot disable or demote their own account
@@ -135,6 +138,65 @@ FinAuditPro implements a 3-tier hybrid audit architecture:
   authentication.
 - **Audit Logging:** Every login, logout, password change, user creation, and
   status toggle is immutably logged to `audit_logs` (Companies Act Rule 11(g)).
+
+---
+
+## 🚀 First-Run Setup & User Onboarding Journey
+
+FinAuditPro implements a first-class, air-gapped first-run onboarding journey:
+
+```
+Fresh Installation (0 Users)
+            │
+            ▼
+   First-Launch Detection
+   [State A: UNINITIALIZED]
+            │
+            ▼
+  Welcome Splash Screen
+  • "Get Started" Wizard
+  • "Have an Activation Code?"
+            │
+            ▼
+  Step 1: Create Master Admin Account
+  (Role: Admin, Strong Password Policy)
+            │
+            ▼
+  Step 2: CA Firm / Practice Profile
+  (Firm Name, ICAI Reg. No., Address, Contact)
+            │
+            ▼
+  Step 3: Session Security & Local AI Shield
+  (Session Timeout, Local-Only vs Hybrid AI)
+            │
+            ▼
+  Step 4: Backup Storage Location
+  (Automated Snapshot Directory Configuration)
+            │
+            ▼
+  Step 5: Setup Summary & Open Workspace
+            │
+            ▼
+  Auditor Dashboard & Practice Initialization
+```
+
+### 🔑 Offline User Activation Flow
+
+For secure multi-auditor desktop deployments without requiring internet email
+delivery:
+
+1. **Admin Invites Team Member:** Navigates to _Administration → Users_ and
+   enters Full Name, Username, Role, and Designation.
+2. **Account Created in `INVITED` State:** System generates a secure
+   32-character offline activation token with a 48-hour expiration window.
+3. **Activation Token Handover:** The admin securely shares the single-use
+   activation code with the staff member.
+4. **Local Activation Screen:** The staff member clicks _"Have an activation
+   code?"_ on the welcome screen or login dialog.
+5. **Set Permanent Password:** The user reviews their profile details, sets
+   their secure permanent password, and accepts the audit security notice.
+6. **Account Becomes `ACTIVE`:** The token is cryptographically cleared and the
+   user is immediately routed to their assigned engagements.
 
 ---
 

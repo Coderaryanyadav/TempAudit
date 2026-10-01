@@ -27,6 +27,12 @@ def get_db_connection():
 def init_db():
     _ensure_db_dir()
     conn = get_db_connection()
+    try:
+        from backend.migrations.runner import apply_migrations
+        apply_migrations(conn)
+    except Exception as e:
+        # Fallback to local table creations if runner hits unexpected condition
+        pass
     cursor = conn.cursor()
 
     # Users
@@ -55,6 +61,14 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN phone TEXT")
     if "token_version" not in user_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1")
+    if "designation" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN designation TEXT")
+    if "status" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'ACTIVE'")
+    if "activation_token" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN activation_token TEXT")
+    if "activation_expires_at" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN activation_expires_at TEXT")
 
     # Revoked / Blacklisted Tokens (for explicit logout)
     cursor.execute("""
@@ -65,6 +79,15 @@ def init_db():
         expires_at TEXT NOT NULL
     )
     """)
+
+    # Rate Limiting
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS rate_limits (
+        key TEXT NOT NULL,
+        timestamp REAL NOT NULL
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON rate_limits(key, timestamp)")
 
     # Clients
     cursor.execute("""

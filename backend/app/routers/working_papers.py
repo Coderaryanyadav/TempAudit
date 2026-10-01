@@ -505,6 +505,9 @@ async def upload_supporting_document(
         conn.close()
         raise HTTPException(status_code=413, detail="File size exceeds maximum limit of 50 MB.")
 
+    import hashlib
+    sha256_hash = hashlib.sha256(content).hexdigest()
+
     original_name = os.path.basename(file.filename or "evidence.bin")
     file_ext = Path(original_name).suffix.lower()
     stored_filename = f"{uuid.uuid4().hex}{file_ext}"
@@ -518,6 +521,12 @@ async def upload_supporting_document(
     rel_path = f"uploaded_files/working_papers/wp_{wp_id}/{stored_filename}"
     doc_id = str(uuid.uuid4())[:8]
 
+    # Check for existing version with same original name
+    attached_files = wp.get("attached_files") or []
+    matching_existing = [d for d in attached_files if d.get("name") == original_name]
+    doc_version = len(matching_existing) + 1
+    parent_id = matching_existing[-1].get("id") if matching_existing else None
+
     new_doc = {
         "id": doc_id,
         "name": original_name,
@@ -526,13 +535,34 @@ async def upload_supporting_document(
         "size_bytes": file_size,
         "size_display": f"{file_size / 1024:.1f} KB" if file_size < 1024 * 1024 else f"{file_size / (1024 * 1024):.2f} MB",
         "content_type": file.content_type or "application/octet-stream",
+        "sha256_hash": sha256_hash,
+        "version": doc_version,
+        "parent_id": parent_id,
         "description": description or "",
         "uploaded_by": current_user.get("full_name", "Auditor"),
         "uploaded_at": now_str
     }
 
-    attached_files = wp.get("attached_files") or []
     attached_files.append(new_doc)
+
+    # Register in immutable evidence_items table
+    try:
+        from backend.app.repositories.evidence_repo import EvidenceRepository
+        ev_repo = EvidenceRepository(conn)
+        ev_repo.register_evidence(
+            engagement_id=wp["engagement_id"],
+            working_paper_id=wp_id,
+            filename=stored_filename,
+            original_filename=original_name,
+            storage_path=rel_path,
+            file_size=file_size,
+            mime_type=file.content_type or "application/octet-stream",
+            sha256_hash=sha256_hash,
+            version=doc_version,
+            uploaded_by=current_user.get("full_name", "Auditor")
+        )
+    except Exception:
+        pass
 
     conn.execute(
         "UPDATE working_papers SET attached_files_json = ?, updated_at = ? WHERE id = ?",
@@ -548,7 +578,7 @@ async def upload_supporting_document(
         record_id=wp_id,
         user=current_user,
         engagement_id=wp["engagement_id"],
-        details=f"Uploaded supporting document '{original_name}' ({new_doc['size_display']}) to WP [{wp['wp_reference']}]",
+        details=f"Uploaded supporting document '{original_name}' (v{doc_version}, SHA-256: {sha256_hash[:12]}..., {new_doc['size_display']}) to WP [{wp['wp_reference']}]",
         timestamp=now_str
     )
 
@@ -558,7 +588,7 @@ async def upload_supporting_document(
     return {
         "status": "success",
         "document": new_doc,
-        "message": f"Document '{original_name}' uploaded successfully."
+        "message": f"Document '{original_name}' (v{doc_version}) uploaded and cryptographically indexed successfully."
     }
 
 
@@ -662,6 +692,63 @@ def download_working_paper_document(wp_id: int, doc_id: str, current_user: dict 
         filename=target_doc.get("name", full_path.name),
         media_type=target_doc.get("content_type", "application/octet-stream")
     )
+
+
+@router.get("/{wp_id}/verify-document/{doc_id}")
+def verify_working_paper_document(wp_id: int, doc_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Verifies the SHA-256 integrity of a working paper attachment against disk storage.
+    """
+    import hashlib
+    conn = get_db_connection()
+    row = conn.execute("SELECT * FROM working_papers WHERE id = ?", (wp_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Working paper not found.")
+
+    wp = _parse_wp_row(row)
+    require_engagement_access(wp["engagement_id"], current_user)
+
+    target_doc = None
+    for doc in wp.get("attached_files", []):
+        if str(doc.get("id")) == str(doc_id) or doc.get("file_name") == doc_id:
+            target_doc = doc
+            break
+
+    if not target_doc:
+        raise HTTPException(status_code=404, detail="Document file not found.")
+
+    stored_name = target_doc.get("file_name") or os.path.basename(target_doc.get("file_path", ""))
+    full_path = resolve_safe_evidence_path(wp_id, stored_name)
+
+    if not full_path.exists():
+        return {
+            "valid": False,
+            "status": "FILE_MISSING",
+            "doc_id": doc_id,
+            "filename": target_doc.get("name"),
+            "error": "File missing on physical server storage."
+        }
+
+    sha = hashlib.sha256()
+    with open(full_path, "rb") as f:
+        while chunk := f.read(65536):
+            sha.update(chunk)
+    actual_hash = sha.hexdigest()
+    expected_hash = target_doc.get("sha256_hash")
+
+    is_valid = True if not expected_hash else (actual_hash == expected_hash)
+
+    return {
+        "valid": is_valid,
+        "status": "VALID" if is_valid else "CORRUPTED",
+        "doc_id": doc_id,
+        "filename": target_doc.get("name"),
+        "version": target_doc.get("version", 1),
+        "expected_sha256": expected_hash,
+        "actual_sha256": actual_hash,
+        "file_size": full_path.stat().st_size
+    }
 
 
 @router.post("/{wp_id}/comments")

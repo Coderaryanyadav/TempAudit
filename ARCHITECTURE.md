@@ -1,108 +1,139 @@
-# FinAuditPro — Technical Architecture
+# FinAuditPro — Technical Architecture & Security Model
 
-FinAuditPro implements a 3-tier hybrid audit architecture engineered specifically for independent Chartered Accountants and audit seniors in India.
+FinAuditPro is an offline-first, AI-assisted desktop audit application engineered for Indian Chartered Accountants, statutory auditors, and tax professionals.
 
-```
-                               ┌─────────────────────────────┐
-                               │   FinAuditPro Desktop UI    │
-                               │ (HTML5/CSS3/Vanilla JS SPA) │
-                               └──────────────┬──────────────┘
-                                              │
-                               ┌──────────────▼──────────────┐
-                               │    FastAPI Backend Server   │
-                               │   (100% Local & Offline)    │
-                               └──────────────┬──────────────┘
-                                              │
-                     ┌────────────────────────┼────────────────────────┐
-                     │                        │                        │
-      ┌──────────────▼──────────────┐ ┌───────▼──────────────┐ ┌───────▼──────────────┐
-      │ 1. Deterministic Rule Engine│ │2. Statistical / ML   │ │3. Local LM Studio    │
-      ├─────────────────────────────┤ ├──────────────────────┤ ├──────────────────────┤
-      │• Debit = Credit check       │ │• Benford's Law (1-9) │ │• OpenAI-Compatible   │
-      │• Section 40A(3) (₹10k cash) │ │• Scikit-Learn        │ │  Localhost:1234 API  │
-      │• Section 269ST (₹2L cash)   │ │  Isolation Forest    │ │• PII Privacy Shield  │
-      │• GSTIN 15-char validation   │ │• 3-Sigma Z-Score     │ │• Deterministic Fact  │
-      │• Duplicate transaction hash │ │• Weekend timing spike│ │  Grounding           │
-      │• Date & chronology mismatch │ │• Outlier Score       │ │• Zero Cloud Leakage  │
-      └─────────────────────────────┘ └──────────────────────┘ └──────────────────────┘
-                                              │
-                               ┌──────────────▼──────────────┐
-                               │     Local SQLite Database   │
-                               │     (`finauditpro.db`)      │
-                               │  Trigger Immutable Trail    │
-                               └─────────────────────────────┘
+---
+
+## 1. High-Level Layered Architecture
+
+```mermaid
+graph TD
+    Client[Frontend SPA / Desktop UI] -->|REST API & JWT| Routers[FastAPI API Routers]
+    Routers --> Services[Domain Business Services]
+    Routers --> Repositories[Data Repositories Layer]
+    Services --> Repositories
+    Repositories --> DB[(Local SQLite DB WAL Mode)]
+
+    Routers --> Jobs[Background Job Queue]
+    Jobs --> DB
+
+    Routers --> Evidence[Evidence Immutability Store]
+    Evidence --> Storage[Controlled Physical Storage & SHA-256]
+    Evidence --> DB
+
+    Routers --> Audit[Audit Trail & Event Store]
+    Audit --> HashChain[Cryptographic SHA-256 Hash Chain]
+    Audit --> DB
+
+    Services --> AIGateway[AI Gateway & Data Boundary]
+    AIGateway --> LocalAI[Local AI Provider: LM Studio / Ollama / llama.cpp]
 ```
 
 ---
 
-## 1. Hybrid 3-Tier Execution Pipeline
+## 2. Core Architectural Principles
 
-### Tier 1: Deterministic Audit Engine
-- **Trial Balance Mathematical Equality:** Calculates exact $Total\,Dr == Total\,Cr$ and flags discrepancies.
-- **Income Tax Act Section 40A(3):** Flags cash expenditures exceeding ₹10,000 to any party in a single day (Clause 21(d) Form 3CD).
-- **Income Tax Act Section 269ST:** Flags cash receipts of ₹2,00,000 or more (Clause 31 Form 3CD).
-- **GSTIN 15-Character Checksum:** Verifies State Code + PAN + Entity Code + Z + Check Digit.
-- **Duplicate Detection:** Exact & Fuzzy string similarity matching on invoice numbers and amounts.
-- **Sequential Gap Detection:** Identifies missing voucher, invoice, or cheque numbers in continuous ranges.
+### 1. Offline-First SQLite Foundation
+- **Storage Engine:** SQLite 3 in WAL (`Write-Ahead Logging`) mode.
+- **Constraints & Pragmas:** `PRAGMA foreign_keys = ON;`, `PRAGMA busy_timeout = 30000;`.
+- **Zero Cloud Leakage:** Strictly no cloud telemetry, Redis, Celery, Kafka, or Kubernetes.
 
-### Tier 2: Statistical & Machine Learning Engine
-- **Benford's Law First-Digit Analysis (Nigrini Forensic Standard):** Computes empirical digit distributions against theoretical log distribution with Mean Absolute Deviation (MAD).
-- **Isolation Forest (Scikit-Learn):** Multi-variate outlier anomaly scoring across amount, debit, credit, day-of-week, and day-of-month features.
+### 2. Versioned Database Migrations
+- Tracked via `schema_migrations` table with SHA-256 file checksums and timestamp tracking.
+- Location: `backend/migrations/`
+  - `001_initial_schema.sql`
+  - `002_performance_indexes.sql`
+  - `003_evidence_and_jobs.sql`
+- Executed in safe transactions (`BEGIN IMMEDIATE`) during application startup or via `apply_migrations()`.
 
-### Tier 3: Local AI Assistant via LM Studio
-- **Privacy Shield:** Sanitizes all input text using regex scrubbers to redact PANs, GSTINs, bank accounts, and client names before model ingestion.
-- **Evidence-Grounded Querying:** First retrieves database transactions and deterministic rule results, passing verifiable evidence to LM Studio.
-- **Zero Hallucination Guarantee:** Never fabricates missing transactions or financial figures. If an item is not found, states: *"No matching transaction was found in the current engagement."*
+### 3. Financial Precision & Money Quantization
+- Application boundary calculations enforce canonical `Decimal` arithmetic.
+- Explicit paise quantization via `Decimal('0.01')` using `ROUND_HALF_UP`.
+- Utility functions in `backend/app/utils/money.py` guarantee zero binary floating point drift on debit/credit balancing, GST splits, reconciliation variances, and ledger aggregations.
+
+### 4. Immutable Evidence Architecture
+- Physical evidence files are decoupled from database metadata (`evidence_items`).
+- Every upload computes a SHA-256 hash stored in the database.
+- Path traversal protection via strict basename and root directory path resolution.
+- Multi-version history (`_v2`, `_v3`) with parent tracking and audit replacement reasons.
+- Physical integrity verification endpoint (`GET /api/evidence/verify/{id}`) checking expected vs actual disk SHA-256.
+
+### 5. Tamper-Evident Append-Only Audit Trail
+- Each event is cryptographically linked to the previous entry:
+  $$\text{entry\_hash} = \text{SHA256}(\text{previous\_hash} \mid \text{timestamp} \mid \text{user\_id} \mid \text{username} \mid \text{action} \mid \text{module} \mid \text{record\_id} \mid \text{old\_value} \mid \text{new\_value} \mid \text{details} \mid \text{engagement\_id})$$
+- Database triggers `trg_prevent_audit_log_update` and `trg_prevent_audit_log_delete` physically forbid modifying or deleting audit logs in SQLite.
+- Full-chain verification via `verify_audit_trail_integrity()`.
+
+### 6. AI Gateway & Strict Data Boundary
+- Clean abstraction interface `BaseLocalAIProvider` implemented by `LMStudioProvider`, `BuiltinDeterministicAIProvider`, `OllamaProvider`.
+- **AI Context Boundary:** Redacts PANs, GSTINs, bank accounts, emails, phone numbers, and entity names before prompting.
+- Enforces engagement scoping and context length limits.
+- **Advisory Invariant:** AI models can never directly mutate database transactions or audit records.
+
+### 7. Background Job Processing
+- Lightweight SQLite-backed queue `background_jobs` with thread pool executor (`JobManager`).
+- States: `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`.
+- Handles large Excel/CSV ingestion, batch reconciliation, ML anomaly detection, and report rendering without blocking the UI.
+
+### 8. System Integrity Diagnostics & Verified Backups
+- Diagnostic dashboard (`/api/system/integrity`) checking DB health, foreign keys, schema status, audit chain validity, and evidence files.
+- Manifest-backed backup archives (`.finpkg` / `.tar.gz`) containing DB snapshot, evidence files, and `manifest.json`.
+- Pre-restore validation checking structure, checksums, and schema version before overwriting the active database.
 
 ---
 
-## 2. Directory Layout & Separation of Concerns
+## 3. Directory Structure
 
 ```
 TempAudit-main/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py                     # FastAPI application & router mounting
-│   │   ├── auth.py                     # PBKDF2 cryptography & JWT tokens
-│   │   ├── database.py                 # SQLite init, schema & triggers
-│   │   ├── routers/                    # Modular REST API endpoints
+│   │   ├── auth.py                     # PBKDF2 authentication & JWT RBAC
+│   │   ├── database.py                 # SQLite WAL connection & initialization
+│   │   ├── schemas.py                  # Pydantic request/response schemas
+│   │   ├── repositories/               # Data access layer
+│   │   │   ├── transaction_repo.py
+│   │   │   ├── engagement_repo.py
+│   │   │   ├── evidence_repo.py
+│   │   │   └── audit_repo.py
+│   │   ├── routers/                    # REST API routers
 │   │   │   ├── auth.py
 │   │   │   ├── clients.py
 │   │   │   ├── engagements.py
-│   │   │   ├── import_data.py
-│   │   │   ├── trial_balance.py
-│   │   │   ├── reconciliation.py
-│   │   │   ├── gst_reconciliation.py
-│   │   │   ├── anomalies.py
-│   │   │   ├── audit_findings.py
+│   │   │   ├── transactions.py
 │   │   │   ├── working_papers.py
-│   │   │   ├── reports.py
-│   │   │   ├── audit_trail.py
-│   │   │   ├── ai_manager.py           # LM Studio configuration router
-│   │   │   └── settings.py
-│   │   └── services/                   # Business logic & algorithms
-│   │       ├── local_ai_provider.py    # LMStudioProvider & Privacy Shield
-│   │       ├── local_ai_assistant_engine.py
-│   │       ├── anomaly_detection_engine.py
-│   │       ├── bank_reconciliation_engine.py
-│   │       ├── gst_reconciliation_engine.py
-│   │       ├── trial_balance_analyzer.py
-│   │       ├── general_ledger_analyzer.py
-│   │       └── pdf_report_service.py
-│   ├── finauditpro.db                  # Local production SQLite database
-│   ├── backups/                        # Timestamped DB backups
-│   ├── uploaded_files/                 # Uploaded ledger/bank/GST files
-│   ├── reports_generated/              # Output PDF audit reports
-│   └── tests/                          # Pytest automated test suite
-├── frontend/                           # Single Page Application
-│   ├── index.html                      # HTML5 layout & modal overlays
-│   ├── css/styles.css                  # UI styling & tokens
-│   └── js/
-│       ├── api.js                      # REST API client
-│       └── app.js                      # Application controller & view routers
-├── .env                                # Local environment configuration
-├── setup.bat                           # Windows one-click installer
-├── start.bat                           # Windows launch script
-├── run.py                              # Python desktop runner
-└── requirements.txt                    # Production dependencies
+│   │   │   ├── evidence.py
+│   │   │   ├── jobs.py
+│   │   │   ├── system.py
+│   │   │   └── ...
+│   │   ├── services/                   # Business logic engines
+│   │   │   ├── anomaly_detection_engine.py
+│   │   │   ├── bank_reconciliation_engine.py
+│   │   │   ├── gst_reconciliation_engine.py
+│   │   │   ├── integrity_checker.py
+│   │   │   ├── backup_service.py
+│   │   │   └── ...
+│   │   ├── ai/                         # AI Gateway & boundary enforcement
+│   │   │   ├── gateway.py
+│   │   │   └── context_builder.py
+│   │   ├── jobs/                       # Background job execution
+│   │   │   └── job_manager.py
+│   │   └── utils/                      # Utilities
+│   │       ├── money.py
+│   │       ├── audit_logger.py
+│   │       └── pdf_generator.py
+│   ├── migrations/                     # Versioned SQL migrations
+│   │   ├── runner.py
+│   │   ├── 001_initial_schema.sql
+│   │   ├── 002_performance_indexes.sql
+│   │   └── 003_evidence_and_jobs.sql
+│   ├── finauditpro.db                  # Local SQLite database
+│   ├── backups/                        # Backups & manifest bundles
+│   ├── uploaded_files/                 # Physical evidence storage
+│   └── tests/                          # Automated test suite (183 tests)
+├── frontend/                           # SPA Frontend (HTML5 / CSS3 / Vanilla JS)
+├── scripts/
+│   └── e2e_full_audit_workflow.py     # 24-step autonomous E2E test suite
+└── requirements.txt
 ```
