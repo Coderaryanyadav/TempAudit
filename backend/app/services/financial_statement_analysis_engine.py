@@ -4,12 +4,32 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 from backend.app.database import get_db_connection
 
-def safe_div(n: float, d: float, default: float = 0.0) -> float:
-    if not d or abs(d) < 1e-6:
+def safe_div(n: Optional[float], d: Optional[float], default: Any = None) -> Optional[float]:
+    """
+    Safely computes n / d.
+    Returns default (None by default) if d is 0, None, or undefined, avoiding false zero ratio values.
+    """
+    if n is None or d is None:
+        return default
+    if abs(d) < 1e-6:
         return default
     return round(n / d, 4)
 
-def calculate_change(cy: float, py: float) -> Dict[str, Any]:
+def calculate_change(cy: Optional[float], py: Optional[float]) -> Dict[str, Any]:
+    """
+    Computes absolute and percentage change between Current Year (CY) and Previous Year (PY).
+    Properly handles missing/undefined values without fabricating zeroes.
+    """
+    if cy is None or py is None:
+        return {
+            "current_value": cy,
+            "previous_value": py,
+            "absolute_difference": None,
+            "percentage_difference": None,
+            "change_type": "NO_PRIOR_YEAR_DATA" if py is None else "UNDEFINED_METRIC",
+            "is_significant": False
+        }
+
     abs_diff = round(cy - py, 2)
     if abs(py) < 1e-4:
         pct_diff = None
@@ -28,8 +48,10 @@ def calculate_change(cy: float, py: float) -> Dict[str, Any]:
         "is_significant": is_significant
     }
 
-def get_possible_explanations(metric_key: str, cy: float, py: float, pct_diff: Optional[float] = None) -> List[str]:
+def get_possible_explanations(metric_key: str, cy: Optional[float], py: Optional[float], pct_diff: Optional[float] = None) -> List[str]:
     """Provides plausible statutory and business hypothesis categories for significant financial movements (requires auditor corroboration)."""
+    if cy is None or py is None:
+        return []
     if pct_diff is None:
         is_increase = cy > py
     else:
@@ -103,6 +125,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
     """
     Executes full Schedule III Balance Sheet, P&L, Cash Flow, and deterministic ratio analysis.
     Performs Current Year (CY) vs Previous Year (PY) comparative analytics with significant movement detection.
+    Enforces strict zero-fabrication: tax expense and balance sheet line items are derived strictly from source vouchers.
     """
     conn = get_db_connection()
     eng_row = conn.execute("SELECT * FROM engagements WHERE id = ?", (engagement_id,)).fetchone()
@@ -142,7 +165,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
             GROUP BY ledger, account_group
         """, (py_eng_row["id"],)).fetchall()
 
-    # 3. Aggregate Ledger Figures
+    # 3. Aggregate Ledger Figures strictly according to Canonical Chart of Accounts rules
     def aggregate_statements(rows):
         rev = 0.0
         cogs = 0.0
@@ -150,6 +173,8 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         finance_costs = 0.0
         depreciation = 0.0
         other_exp = 0.0
+        tax_expense = 0.0
+        tax_entries_found = False
 
         cash_bank = 0.0
         debtors = 0.0
@@ -175,21 +200,72 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         equity_items = []
 
         for r in rows:
-            ledger = r["ledger"]
+            ledger = r["ledger"] or ""
             l_lower = ledger.lower()
             group = (r["account_group"] or "").lower()
             dr = float(r["total_debit"] or 0.0)
             cr = float(r["total_credit"] or 0.0)
 
-            # 1. Check Account Group or Specific Keywords
-            # Revenue / Income
-            if "revenue" in group or "income" in group or "sales" in group or (("sale" in l_lower or "revenue" in l_lower) and "asset" not in group and "receivable" not in l_lower):
+            # --- 1. Capital Purchases & Fixed Assets Overrides ---
+            is_capital_purchase = ("purchase" in l_lower and any(k in l_lower for k in ["capital", "machinery", "equipment", "asset", "fixed", "furniture", "computer", "vehicle"]))
+            if is_capital_purchase or "fixed asset" in group or "fixed asset" in l_lower or "property" in l_lower or "plant" in l_lower or "machinery" in l_lower or "ppe" in l_lower:
+                amt = dr - cr
+                if amt != 0:
+                    asset_items.append({"ledger": ledger, "amount": amt})
+                    fixed_assets += amt
+                continue
+
+            # --- 2. Contra Revenue (Sales Returns / Return Inward) ---
+            if "return inward" in l_lower or "sales return" in l_lower or "sale return" in l_lower:
+                amt = dr - cr  # Debits in sales return reduce net revenue
+                if amt != 0:
+                    revenue_items.append({"ledger": ledger, "amount": -amt})
+                    rev -= amt
+                continue
+
+            # --- 3. Contra Expense (Purchase Returns / Return Outward) ---
+            if "return outward" in l_lower or "purchase return" in l_lower:
+                amt = cr - dr  # Credits in purchase return reduce COGS/expenses
+                if amt != 0:
+                    expense_items.append({"ledger": ledger, "amount": -amt})
+                    cogs -= amt
+                continue
+
+            # --- 4. Tax Expense & Provisions vs Tax Assets / Liabilities ---
+            is_tax_kw = any(k in l_lower for k in ["income tax", "tax expense", "provision for tax", "provision for income tax", "current tax", "deferred tax", "tax provision"])
+            if is_tax_kw:
+                is_tax_liability = "payable" in l_lower or "liabilit" in group or "provision" in group or ("provision for" in l_lower and "expense" not in group and "expense" not in l_lower)
+                is_tax_asset = "advance" in l_lower or "tds" in l_lower or "tcs" in l_lower or "asset" in group or "receivable" in l_lower
+
+                if is_tax_liability:
+                    amt = cr - dr
+                    if amt != 0:
+                        liability_items.append({"ledger": ledger, "amount": amt})
+                        other_cl += amt
+                    continue
+                elif is_tax_asset:
+                    amt = dr - cr
+                    if amt != 0:
+                        asset_items.append({"ledger": ledger, "amount": amt})
+                        other_ca += amt
+                    continue
+                else:
+                    # True P&L Tax Expense Ledger
+                    amt = dr - cr
+                    if amt != 0:
+                        expense_items.append({"ledger": ledger, "amount": amt})
+                        tax_expense += amt
+                        tax_entries_found = True
+                    continue
+
+            # --- 5. Revenue / Income ---
+            if "revenue" in group or "income" in group or "sales" in group or (("sale" in l_lower or "revenue" in l_lower) and "asset" not in group and "receivable" not in l_lower and "creditor" not in l_lower):
                 amt = cr - dr
                 if amt != 0:
                     revenue_items.append({"ledger": ledger, "amount": amt})
                     rev += amt
 
-            # Expenses / Cost of Goods Sold
+            # --- 6. Expenses / Cost of Goods Sold ---
             elif "expense" in group or "cost" in group or ("purchase" in l_lower and "asset" not in group) or "salary" in l_lower or "wages" in l_lower or bool(re.search(r'\brent\b', l_lower)) or "freight" in l_lower or "depreciation" in l_lower or ("interest" in l_lower and "received" not in l_lower and "loan" not in l_lower):
                 amt = dr - cr
                 if amt != 0:
@@ -205,7 +281,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                     else:
                         other_exp += amt
 
-            # Equity & Capital
+            # --- 7. Equity & Capital ---
             elif "equity" in group or "capital" in group or "reserve" in group or "surplus" in group or (("share capital" in l_lower or "proprietor capital" in l_lower or "partners capital" in l_lower) and "asset" not in group):
                 amt = cr - dr
                 if amt != 0:
@@ -215,7 +291,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                     else:
                         reserves += amt
 
-            # Liabilities (Current & Non-Current)
+            # --- 8. Liabilities (Current & Non-Current) ---
             elif "liability" in group or "payable" in group or "borrowing" in group or "creditor" in l_lower or "payable" in l_lower or "term loan" in l_lower or "cash credit" in l_lower or "overdraft" in l_lower or "od/cc" in l_lower or "borrowing" in l_lower:
                 amt = cr - dr
                 if amt != 0:
@@ -231,7 +307,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                     else:
                         other_ncl += amt
 
-            # Assets (Current & Fixed)
+            # --- 9. Assets (Current & Non-Current) ---
             else:
                 amt = dr - cr
                 if amt != 0:
@@ -242,8 +318,6 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                         debtors += amt
                     elif "stock" in l_lower or "inventory" in l_lower:
                         inventory += amt
-                    elif "machinery" in l_lower or "building" in l_lower or "plant" in l_lower or "ppe" in l_lower or "fixed asset" in l_lower or "computer" in l_lower or "furniture" in l_lower or "vehicle" in l_lower or "fixed" in group:
-                        fixed_assets += amt
                     elif "investment" in l_lower or "shares" in l_lower or "mutual" in l_lower:
                         investments += amt
                     elif "advance" in l_lower or "deposit" in l_lower or "prepaid" in l_lower:
@@ -251,15 +325,17 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                     else:
                         other_nca += amt
 
-        # P&L Totals (Computed strictly from real ledger balances - no synthetic estimations)
+        # P&L Totals (Derived strictly from real ledger balances - no assumed percentages)
         total_income = rev
         gross_profit = rev - cogs
         total_operating_expenses = employee_exp + other_exp
         ebitda = gross_profit - total_operating_expenses
         ebit = ebitda - depreciation
         pbt = ebit - finance_costs
-        tax_expense = max(0.0, pbt * 0.25)
-        pat = pbt - tax_expense
+        
+        # Real ledger-derived tax expense (Never assume 25% or any hardcoded rate)
+        actual_tax = tax_expense if tax_entries_found else 0.0
+        pat = pbt - actual_tax
 
         # Balance Sheet Totals
         current_assets = cash_bank + debtors + inventory + other_ca
@@ -270,10 +346,15 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         non_current_liabilities = lt_borrowings + other_ncl
         total_liabilities = current_liabilities + non_current_liabilities
         
+        # Equity accounting: Share capital + opening reserves + current year PAT
         total_equity = share_capital + reserves + pat
         total_equity_and_liabilities = total_equity + total_liabilities
 
-        # Rounding
+        # Fundamental Accounting Equation Check
+        diff = round(abs(total_assets - total_equity_and_liabilities), 2)
+        is_balanced = diff < 0.01
+        bs_status = "BALANCED" if is_balanced else "IMBALANCED"
+
         return {
             "pnl": {
                 "revenue": round(rev, 2),
@@ -287,7 +368,8 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                 "ebitda": round(ebitda, 2),
                 "ebit": round(ebit, 2),
                 "pbt": round(pbt, 2),
-                "tax_expense": round(tax_expense, 2),
+                "tax_expense": round(actual_tax, 2),
+                "tax_data_status": "ACTUAL_LEDGER" if tax_entries_found else "NOT_RECORDED_OR_ZERO",
                 "pat": round(pat, 2),
                 "revenue_items": revenue_items,
                 "expense_items": expense_items
@@ -317,15 +399,20 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                 "total_liabilities": round(total_liabilities, 2),
                 "share_capital": round(share_capital, 2),
                 "reserves_surplus": round(reserves, 2),
+                "reserves_surplus_opening": round(reserves, 2),
+                "current_year_pat": round(pat, 2),
                 "pat_retained": round(pat, 2),
                 "total_equity": round(total_equity, 2),
                 "total_equity_and_liabilities": round(total_equity_and_liabilities, 2),
                 "total_liabilities_and_equity": round(total_equity_and_liabilities, 2),
-                "difference": round(abs(total_assets - total_equity_and_liabilities), 2)
+                "balance_sheet_status": bs_status,
+                "balance_difference": diff,
+                "difference": diff,
+                "integrity_warning": None if is_balanced else f"Balance Sheet is IMBALANCED by ₹{diff:,.2f}. Assets: ₹{total_assets:,.2f}, Equity & Liabilities: ₹{total_equity_and_liabilities:,.2f}."
             }
         }
 
-    # 4. Compute Deterministic Ratios
+    # 4. Compute Deterministic Ratios (Return None / null for undefined zero-denominator ratios)
     def compute_ratios(pnl, bs):
         rev = pnl["revenue"]
         cogs = pnl["cogs"]
@@ -342,48 +429,49 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         total_equity = bs["total_equity"]
         capital_employed = bs["total_assets"] - cl
 
-        # Liquidity
-        curr_ratio = safe_div(ca, cl, 0.0)
-        quick_ratio = safe_div(ca - inv, cl, 0.0)
+        # Liquidity (Undefined / None when liabilities are zero)
+        curr_ratio = safe_div(ca, cl, None)
+        quick_ratio = safe_div(ca - inv, cl, None)
 
-        # Solvency
-        debt_equity = safe_div(total_debt, total_equity, 0.0)
+        # Solvency (Undefined / None when equity is zero or negative)
+        debt_equity = safe_div(total_debt, total_equity, None) if total_equity > 0 else None
 
-        # Profitability
-        gp_margin = safe_div(gp * 100.0, rev, 0.0)
-        np_margin = safe_div(pat * 100.0, rev, 0.0)
-        op_margin = safe_div(ebit * 100.0, rev, 0.0)
-        roce = safe_div(ebit * 100.0, capital_employed, 0.0)
-        roe = safe_div(pat * 100.0, total_equity, 0.0)
+        # Profitability (Undefined / None when revenue is zero)
+        gp_margin = safe_div(gp * 100.0, rev, None)
+        np_margin = safe_div(pat * 100.0, rev, None)
+        op_margin = safe_div(ebit * 100.0, rev, None)
+        roce = safe_div(ebit * 100.0, capital_employed, None) if capital_employed > 0 else None
+        roe = safe_div(pat * 100.0, total_equity, None) if total_equity > 0 else None
 
-        # Activity / Turnover
-        rec_turnover = safe_div(rev, debtors, 0.0)
-        dso_days = round(365.0 / rec_turnover, 1) if rec_turnover > 0 else 0.0
+        # Activity / Turnover (Undefined / None when balances are zero)
+        rec_turnover = safe_div(rev, debtors, None)
+        dso_days = round(365.0 / rec_turnover, 1) if (rec_turnover is not None and rec_turnover > 0) else None
 
-        inv_turnover = safe_div(cogs, inv, 0.0)
-        dsi_days = round(365.0 / inv_turnover, 1) if inv_turnover > 0 else 0.0
+        inv_turnover = safe_div(cogs, inv, None)
+        dsi_days = round(365.0 / inv_turnover, 1) if (inv_turnover is not None and inv_turnover > 0) else None
 
-        pay_turnover = safe_div(cogs, creditors, 0.0)
-        dpo_days = round(365.0 / pay_turnover, 1) if pay_turnover > 0 else 0.0
+        pay_turnover = safe_div(cogs, creditors, None)
+        dpo_days = round(365.0 / pay_turnover, 1) if (pay_turnover is not None and pay_turnover > 0) else None
 
-        wc_turnover = safe_div(rev, ca - cl, 0.0)
+        wc_diff = ca - cl
+        wc_turnover = safe_div(rev, wc_diff, None) if abs(wc_diff) > 1e-6 else None
 
         return {
-            "current_ratio": round(curr_ratio, 2),
-            "quick_ratio": round(quick_ratio, 2),
-            "debt_equity_ratio": round(debt_equity, 2),
-            "gross_profit_margin_pct": round(gp_margin, 2),
-            "net_profit_margin_pct": round(np_margin, 2),
-            "operating_margin_pct": round(op_margin, 2),
-            "receivable_turnover": round(rec_turnover, 2),
+            "current_ratio": round(curr_ratio, 2) if curr_ratio is not None else None,
+            "quick_ratio": round(quick_ratio, 2) if quick_ratio is not None else None,
+            "debt_equity_ratio": round(debt_equity, 2) if debt_equity is not None else None,
+            "gross_profit_margin_pct": round(gp_margin, 2) if gp_margin is not None else None,
+            "net_profit_margin_pct": round(np_margin, 2) if np_margin is not None else None,
+            "operating_margin_pct": round(op_margin, 2) if op_margin is not None else None,
+            "receivable_turnover": round(rec_turnover, 2) if rec_turnover is not None else None,
             "dso_days": dso_days,
-            "inventory_turnover": round(inv_turnover, 2),
+            "inventory_turnover": round(inv_turnover, 2) if inv_turnover is not None else None,
             "dsi_days": dsi_days,
-            "payable_turnover": round(pay_turnover, 2),
+            "payable_turnover": round(pay_turnover, 2) if pay_turnover is not None else None,
             "dpo_days": dpo_days,
-            "return_on_capital_employed_pct": round(roce, 2),
-            "return_on_equity_pct": round(roe, 2),
-            "working_capital_turnover": round(wc_turnover, 2)
+            "return_on_capital_employed_pct": round(roce, 2) if roce is not None else None,
+            "return_on_equity_pct": round(roe, 2) if roe is not None else None,
+            "working_capital_turnover": round(wc_turnover, 2) if wc_turnover is not None else None
         }
 
     # Aggregate CY
@@ -403,7 +491,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         py_bs = None
         py_ratios = None
 
-    # 5. Compute Cash Flow Statement (Indirect Method)
+    # 5. Compute Cash Flow Statement (Consistent Indirect Method with Fundamental Equation Verification)
     def compute_cash_flow(cy_pnl, cy_bs, py_bs):
         if not py_bs:
             return {
@@ -414,76 +502,101 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                 "cash_flow_financing": None,
                 "net_cash_flow": None,
                 "opening_cash_balance": None,
-                "closing_cash_balance": cy_bs["cash_bank"]
+                "closing_cash_balance": cy_bs["cash_bank"],
+                "cash_flow_reconciles": None,
+                "reconciliation_difference": None
             }
 
-        pat = cy_pnl["pat"]
+        pbt = cy_pnl["pbt"]
         dep = cy_pnl["depreciation"]
+        fin_cost = cy_pnl.get("finance_costs", 0.0)
+        tax_paid = cy_pnl.get("tax_expense", 0.0)
         
-        # Working capital changes
-        delta_debtors = cy_bs["trade_debtors"] - py_bs["trade_debtors"]
-        delta_inv = cy_bs["inventory"] - py_bs["inventory"]
-        delta_other_ca = cy_bs["other_current_assets"] - py_bs["other_current_assets"]
-        delta_creditors = cy_bs["trade_creditors"] - py_bs["trade_creditors"]
-        delta_other_cl = cy_bs["other_current_liabilities"] - py_bs["other_current_liabilities"]
+        # Working capital movements
+        delta_debtors = round(cy_bs["trade_debtors"] - py_bs["trade_debtors"], 2)
+        delta_inv = round(cy_bs["inventory"] - py_bs["inventory"], 2)
+        delta_other_ca = round(cy_bs["other_current_assets"] - py_bs["other_current_assets"], 2)
+        delta_creditors = round(cy_bs["trade_creditors"] - py_bs["trade_creditors"], 2)
+        delta_other_cl = round(cy_bs["other_current_liabilities"] - py_bs["other_current_liabilities"], 2)
+        wc_adjustment = round(- delta_debtors - delta_inv - delta_other_ca + delta_creditors + delta_other_cl, 2)
 
-        cfo = round(pat + dep - delta_debtors - delta_inv - delta_other_ca + delta_creditors + delta_other_cl, 2)
+        # Operating Activities:
+        # PBT + Depreciation + Finance Costs + Working Capital Changes - Direct Taxes Paid
+        op_profit_before_wc = round(pbt + dep + fin_cost, 2)
+        cash_gen_ops = round(op_profit_before_wc + wc_adjustment, 2)
+        cfo = round(cash_gen_ops - tax_paid, 2)
 
         # Investing Activities (Capex & Investments)
-        delta_ppe = cy_bs["fixed_assets_ppe"] - py_bs["fixed_assets_ppe"] + dep
-        delta_invst = cy_bs["investments"] - py_bs["investments"]
+        delta_ppe = round(cy_bs["fixed_assets_ppe"] - py_bs["fixed_assets_ppe"] + dep, 2)
+        delta_invst = round(cy_bs["investments"] - py_bs["investments"], 2)
         cfi = round(- (delta_ppe + delta_invst), 2)
 
-        # Financing Activities (Borrowings & Equity)
-        delta_lt_debt = cy_bs["long_term_borrowings"] - py_bs["long_term_borrowings"]
-        delta_st_debt = cy_bs["short_term_borrowings"] - py_bs["short_term_borrowings"]
-        delta_equity = cy_bs["share_capital"] - py_bs["share_capital"]
-        cff = round(delta_lt_debt + delta_st_debt + delta_equity, 2)
+        # Financing Activities (Borrowings, Equity, and Finance Costs Paid)
+        delta_lt_debt = round(cy_bs["long_term_borrowings"] - py_bs["long_term_borrowings"], 2)
+        delta_st_debt = round(cy_bs["short_term_borrowings"] - py_bs["short_term_borrowings"], 2)
+        delta_equity = round(cy_bs["share_capital"] - py_bs["share_capital"], 2)
+        cff = round(delta_lt_debt + delta_st_debt + delta_equity - fin_cost, 2)
 
         net_change = round(cfo + cfi + cff, 2)
         opening_cash = py_bs["cash_bank"]
         closing_cash = cy_bs["cash_bank"]
 
+        # Fundamental Cash Flow Verification: Opening Cash + Net Change == Closing Cash
+        recon_diff = round(opening_cash + net_change - closing_cash, 2)
+        cash_flow_reconciles = abs(recon_diff) < 0.05
+
         return {
             "status": "COMPUTED",
+            "cash_flow_reconciles": cash_flow_reconciles,
+            "reconciliation_difference": recon_diff,
             "cash_flow_operating": cfo,
             "cash_flow_investing": cfi,
             "cash_flow_financing": cff,
             "net_cash_flow": {
                 "net_increase_in_cash_and_equivalents": net_change,
                 "cash_at_beginning_of_period": opening_cash,
-                "cash_at_end_of_period": closing_cash
+                "cash_at_end_of_period": closing_cash,
+                "cash_flow_reconciles": cash_flow_reconciles,
+                "reconciliation_difference": recon_diff
             },
             "opening_cash_balance": opening_cash,
             "closing_cash_balance": closing_cash,
             "operating_activities": {
                 "net_cash_from_operating_activities": cfo,
-                "net_profit_before_tax": cy_pnl.get("pbt", pat),
+                "net_profit_before_tax": pbt,
                 "adjustments_for_depreciation": dep,
-                "adjustments_for_finance_costs": cy_pnl.get("finance_costs", 0.0),
+                "adjustments_for_finance_costs": fin_cost,
+                "operating_profit_before_working_capital_changes": op_profit_before_wc,
                 "change_in_trade_receivables": -delta_debtors,
                 "change_in_inventories": -delta_inv,
+                "change_in_other_current_assets": -delta_other_ca,
                 "change_in_trade_payables": delta_creditors,
-                "change_in_other_working_capital": delta_other_cl - delta_other_ca,
-                "direct_taxes_paid": cy_pnl.get("tax_expense", 0.0)
+                "change_in_other_current_liabilities": delta_other_cl,
+                "working_capital_adjustments": wc_adjustment,
+                "cash_generated_from_operations": cash_gen_ops,
+                "direct_taxes_paid": tax_paid
             },
             "investing_activities": {
                 "net_cash_from_investing_activities": cfi,
                 "purchase_of_fixed_assets": -delta_ppe,
-                "other_investing_cash_flow": -delta_invst
+                "purchase_of_investments": -delta_invst
             },
             "financing_activities": {
                 "net_cash_from_financing_activities": cff,
-                "proceeds_from_borrowings": delta_lt_debt + delta_st_debt,
-                "finance_costs_paid": cy_pnl.get("finance_costs", 0.0),
-                "dividend_paid": delta_equity
+                "proceeds_from_borrowings": round(delta_lt_debt + delta_st_debt, 2),
+                "proceeds_from_equity": delta_equity,
+                "finance_costs_paid": -fin_cost
             },
             "details": {
-                "net_profit_pat": pat,
+                "net_profit_pbt": pbt,
+                "net_profit_pat": cy_pnl["pat"],
                 "depreciation_added_back": dep,
-                "working_capital_adjustments": round(- delta_debtors - delta_inv + delta_creditors, 2),
+                "finance_costs_added_back": fin_cost,
+                "working_capital_adjustments": wc_adjustment,
                 "capex_outflow": round(- delta_ppe, 2),
-                "net_borrowing_change": round(delta_lt_debt + delta_st_debt, 2)
+                "net_borrowing_change": round(delta_lt_debt + delta_st_debt, 2),
+                "cash_flow_reconciles": cash_flow_reconciles,
+                "difference": recon_diff
             }
         }
 
@@ -535,7 +648,7 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
     significant_movements_count = 0
 
     for key, name, cat, cy_val, py_val, unit in metrics_to_compare:
-        if py_val is not None:
+        if py_val is not None and cy_val is not None:
             chg = calculate_change(cy_val, py_val)
             is_sig = chg["is_significant"]
             if is_sig:
@@ -551,11 +664,11 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
             prev_val = chg["previous_value"]
         else:
             is_sig = False
-            finding_status = "No prior year data"
+            finding_status = "No prior year data" if py_val is None else "Undefined metric"
             expl_categories = []
             abs_diff = None
             pct_diff = None
-            change_type = "NO_PRIOR_YEAR_DATA"
+            change_type = "NO_PRIOR_YEAR_DATA" if py_val is None else "UNDEFINED"
             prev_val = None
 
         saved = saved_expls.get(key, {})
@@ -579,6 +692,14 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         })
 
     # 8. Management / Audit Analysis Summary Synthesis
+    cr_str = f"{cy_ratios['current_ratio']}x" if cy_ratios['current_ratio'] is not None else "N/A"
+    qr_str = f"{cy_ratios['quick_ratio']}x" if cy_ratios['quick_ratio'] is not None else "N/A"
+    de_str = f"{cy_ratios['debt_equity_ratio']}x" if cy_ratios['debt_equity_ratio'] is not None else "N/A"
+    npm_str = f"{cy_ratios['net_profit_margin_pct']}%" if cy_ratios['net_profit_margin_pct'] is not None else "N/A"
+    dso_str = f"{cy_ratios['dso_days']} days" if cy_ratios['dso_days'] is not None else "N/A"
+    dsi_str = f"{cy_ratios['dsi_days']} days" if cy_ratios['dsi_days'] is not None else "N/A"
+    dpo_str = f"{cy_ratios['dpo_days']} days" if cy_ratios['dpo_days'] is not None else "N/A"
+
     if py_available and py_data:
         rev_cy = cy_data['pnl']['revenue']
         rev_py = py_data['pnl']['revenue']
@@ -586,17 +707,17 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
         summary_text = (
             f"Financial Statement Analysis for FY {cy_year} (vs FY {py_year}) reveals a revenue trajectory of "
             f"₹{rev_cy:,.2f} ({'+' if rev_cy >= rev_py else ''}{pct_rev:.1f}%) with PAT of "
-            f"₹{cy_data['pnl']['pat']:,.2f} (Net Margin: {cy_ratios['net_profit_margin_pct']}%). "
-            f"Liquidity remains {'adequate' if cy_ratios['current_ratio'] >= 1.33 else 'tight'} with a Current Ratio of {cy_ratios['current_ratio']}x "
-            f"and Quick Ratio of {cy_ratios['quick_ratio']}x. Solvency profile reflects Debt-to-Equity of {cy_ratios['debt_equity_ratio']}x. "
-            f"Working capital cycle indicates DSO of {cy_ratios['dso_days']} days, DSI of {cy_ratios['dsi_days']} days, and DPO of {cy_ratios['dpo_days']} days. "
+            f"₹{cy_data['pnl']['pat']:,.2f} (Net Margin: {npm_str}). "
+            f"Liquidity reflects a Current Ratio of {cr_str} and Quick Ratio of {qr_str}. "
+            f"Solvency profile reflects Debt-to-Equity of {de_str}. "
+            f"Working capital cycle indicates DSO of {dso_str}, DSI of {dsi_str}, and DPO of {dpo_str}. "
             f"{significant_movements_count} significant movements detected requiring auditor review."
         )
     else:
         summary_text = (
             f"Financial Statement Analysis for FY {cy_year} (Standalone CY). Revenue is ₹{cy_data['pnl']['revenue']:,.2f} "
-            f"with PAT of ₹{cy_data['pnl']['pat']:,.2f} (Net Margin: {cy_ratios['net_profit_margin_pct']}%). "
-            f"Liquidity reflects Current Ratio of {cy_ratios['current_ratio']}x and Quick Ratio of {cy_ratios['quick_ratio']}x. "
+            f"with PAT of ₹{cy_data['pnl']['pat']:,.2f} (Net Margin: {npm_str}). "
+            f"Liquidity reflects Current Ratio of {cr_str} and Quick Ratio of {qr_str}. "
             f"Prior year source dataset is NOT AVAILABLE; comparative cash flow and YoY baseline movements are omitted."
         )
 

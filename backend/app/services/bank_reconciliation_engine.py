@@ -171,22 +171,51 @@ def run_bank_reconciliation(
 
                 exact_candidates.append((priority, -date_diff, bk, bn, is_exact_chq, is_exact_ref, is_ambiguous, bk_chq, bk_ref, bk_amt, date_diff))
 
+    ambiguous_items = []
+
     # Sort exact candidates by priority descending, date proximity ascending
     exact_candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
     for priority, _, bk, bn, is_exact_chq, is_exact_ref, is_ambiguous, bk_chq, bk_ref, bk_amt, date_diff in exact_candidates:
         if bk["id"] in matched_book_ids or bn["id"] in matched_bank_ids:
             continue
-        matched_book_ids.add(bk["id"])
-        matched_bank_ids.add(bn["id"])
 
         reason_parts = [f"Exact Amount ₹{bk_amt:,.2f}"]
         if is_exact_chq:
             reason_parts.append(f"Matching Cheque #{bk_chq}")
         elif is_exact_ref:
             reason_parts.append(f"Matching Ref #{bk_ref}")
+
         if is_ambiguous:
             reason_parts.append("Ambiguous Duplicate Entry (Multiple Identical Amounts/Parties - Requires Auditor Verification)")
-        elif date_diff == 0:
+            ambiguous_items.append({
+                "book_tx_id": bk["id"],
+                "bank_tx_id": bn["id"],
+                "date_a": bk.get("date"),
+                "date_b": bn.get("date"),
+                "ref_a": bk.get("voucher_no") or bk.get("reference_no") or "",
+                "ref_b": bn.get("voucher_no") or bn.get("reference_no") or "",
+                "party_a": bk.get("party_name") or "",
+                "party_b": bn.get("party_name") or "",
+                "description_a": bk.get("description") or "",
+                "description_b": bn.get("description") or "",
+                "amount_a": bk_amt,
+                "amount_b": bk_amt,
+                "difference": 0.0,
+                "date_diff_days": date_diff,
+                "match_level": "AMBIGUOUS EXACT CANDIDATE",
+                "match_score": 85.0,
+                "match_reason": " • ".join(reason_parts),
+                "item_type": "AMBIGUOUS_CANDIDATE",
+                "status": "Review Required",
+                "notes": "Ambiguous duplicate candidates require manual auditor verification before reconciliation."
+            })
+            # Do NOT add to matched_book_ids or matched_bank_ids so they remain open for auditor verification
+            continue
+
+        matched_book_ids.add(bk["id"])
+        matched_bank_ids.add(bn["id"])
+
+        if date_diff == 0:
             reason_parts.append("Same Day Clearance")
         else:
             reason_parts.append(f"{date_diff}d timing clearance")
@@ -206,12 +235,12 @@ def run_bank_reconciliation(
             "amount_b": bk_amt,
             "difference": 0.0,
             "date_diff_days": date_diff,
-            "match_level": "AMBIGUOUS EXACT CANDIDATE" if is_ambiguous else "EXACT MATCH",
-            "match_score": 85.0 if is_ambiguous else 100.0,
+            "match_level": "EXACT MATCH",
+            "match_score": 100.0,
             "match_reason": " • ".join(reason_parts),
             "item_type": "MATCHED",
-            "status": "Review Required" if is_ambiguous else "Confirmed",
-            "notes": "Ambiguous duplicate candidates require manual auditor verification." if is_ambiguous else "System verified exact voucher and statement match with strong identifier."
+            "status": "Confirmed",
+            "notes": "System verified exact voucher and statement match with strong identifier."
         })
 
     # -------------------------------------------------------------
@@ -284,8 +313,9 @@ def run_bank_reconciliation(
         })
 
     # -------------------------------------------------------------
-    # PASS 3: POSSIBLE MATCH (50% - 79% Score)
+    # PASS 3: POSSIBLE MATCH (50% - 79% Score - Global Bipartite Pairing)
     # -------------------------------------------------------------
+    possible_candidates = []
     for bk in book_txs:
         if bk["id"] in matched_book_ids:
             continue
@@ -313,59 +343,42 @@ def run_bank_reconciliation(
 
             # Case A: Exact amount with larger date lag (8-30 days)
             if amt_diff == 0.0 and date_diff <= 30:
-                matched_book_ids.add(bk["id"])
-                matched_bank_ids.add(bn["id"])
-                matched_items.append({
-                    "book_tx_id": bk["id"],
-                    "bank_tx_id": bn["id"],
-                    "date_a": bk.get("date"),
-                    "date_b": bn.get("date"),
-                    "ref_a": bk.get("voucher_no") or bk.get("reference_no") or "",
-                    "ref_b": bn.get("voucher_no") or bn.get("reference_no") or "",
-                    "party_a": bk_party,
-                    "party_b": bn_party,
-                    "description_a": bk_desc,
-                    "description_b": bn_desc,
-                    "amount_a": bk_amt,
-                    "amount_b": bn_amt,
-                    "difference": 0.0,
-                    "date_diff_days": date_diff,
-                    "match_level": "POSSIBLE MATCH",
-                    "match_score": 65.0,
-                    "match_reason": f"Exact Amount ₹{bk_amt:,.2f} with extended {date_diff} days transit lag",
-                    "item_type": "MATCHED",
-                    "status": "Suggested",
-                    "notes": "Possible match requiring auditor verification of delayed clearance."
-                })
-                break
+                score = 65.0 - (date_diff * 0.3)
+                possible_candidates.append((score, -date_diff, bk, bn, bk_amt, bn_amt, 0.0, date_diff, "MATCHED", "POSSIBLE MATCH", f"Exact Amount ₹{bk_amt:,.2f} with extended {date_diff} days transit lag"))
             
-            # Case B: Minor amount difference (<= ₹50 or <= 0.5% e.g. bank fee deduction) with matching party
+            # Case B: Minor amount difference (<= ₹100 e.g. bank fee deduction) with matching party
             elif amt_diff > 0 and amt_diff <= 100.0 and sim >= 0.4 and date_diff <= 10:
-                matched_book_ids.add(bk["id"])
-                matched_bank_ids.add(bn["id"])
-                matched_items.append({
-                    "book_tx_id": bk["id"],
-                    "bank_tx_id": bn["id"],
-                    "date_a": bk.get("date"),
-                    "date_b": bn.get("date"),
-                    "ref_a": bk.get("voucher_no") or bk.get("reference_no") or "",
-                    "ref_b": bn.get("voucher_no") or bn.get("reference_no") or "",
-                    "party_a": bk_party,
-                    "party_b": bn_party,
-                    "description_a": bk_desc,
-                    "description_b": bn_desc,
-                    "amount_a": bk_amt,
-                    "amount_b": bn_amt,
-                    "difference": amt_diff,
-                    "date_diff_days": date_diff,
-                    "match_level": "POSSIBLE MATCH",
-                    "match_score": 55.0,
-                    "match_reason": f"Party match '{bk_party}' with variance ₹{amt_diff:,.2f} (Potential bank service fee or deduction)",
-                    "item_type": "AMOUNT_MISMATCH",
-                    "status": "Suggested",
-                    "notes": "Potential amount discrepancy detected. Verify deduction or billing adjustment."
-                })
-                break
+                score = 55.0 + (sim * 10.0) - (date_diff * 0.3)
+                possible_candidates.append((score, -date_diff, bk, bn, bk_amt, bn_amt, amt_diff, date_diff, "AMOUNT_MISMATCH", "POSSIBLE MATCH", f"Party match '{bk_party}' with variance ₹{amt_diff:,.2f} (Potential bank service fee or deduction)"))
+
+    possible_candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    for score, _, bk, bn, bk_amt, bn_amt, amt_diff, date_diff, item_type, match_lvl, reason in possible_candidates:
+        if bk["id"] in matched_book_ids or bn["id"] in matched_bank_ids:
+            continue
+        matched_book_ids.add(bk["id"])
+        matched_bank_ids.add(bn["id"])
+        matched_items.append({
+            "book_tx_id": bk["id"],
+            "bank_tx_id": bn["id"],
+            "date_a": bk.get("date"),
+            "date_b": bn.get("date"),
+            "ref_a": bk.get("voucher_no") or bk.get("reference_no") or "",
+            "ref_b": bn.get("voucher_no") or bn.get("reference_no") or "",
+            "party_a": bk.get("party_name") or "",
+            "party_b": bn.get("party_name") or "",
+            "description_a": bk.get("description") or "",
+            "description_b": bn.get("description") or "",
+            "amount_a": bk_amt,
+            "amount_b": bn_amt,
+            "difference": amt_diff,
+            "date_diff_days": date_diff,
+            "match_level": match_lvl,
+            "match_score": round(score, 1),
+            "match_reason": reason,
+            "item_type": item_type,
+            "status": "Suggested",
+            "notes": "Possible match requiring auditor verification of delayed clearance or amount adjustment."
+        })
 
     # -------------------------------------------------------------
     # PASS 4: UNMATCHED ITEMS & TIMING EXCEPTIONS DETECTION
@@ -479,7 +492,7 @@ def run_bank_reconciliation(
             })
 
     # Total counts and balances calculation
-    all_recon_items = matched_items + unmatched_book_items + unmatched_bank_items
+    all_recon_items = matched_items + ambiguous_items + unmatched_book_items + unmatched_bank_items
 
     # Compute BRS Roll-Forward Schedule
     # Book Balance = Sum of Book Debits - Sum of Book Credits
@@ -548,7 +561,7 @@ def run_bank_reconciliation(
     conn.execute("""
         INSERT INTO audit_logs (username, action, entity_type, entity_id, details, timestamp)
         VALUES (?, 'RUN_BANK_RECONCILIATION', 'reconciliation', ?, ?, ?)
-    """, (created_by, recon_id, f"Executed BRS for '{bank_ledger_name}': {len(matched_items)} matched, {len(unmatched_book_items)} unpresented/outstanding, {len(unmatched_bank_items)} bank exceptions", now_str))
+    """, (created_by, recon_id, f"Executed BRS for '{bank_ledger_name}': {len(matched_items)} matched, {len(ambiguous_items)} ambiguous, {len(unmatched_book_items)} unpresented/outstanding, {len(unmatched_bank_items)} bank exceptions", now_str))
 
     conn.commit()
     conn.close()
@@ -561,6 +574,7 @@ def run_bank_reconciliation(
             "total_bank_tx": len(bank_txs),
             "total_book_tx": len(book_txs),
             "matched_count": len(matched_items),
+            "ambiguous_candidates_count": len(ambiguous_items),
             "unmatched_bank_count": len(unmatched_bank_items),
             "unmatched_book_count": len(unmatched_book_items),
             "amount_diff_count": sum(1 for m in matched_items if m["difference"] > 0),

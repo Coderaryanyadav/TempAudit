@@ -123,13 +123,20 @@ def download_financial_analysis_report(engagement_id: int, current_user: dict = 
         ("working_capital_turnover", "Working Capital Turnover (times)", "> 5.0x")
     ]
     for r_key, r_name, bench in ratio_labels:
-        cy_v = ratios["current_year"].get(r_key, 0.0) if ratios.get("current_year") else 0.0
+        cy_raw = ratios["current_year"].get(r_key) if ratios.get("current_year") else None
+        cy_v = cy_raw if cy_raw is not None else "N/A"
         py_r = ratios.get("previous_year")
         if py_r:
-            py_v = py_r.get(r_key, 0.0)
-            diff = round(cy_v - py_v, 2)
-            pct = round(((cy_v - py_v) / abs(py_v) * 100.0) if abs(py_v) > 0 else 0.0, 2)
-            pct_s = f"{pct}%"
+            py_raw = py_r.get(r_key)
+            if cy_raw is not None and py_raw is not None:
+                py_v = py_raw
+                diff = round(cy_raw - py_raw, 2)
+                pct = round(((cy_raw - py_raw) / abs(py_raw) * 100.0) if abs(py_raw) > 0 else 0.0, 2)
+                pct_s = f"{pct}%"
+            else:
+                py_v = py_raw if py_raw is not None else "N/A"
+                diff = "N/A"
+                pct_s = "N/A"
         else:
             py_v = "N/A"
             diff = "N/A"

@@ -257,6 +257,7 @@ def run_yoy_comparison(
         emp_exp = 0.0
         fin_cost = 0.0
         depr = 0.0
+        tax_expense_val = 0.0
         other_exp = 0.0
         
         fixed_assets = 0.0
@@ -279,17 +280,28 @@ def run_yoy_comparison(
             net_dr = dr - cr
             net_cr = cr - dr
 
+            # Capital Purchases / Fixed Assets override
+            is_capital_purchase = ("purchase" in name_l and any(k in name_l for k in ["capital", "machinery", "equipment", "asset", "fixed", "furniture", "computer", "vehicle"]))
+            if is_capital_purchase or "fixed asset" in grp or any(k in name_l for k in ["plant", "machinery", "building", "furniture", "vehicle", "computer", "fixed asset", "ppe"]):
+                val = max(0.0, net_dr if net_dr > 0 else (dr if dr > 0 else cr))
+                fixed_assets += val
+                continue
+
             # Revenue
             if "revenue" in grp or "sales" in grp or "income" in grp:
                 val = max(0.0, net_cr if net_cr > 0 else (cr if cr > 0 else dr))
-                if "other" in name_l or "interest" in name_l or "discount" in name_l:
+                if "return inward" in name_l or "sales return" in name_l:
+                    rev -= max(0.0, net_dr if net_dr > 0 else dr)
+                elif "other" in name_l or "interest" in name_l or "discount" in name_l:
                     other_inc += val
                 else:
                     rev += val
             # Expenses
             elif "expense" in grp or "purchase" in grp or "direct" in grp:
                 val = max(0.0, net_dr if net_dr > 0 else (dr if dr > 0 else cr))
-                if any(k in name_l for k in ["purchase", "raw material", "cogs", "freight", "direct"]):
+                if "return outward" in name_l or "purchase return" in name_l:
+                    cogs -= max(0.0, net_cr if net_cr > 0 else cr)
+                elif any(k in name_l for k in ["purchase", "raw material", "cogs", "freight", "direct"]):
                     cogs += val
                 elif any(k in name_l for k in ["salary", "wage", "employee", "bonus", "staff", "pf", "payroll"]):
                     emp_exp += val
@@ -297,6 +309,8 @@ def run_yoy_comparison(
                     fin_cost += val
                 elif any(k in name_l for k in ["depreciation", "amortisation", "amortization"]):
                     depr += val
+                elif any(k in name_l for k in ["tax expense", "income tax", "provision for tax", "current tax", "deferred tax"]):
+                    tax_expense_val += val
                 else:
                     other_exp += val
             # Assets
@@ -333,11 +347,11 @@ def run_yoy_comparison(
                     other_exp += max(0.0, net_dr if net_dr > 0 else (dr if dr > 0 else cr))
 
         total_rev = rev + other_inc
-        total_exp = cogs + emp_exp + fin_cost + depr + other_exp
+        total_exp = cogs + emp_exp + fin_cost + depr + other_exp + tax_expense_val
         gross_profit = total_rev - cogs
         operating_profit = gross_profit - emp_exp - other_exp
-        pbt = total_rev - total_exp
-        pat = pbt * 0.75 if pbt > 0 else pbt # Approximate standard 25% tax provision
+        pbt = total_rev - (cogs + emp_exp + fin_cost + depr + other_exp)
+        pat = pbt - tax_expense_val
 
         current_assets = receivables + cash + bank + inventory + other_ca
         total_assets = fixed_assets + current_assets
@@ -353,6 +367,7 @@ def run_yoy_comparison(
             "finance_costs": fin_cost,
             "depreciation_amortization": depr,
             "other_expenses": other_exp,
+            "tax_expense": tax_expense_val,
             "total_expenses": total_exp,
             "gross_profit": gross_profit,
             "operating_profit": operating_profit,

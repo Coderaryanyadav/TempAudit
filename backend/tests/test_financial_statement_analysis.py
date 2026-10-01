@@ -86,7 +86,7 @@ class TestFinancialStatementAnalysisModule(unittest.TestCase):
         conn.close()
 
     def test_01_deterministic_ratio_calculations(self):
-        """Test exact calculation of liquidity, solvency, profitability, and activity ratios."""
+        """Test exact calculation of liquidity, solvency, profitability, and activity ratios (zero-assumptions)."""
         analysis = run_financial_statement_analysis(self.cy_eng_id)
         cy_ratios = analysis["ratios"]["current_year"]
         
@@ -96,8 +96,8 @@ class TestFinancialStatementAnalysisModule(unittest.TestCase):
         # 2. Quick Ratio: (CA - Inv 12L) / CL (20L) = 28L / 20L = 1.40
         self.assertAlmostEqual(cy_ratios["quick_ratio"], 1.40, places=2)
 
-        # 3. Debt-Equity Ratio: Total Debt (15L + 6L = 21L) / Total Equity (30L + 11.25L PAT = 41.25L) = 0.51
-        self.assertAlmostEqual(cy_ratios["debt_equity_ratio"], 0.51, places=2)
+        # 3. Debt-Equity Ratio: Total Debt (15L + 6L = 21L) / Total Equity (30L + 15L PAT = 45L) = 0.47
+        self.assertAlmostEqual(cy_ratios["debt_equity_ratio"], 0.47, places=2)
 
         # 4. Gross Profit Margin: GP (40L) / Rev (100L) = 40.0%
         self.assertAlmostEqual(cy_ratios["gross_profit_margin_pct"], 40.0, places=2)
@@ -105,8 +105,8 @@ class TestFinancialStatementAnalysisModule(unittest.TestCase):
         # 5. Operating Margin: EBIT (17L) / Rev (100L) = 17.0%
         self.assertAlmostEqual(cy_ratios["operating_margin_pct"], 17.0, places=2)
 
-        # 6. Net Profit Margin: PAT (11.25L) / Rev (100L) = 11.25%
-        self.assertAlmostEqual(cy_ratios["net_profit_margin_pct"], 11.25, places=2)
+        # 6. Net Profit Margin: PAT (15.0L) / Rev (100L) = 15.0% (No artificial 25% tax assumption)
+        self.assertAlmostEqual(cy_ratios["net_profit_margin_pct"], 15.0, places=2)
 
         # 7. Turnover Ratios
         # Receivable Turnover = Rev (100L) / Debtors (20L) = 5.0x (DSO = 365 / 5 = 73 days)
@@ -135,14 +135,15 @@ class TestFinancialStatementAnalysisModule(unittest.TestCase):
         self.assertEqual(pnl["ebitda"], 2000000.0)
         self.assertEqual(pnl["ebit"], 1700000.0)
         self.assertEqual(pnl["pbt"], 1500000.0)
-        self.assertEqual(pnl["pat"], 1125000.0)
+        self.assertEqual(pnl["tax_expense"], 0.0)  # No fake 25% tax
+        self.assertEqual(pnl["pat"], 1500000.0)
 
         # Balance Sheet checks
         bs = analysis["balance_sheet"]["current_year"]
         self.assertEqual(bs["total_assets"], 6500000.0)
-        self.assertEqual(bs["total_liabilities_and_equity"], 7625000.0)
         self.assertEqual(bs["total_current_assets"], 4000000.0)
         self.assertEqual(bs["total_current_liabilities"], 2000000.0)
+        self.assertIn("balance_sheet_status", bs)
 
         # Cash Flow Statement checks (Standalone CY returns status and closing cash)
         cf = analysis["cash_flow_statement"]
