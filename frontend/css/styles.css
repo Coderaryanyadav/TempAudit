@@ -213,10 +213,20 @@ body {
   margin: 2px 12px;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  width: calc(100% - 24px);
+  box-sizing: border-box;
+  text-align: left;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  transition: all 0.1s ease;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: all 0.12s ease;
 }
 
 .nav-item:hover {
