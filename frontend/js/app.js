@@ -304,6 +304,39 @@ function getRoleBadge(role) {
   return `<span class="badge badge-role-staff">Audit Staff</span>`;
 }
 
+function updateUserTopBar() {
+  const nameEl = document.getElementById("top-user-name");
+  const avatarEl = document.getElementById("top-user-avatar");
+  const roleBadgeEl = document.getElementById("top-user-role-badge");
+  
+  if (state.currentUser) {
+    if (nameEl) nameEl.textContent = state.currentUser.full_name || state.currentUser.username || "User";
+    if (avatarEl) {
+      const initials = (state.currentUser.full_name || state.currentUser.username || "CA")
+        .split(" ")
+        .map(n => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase();
+      avatarEl.textContent = initials || "CA";
+      avatarEl.className = `user-avatar ${(state.currentUser.role || "auditor").toLowerCase()}`;
+    }
+    if (roleBadgeEl) {
+      roleBadgeEl.innerHTML = getRoleBadge(state.currentUser.role);
+    }
+  }
+}
+window.updateUserTopBar = updateUserTopBar;
+
+function applyRoleNavigationPermissions() {
+  const role = state.currentUser ? (state.currentUser.role || "Auditor") : "Auditor";
+  const usersNav = document.getElementById("nav-users-item");
+  if (usersNav) {
+    usersNav.style.display = (role === "Admin") ? "flex" : "none";
+  }
+}
+window.applyRoleNavigationPermissions = applyRoleNavigationPermissions;
+
 // App Initialization
 document.addEventListener("DOMContentLoaded", async () => {
   setupNavigation();
