@@ -105,6 +105,10 @@ const FinNotify = {
 
 // Global toast / alert redirection
 window.FinNotify = FinNotify;
+window.notifySuccess = (msg, title) => FinNotify.success(msg, title);
+window.notifyError = (msg, title) => FinNotify.error(msg, title);
+window.notifyWarning = (msg, title) => FinNotify.warning(msg, title);
+window.notifyInfo = (msg, title) => FinNotify.info(msg, title);
 window.showToast = (msg, type = "info") => FinNotify[type] ? FinNotify[type](msg) : FinNotify.info(msg);
 window.alert = (msg) => {
   if (typeof msg !== "string") msg = String(msg);
@@ -382,7 +386,7 @@ function showFirstRunSetupScreen(errorMsg = null) {
 
           <div class="form-group">
             <label class="form-label">Admin Username</label>
-            <input type="text" id="setup-username" class="form-control" placeholder="e.g., admin" value="admin" required>
+            <input type="text" id="setup-username" class="form-control" placeholder="Enter administrator username" required>
           </div>
 
           <div class="form-group">
@@ -413,7 +417,7 @@ function showFirstRunSetupScreen(errorMsg = null) {
 
         <div class="login-footer-security">
           <span class="offline-pill" style="font-size: 10px;"><span class="offline-dot"></span> 100% Offline SQLite</span>
-          <span>• SHA-256 PBKDF2 Encrypted</span>
+          <span>• Passwords protected using PBKDF2-HMAC-SHA256</span>
         </div>
       </div>
     </div>
@@ -1147,24 +1151,31 @@ async function renderUserManagement() {
 async function changeUserRole(userId, newRole) {
   try {
     await FinAuditAPI.updateUser(userId, { role: newRole });
-    alert(`User role updated to '${newRole}'.`);
+    notifySuccess(`User role updated to '${newRole}'.`);
     renderUserManagement();
   } catch (err) {
-    alert("Failed to update role: " + err.message);
+    notifyError("Failed to update role: " + err.message);
     renderUserManagement();
   }
 }
 
 async function toggleUserStatus(userId, newStatus, username) {
   const actionName = newStatus ? "enable" : "disable";
-  if (!confirm(`Are you sure you want to ${actionName} account '${username}'?`)) return;
+  const confirmed = await FinConfirm({
+    title: `${newStatus ? 'Enable' : 'Disable'} User Account`,
+    message: `Are you sure you want to ${actionName} account '${username}'?`,
+    consequences: newStatus ? ["The user will regain login access to the firm workspace"] : ["The user will be immediately logged out and blocked from signing in"],
+    confirmText: newStatus ? "Enable Account" : "Disable Account",
+    isDanger: !newStatus
+  });
+  if (!confirmed) return;
 
   try {
     const res = await FinAuditAPI.toggleUserStatus(userId, newStatus);
-    alert(res.message);
+    notifyInfo(res.message);
     renderUserManagement();
   } catch (err) {
-    alert("Failed to change account status: " + err.message);
+    notifyError("Failed to change account status: " + err.message);
   }
 }
 
@@ -1231,11 +1242,11 @@ async function handleCreateUserSubmit(event) {
     await FinAuditAPI.createUser({
       full_name, username, email, phone, role, password
     });
-    alert(`User '${username}' created successfully with role '${role}'.`);
+    notifySuccess(`User '${username}' created successfully with role '${role}'.`);
     closeModal("user-modal");
     renderUserManagement();
   } catch (err) {
-    alert("Error creating user: " + err.message);
+    notifyError("Error creating user: " + err.message);
   }
 }
 
@@ -1270,10 +1281,10 @@ async function handleAdminResetPasswordSubmit(event, userId, username) {
   const newPassword = document.getElementById("admin-new-pwd").value;
   try {
     await FinAuditAPI.adminResetPassword(userId, newPassword);
-    alert(`Password for '${username}' has been reset successfully.`);
+    notifySuccess(`Password for '${username}' has been reset successfully.`);
     closeModal("reset-pwd-modal");
   } catch (err) {
-    alert("Error resetting password: " + err.message);
+    notifyError("Error resetting password: " + err.message);
   }
 }
 
@@ -1319,16 +1330,16 @@ async function handleChangePasswordSubmit(event) {
   const confPwd = document.getElementById("confirm-account-password").value;
 
   if (newPwd !== confPwd) {
-    alert("New password and confirmation do not match.");
+    notifyInfo("New password and confirmation do not match.");
     return;
   }
 
   try {
     await FinAuditAPI.changePassword(oldPwd, newPwd);
-    alert("Password updated successfully!");
+    notifySuccess("Password updated successfully!");
     closeModal("change-pwd-modal");
   } catch (err) {
-    alert("Error changing password: " + err.message);
+    notifyError("Error changing password: " + err.message);
   }
 }
 
@@ -1744,7 +1755,7 @@ async function openEditClientModal(clientId) {
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Error loading client profile: " + err.message);
+    notifyError("Error loading client profile: " + err.message);
   }
 }
 
@@ -1755,13 +1766,13 @@ async function handleClientFormSubmit(event, clientId) {
 
   // PAN validation regex
   if (pan && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan)) {
-    alert("Invalid PAN format. Standard format: 5 letters + 4 digits + 1 letter (e.g. ABCDE1234F)");
+    notifyWarning("Invalid PAN format. Standard format: 5 letters + 4 digits + 1 letter (e.g. ABCDE1234F)");
     return;
   }
 
   // GSTIN validation regex
   if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)) {
-    alert("Invalid GSTIN format. Standard format: 15 alphanumeric characters (e.g. 27ABCDE1234F1Z5)");
+    notifyWarning("Invalid GSTIN format. Standard format: 15 alphanumeric characters (e.g. 27ABCDE1234F1Z5)");
     return;
   }
 
@@ -1782,16 +1793,16 @@ async function handleClientFormSubmit(event, clientId) {
   try {
     if (clientId) {
       await FinAuditAPI.updateClient(clientId, payload);
-      alert("Client profile updated successfully!");
+      notifySuccess("Client profile updated successfully!");
     } else {
       const res = await FinAuditAPI.createClient(payload);
-      alert(`Client '${payload.name}' registered successfully!`);
+      notifySuccess(`Client '${payload.name}' registered successfully!`);
     }
     closeModal("client-modal");
     await loadEngagements();
     renderClients();
   } catch (err) {
-    alert("Operation failed: " + err.message);
+    notifyError("Operation failed: " + err.message);
   }
 }
 
@@ -1864,7 +1875,7 @@ async function openClientHistoryDrawer(clientId) {
     overlay.style.display = "block";
     document.getElementById("evidence-drawer").classList.add("open");
   } catch (err) {
-    alert("Error fetching client history: " + err.message);
+    notifyError("Error fetching client history: " + err.message);
   }
 }
 
@@ -2074,11 +2085,11 @@ async function switchEngagement(engId) {
 async function changeEngagementStatus(engId, newStatus) {
   try {
     await FinAuditAPI.updateEngagementStatus(engId, newStatus);
-    alert(`Engagement status updated to '${newStatus}'.`);
+    notifySuccess(`Engagement status updated to '${newStatus}'.`);
     await loadEngagements();
     renderEngagements();
   } catch (err) {
-    alert("Error updating status: " + err.message);
+    notifyError("Error updating status: " + err.message);
   }
 }
 
@@ -2089,7 +2100,7 @@ async function openCreateEngagementModal(preselectedClientId = null) {
     const users = await FinAuditAPI.getUsers();
 
     if (clients.length === 0) {
-      alert("Please register a Client first before creating an audit engagement.");
+      notifyWarning("Please register a Client first before creating an audit engagement.");
       openCreateClientModal();
       return;
     }
@@ -2186,7 +2197,7 @@ async function openCreateEngagementModal(preselectedClientId = null) {
     document.body.insertAdjacentHTML("beforeend", modalHtml);
     autoFillEngagementTitle();
   } catch (err) {
-    alert("Error initializing engagement creation: " + err.message);
+    notifyError("Error initializing engagement creation: " + err.message);
   }
 }
 
@@ -2315,7 +2326,7 @@ async function openEditEngagementModal(engId) {
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Error loading engagement details: " + err.message);
+    notifyError("Error loading engagement details: " + err.message);
   }
 }
 
@@ -2343,10 +2354,10 @@ async function handleEngagementFormSubmit(event, engId) {
   try {
     if (engId) {
       await FinAuditAPI.updateEngagement(engId, payload);
-      alert("Engagement updated successfully!");
+      notifySuccess("Engagement updated successfully!");
     } else {
       const res = await FinAuditAPI.createEngagement(payload);
-      alert(`Engagement '${res.title}' created successfully!`);
+      notifySuccess(`Engagement '${res.title}' created successfully!`);
       state.currentEngagementId = res.id;
     }
     closeModal("engagement-modal");
@@ -2354,7 +2365,7 @@ async function handleEngagementFormSubmit(event, engId) {
     await updateActiveEngagement();
     renderEngagements();
   } catch (err) {
-    alert("Operation failed: " + err.message);
+    notifyError("Operation failed: " + err.message);
   }
 }
 
@@ -2427,7 +2438,7 @@ async function openDuplicateEngagementModal(sourceEngId) {
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Error initializing duplication modal: " + err.message);
+    notifyError("Error initializing duplication modal: " + err.message);
   }
 }
 
@@ -2439,7 +2450,7 @@ async function handleDuplicateEngagementSubmit(event, sourceEngId) {
   const copyWps = document.getElementById("dup-copy-wps").checked;
 
   if (!targetFy) {
-    alert("Target financial year is required.");
+    notifyWarning("Target financial year is required.");
     return;
   }
 
@@ -2452,14 +2463,14 @@ async function handleDuplicateEngagementSubmit(event, sourceEngId) {
       copy_working_paper_templates: copyWps
     });
 
-    alert(res.message);
+    notifyInfo(res.message);
     closeModal("duplicate-modal");
     state.currentEngagementId = res.new_engagement_id;
     await loadEngagements();
     await updateActiveEngagement();
     navigateTo("dashboard");
   } catch (err) {
-    alert("Duplication failed: " + err.message);
+    notifyError("Duplication failed: " + err.message);
   }
 }
 
@@ -2652,7 +2663,7 @@ async function handleFileInputChange(event) {
     state.uploadPreview = preview;
     renderMappingWorkspace(preview);
   } catch (err) {
-    alert("File Upload & Parse Error: " + err.message);
+    notifyError("File Upload & Parse Error: " + err.message);
     renderImportData();
   }
 }
@@ -2782,7 +2793,7 @@ function collectMappingConfig() {
 async function handleValidateData(fileId, dataCategory) {
   const mapping = collectMappingConfig();
   if (Object.keys(mapping).length === 0) {
-    alert("Please map at least one column before validating.");
+    notifyWarning("Please map at least one column before validating.");
     return;
   }
 
@@ -2881,7 +2892,7 @@ async function handleValidateData(fileId, dataCategory) {
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Validation failed: " + err.message);
+    notifyError("Validation failed: " + err.message);
   }
 }
 
@@ -2889,7 +2900,7 @@ async function handleValidateData(fileId, dataCategory) {
 async function handleConfirmImport(fileId, dataCategory) {
   const mapping = collectMappingConfig();
   if (Object.keys(mapping).length === 0) {
-    alert("Please configure column mappings before importing.");
+    notifyWarning("Please configure column mappings before importing.");
     return;
   }
 
@@ -2952,22 +2963,32 @@ async function handleConfirmImport(fileId, dataCategory) {
     await updateActiveEngagement();
     renderImportData();
   } catch (err) {
-    alert("Import failed: " + err.message);
+    notifyError("Import failed: " + err.message);
   }
 }
 
 async function deleteImportedFile(fileId, filename) {
-  if (!confirm(`Are you sure you want to delete '${filename}' and remove all its imported transactions from this engagement?`)) {
-    return;
-  }
+  const confirmed = await FinConfirm({
+    title: "Delete Uploaded Dataset",
+    message: `Are you sure you want to delete '${filename}'?`,
+    consequences: [
+      "Source uploaded file will be permanently deleted",
+      "All imported transactions from this file will be removed",
+      "Related ledger balances and reconciliation records will be recalculated"
+    ],
+    confirmText: "Delete Dataset",
+    cancelText: "Keep File",
+    isDanger: true
+  });
+  if (!confirmed) return;
 
   try {
     await FinAuditAPI.deleteUploadedFile(fileId);
-    alert(`File '${filename}' and its associated transactions have been deleted.`);
+    notifySuccess(`File '${filename}' and its associated transactions have been deleted.`);
     await updateActiveEngagement();
     renderImportData();
   } catch (err) {
-    alert("Failed to delete file: " + err.message);
+    notifyError("Failed to delete file: " + err.message);
   }
 }
 
@@ -3365,11 +3386,11 @@ async function handleReviewCleaningSubmit(event, logId) {
       custom_normalized_value: action === "Overridden" ? customVal : null,
       auditor_comment: comment
     });
-    alert(res.message);
+    notifyInfo(res.message);
     closeModal("review-cleaning-modal");
     renderDataCleaningLogs();
   } catch (err) {
-    alert("Error updating review: " + err.message);
+    notifyError("Error updating review: " + err.message);
   }
 }
 
@@ -4633,11 +4654,11 @@ async function triggerRunHybridEngine() {
 
   try {
     const res = await FinAuditAPI.runHybridEngine(state.currentEngagementId);
-    alert(`Hybrid Audit Completed! Found ${res.findings_count} audit exceptions across ${res.total_transactions} transactions.`);
+    notifyError(`Hybrid Audit Completed! Found ${res.findings_count} audit exceptions across ${res.total_transactions} transactions.`);
     await updateActiveEngagement();
     navigateTo("anomaly_detection");
   } catch (err) {
-    alert("Error executing audit engine: " + err.message);
+    notifyError("Error executing audit engine: " + err.message);
     renderDashboard();
   }
 }
@@ -5841,7 +5862,7 @@ async function openGLTransactionDrawer(txId) {
 async function saveGLWorkingPaperNote(txId) {
   const note = document.getElementById("gl-wp-note")?.value.trim();
   if (!note) {
-    alert("Please enter a working paper note before saving.");
+    notifyWarning("Please enter a working paper note before saving.");
     return;
   }
 
@@ -5852,9 +5873,9 @@ async function saveGLWorkingPaperNote(txId) {
       section_reference: "General Ledger Substantive Testing",
       sa_reference: "SA 500 / SA 520"
     });
-    alert("Working paper note saved successfully!");
+    notifySuccess("Working paper note saved successfully!");
   } catch (e) {
-    alert("Note saved to working paper repository.");
+    notifySuccess("Note saved to working paper repository.");
   }
 }
 
@@ -6122,7 +6143,7 @@ async function openGSTRulesModal() {
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Error loading GST rules: " + err.message);
+    notifyError("Error loading GST rules: " + err.message);
   }
 }
 
@@ -6133,21 +6154,28 @@ async function handleSaveGSTRule(ruleKey) {
   try {
     const parsedConfig = JSON.parse(textarea.value);
     await FinAuditAPI.updateGSTRule(ruleKey, parsedConfig);
-    alert(`Rule '${ruleKey}' updated successfully.`);
+    notifySuccess(`Rule '${ruleKey}' updated successfully.`);
   } catch (err) {
-    alert("Invalid JSON configuration: " + err.message);
+    notifyError("Invalid JSON configuration: " + err.message);
   }
 }
 
 async function handleResetGSTRules() {
-  if (confirm("Are you sure you want to reset all GST rules to default baseline settings?")) {
+  const confirmed = await FinConfirm({
+    title: "Reset GST Rules to Defaults",
+    message: "Are you sure you want to reset all GST validation rules to default baseline settings?",
+    consequences: ["Any custom GST thresholds, tolerance limits, and rule configurations will be reverted"],
+    confirmText: "Reset to Baseline",
+    isDanger: true
+  });
+  if (confirmed) {
     try {
       await FinAuditAPI.resetGSTRules();
-      alert("All GST rules reset to defaults.");
+      notifySuccess("All GST rules reset to defaults.");
       closeModal("gst-rules-modal");
       openGSTRulesModal();
     } catch (err) {
-      alert("Error resetting GST rules: " + err.message);
+      notifyError("Error resetting GST rules: " + err.message);
     }
   }
 }
@@ -6244,7 +6272,7 @@ async function openRunGSTReconModal() {
     document.body.insertAdjacentHTML("beforeend", modalHtml);
     autoFillGSTTitle();
   } catch (err) {
-    alert("Error preparing GST modal: " + err.message);
+    notifyError("Error preparing GST modal: " + err.message);
   }
 }
 
@@ -6281,10 +6309,10 @@ async function handleExecuteGSTSubmit(event) {
       ledger_name: ledger || "All",
       title: title
     });
-    alert(`GST Reconciliation Completed!\n• Matched: ${res.summary?.matched_count || 0}\n• Partially Matched: ${res.summary?.partially_matched_count || 0}\n• Mismatches: ${res.summary?.mismatched_count || 0}\n• Missing in Portal/Books: ${(res.summary?.missing_in_source_a_count || 0) + (res.summary?.missing_in_source_b_count || 0)}\n• Net Tax Variance: ₹${(res.summary?.net_tax_difference || 0).toLocaleString('en-IN')}`);
+    notifySuccess(`GST Reconciliation Completed!\n• Matched: ${res.summary?.matched_count || 0}\n• Partially Matched: ${res.summary?.partially_matched_count || 0}\n• Mismatches: ${res.summary?.mismatched_count || 0}\n• Missing in Portal/Books: ${(res.summary?.missing_in_source_a_count || 0) + (res.summary?.missing_in_source_b_count || 0)}\n• Net Tax Variance: ₹${(res.summary?.net_tax_difference || 0).toLocaleString('en-IN')}`);
     viewGSTReconciliationDetails(res.recon_id);
   } catch (err) {
-    alert("Error executing GST reconciliation: " + err.message);
+    notifyError("Error executing GST reconciliation: " + err.message);
     renderReconciliation();
   }
 }
@@ -6556,7 +6584,7 @@ async function handleGSTItemAction(reconId, itemId, status, comment = null) {
     });
     viewGSTReconciliationDetails(reconId);
   } catch (err) {
-    alert("Error updating GST item action: " + err.message);
+    notifyError("Error updating GST item action: " + err.message);
   }
 }
 
@@ -6865,7 +6893,7 @@ async function openRunSalesPurchaseReconModal() {
     document.body.insertAdjacentHTML("beforeend", modalHtml);
     autoFillSPTitle();
   } catch (err) {
-    alert("Error preparing modal: " + err.message);
+    notifyError("Error preparing modal: " + err.message);
   }
 }
 
@@ -6900,10 +6928,10 @@ async function handleExecuteSPSubmit(event) {
       ledger_name: ledgerName || "All",
       title: title
     });
-    alert(`${reconType} Completed Successfully!\n• Matched Invoices: ${res.summary?.matched_count || 0}\n• Total Discrepancies: ${res.summary?.discrepancy_count || 0}\n• Net Amount Variance: ₹${(res.summary?.net_amount_difference || 0).toLocaleString('en-IN')}\n• Net Tax Variance: ₹${(res.summary?.net_tax_difference || 0).toLocaleString('en-IN')}`);
+    notifySuccess(`${reconType} Completed Successfully!\n• Matched Invoices: ${res.summary?.matched_count || 0}\n• Total Discrepancies: ${res.summary?.discrepancy_count || 0}\n• Net Amount Variance: ₹${(res.summary?.net_amount_difference || 0).toLocaleString('en-IN')}\n• Net Tax Variance: ₹${(res.summary?.net_tax_difference || 0).toLocaleString('en-IN')}`);
     viewSalesPurchaseReconDetails(res.recon_id);
   } catch (err) {
-    alert("Error executing reconciliation: " + err.message);
+    notifyError("Error executing reconciliation: " + err.message);
     renderReconciliation();
   }
 }
@@ -7189,7 +7217,7 @@ async function handleSPItemAction(reconId, itemId, status, comment = null) {
     });
     viewSalesPurchaseReconDetails(reconId);
   } catch (err) {
-    alert("Error updating item action: " + err.message);
+    notifyError("Error updating item action: " + err.message);
   }
 }
 
@@ -7307,7 +7335,7 @@ async function openRunBRSModal() {
     document.body.insertAdjacentHTML("beforeend", modalHtml);
     autoFillBRSTitle();
   } catch (err) {
-    alert("Error preparing BRS modal: " + err.message);
+    notifyError("Error preparing BRS modal: " + err.message);
   }
 }
 
@@ -7337,10 +7365,10 @@ async function handleExecuteBRSSubmit(event) {
       file_b_id: fileB ? parseInt(fileB) : null,
       title: title
     });
-    alert(`Bank Reconciliation Completed!\n• Matched Items: ${res.summary?.matched_count || res.matched_count}\n• Unmatched Bank: ${res.summary?.unmatched_bank_count || 0}\n• Unmatched Books: ${res.summary?.unmatched_book_count || res.mismatched_count}`);
+    notifySuccess(`Bank Reconciliation Completed!\n• Matched Items: ${res.summary?.matched_count || res.matched_count}\n• Unmatched Bank: ${res.summary?.unmatched_bank_count || 0}\n• Unmatched Books: ${res.summary?.unmatched_book_count || res.mismatched_count}`);
     viewReconciliationDetails(res.recon_id);
   } catch (err) {
-    alert("Error executing reconciliation: " + err.message);
+    notifyError("Error executing reconciliation: " + err.message);
     renderReconciliation();
   }
 }
@@ -7635,17 +7663,24 @@ async function confirmBRSMatch(reconId, itemId) {
     await FinAuditAPI.confirmReconMatch(reconId, itemId);
     viewReconciliationDetails(reconId);
   } catch (err) {
-    alert("Error confirming match: " + err.message);
+    notifyError("Error confirming match: " + err.message);
   }
 }
 
 async function rejectBRSMatch(reconId, itemId) {
-  if (confirm("Are you sure you want to unlink and reject this match?")) {
+  const confirmed = await FinConfirm({
+    title: "Reject Reconciliation Match",
+    message: "Are you sure you want to unlink and reject this match?",
+    consequences: ["The transaction pair will be moved back to the unmatched population"],
+    confirmText: "Unlink & Reject",
+    isDanger: true
+  });
+  if (confirmed) {
     try {
       await FinAuditAPI.rejectReconMatch(reconId, itemId);
       viewReconciliationDetails(reconId);
     } catch (err) {
-      alert("Error rejecting match: " + err.message);
+      notifyError("Error rejecting match: " + err.message);
     }
   }
 }
@@ -7658,7 +7693,7 @@ async function openManualMatchModal(reconId) {
     const unmatchedBank = items.filter(i => i.amount_b > 0 && i.status === "Unmatched");
 
     if (unmatchedBook.length === 0 || unmatchedBank.length === 0) {
-      alert("Both an unmatched Book item and an unmatched Bank item are required to create a manual match.");
+      notifyWarning("Both an unmatched Book item and an unmatched Bank item are required to create a manual match.");
       return;
     }
 
@@ -7713,7 +7748,7 @@ async function openManualMatchModal(reconId) {
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Error opening manual match: " + err.message);
+    notifyError("Error opening manual match: " + err.message);
   }
 }
 
@@ -7731,10 +7766,10 @@ async function handleManualMatchSubmit(event, reconId) {
       bank_item_id: parseInt(bankId),
       auditor_notes: notes
     });
-    alert("Manual match created successfully!");
+    notifySuccess("Manual match created successfully!");
     viewReconciliationDetails(reconId);
   } catch (err) {
-    alert("Error creating manual match: " + err.message);
+    notifyError("Error creating manual match: " + err.message);
   }
 }
 
@@ -8069,11 +8104,11 @@ async function submitImportMapping() {
 
   try {
     const res = await FinAuditAPI.applyMapping(state.uploadPreview.file_id, mapping);
-    alert(res.message);
+    notifyInfo(res.message);
     await updateActiveEngagement();
     navigateTo("trial_balance");
   } catch (err) {
-    alert("Import failed: " + err.message);
+    notifyError("Import failed: " + err.message);
   }
 }
 
@@ -8499,7 +8534,7 @@ async function handleInlineChecklistStatusChange(itemId, newStatus) {
     await FinAuditAPI.updateChecklistItem(itemId, updateData);
     await renderChecklist();
   } catch (err) {
-    alert("Failed to update status: " + (err.message || "Unknown error"));
+    notifyError("Failed to update status: " + (err.message || "Unknown error"));
   }
 }
 
@@ -8606,7 +8641,7 @@ async function handleCreateCustomChecklistSubmit(event) {
     closeModal("custom-checklist-modal");
     await renderChecklist();
   } catch (err) {
-    alert("Failed to create custom checklist item: " + (err.message || "Unknown error"));
+    notifyError("Failed to create custom checklist item: " + (err.message || "Unknown error"));
   }
 }
 
@@ -8731,7 +8766,7 @@ async function handleChecklistSignOffSubmit(event, itemId) {
     closeModal("checklist-signoff-modal");
     await renderChecklist();
   } catch (err) {
-    alert("Failed to update checklist item: " + (err.message || "Unknown error"));
+    notifyError("Failed to update checklist item: " + (err.message || "Unknown error"));
   }
 }
 
@@ -8855,23 +8890,30 @@ async function handleGenerateChecklistSubmit(event) {
     });
 
     closeModal("generate-checklist-modal");
-    alert(`Success: ${res.generated_items || 0} substantive procedures generated across 15 audit categories.`);
+    notifySuccess(`Success: ${res.generated_items || 0} substantive procedures generated across 15 audit categories.`);
     await renderChecklist();
   } catch (err) {
-    alert("Failed to generate checklist: " + (err.message || "Unknown error"));
+    notifyError("Failed to generate checklist: " + (err.message || "Unknown error"));
   }
 }
 
 // ----------------- Delete Custom Item Handler -----------------
 
 async function handleDeleteChecklistItem(itemId, code) {
-  if (!confirm(`Are you sure you want to delete custom procedure ${code}?`)) return;
+  const confirmed = await FinConfirm({
+    title: "Delete Custom Checklist Procedure",
+    message: `Are you sure you want to delete custom procedure ${code}?`,
+    consequences: ["This procedure and any responses or comments recorded under it will be removed"],
+    confirmText: "Delete Procedure",
+    isDanger: true
+  });
+  if (!confirmed) return;
 
   try {
     await FinAuditAPI.deleteChecklistItem(itemId);
     await renderChecklist();
   } catch (err) {
-    alert("Failed to delete checklist item: " + (err.message || "Unknown error"));
+    notifyError("Failed to delete checklist item: " + (err.message || "Unknown error"));
   }
 }
 
@@ -9327,7 +9369,7 @@ async function handleCreateWorkingPaperSubmit(event) {
       openWorkingPaperDrawer(res.id);
     }
   } catch (err) {
-    alert("Failed to create Working Paper: " + err.message);
+    notifyError("Failed to create Working Paper: " + err.message);
     if (btn) btn.disabled = false;
   }
 }
@@ -9600,9 +9642,9 @@ async function saveWorkingPaperOverview(wpId) {
     currentDrawerWp = updated;
     populateWorkingPaperDrawer();
     renderWorkingPapers();
-    alert("Working paper details saved successfully.");
+    notifySuccess("Working paper details saved successfully.");
   } catch (err) {
-    alert("Failed to save working paper: " + err.message);
+    notifyError("Failed to save working paper: " + err.message);
   }
 }
 
@@ -9718,12 +9760,19 @@ async function uploadWorkingPaperFile(wpId, file) {
     populateWorkingPaperDrawer();
     renderWorkingPapers();
   } catch (err) {
-    alert("Failed to upload document: " + err.message);
+    notifyError("Failed to upload document: " + err.message);
   }
 }
 
 async function handleDeleteWpDoc(wpId, docId) {
-  if (!confirm("Are you sure you want to remove this supporting evidence file? This action will be recorded in the audit log.")) return;
+  const confirmed = await FinConfirm({
+    title: "Remove Supporting Evidence File",
+    message: "Are you sure you want to remove this supporting evidence file?",
+    consequences: ["The document will be unlinked from the working paper", "This action will be logged in the tamper-evident audit trail"],
+    confirmText: "Remove Document",
+    isDanger: true
+  });
+  if (!confirmed) return;
   try {
     await FinAuditAPI.deleteWorkingPaperDocument(wpId, docId);
     const updated = await FinAuditAPI.getWorkingPaperDetail(wpId);
@@ -9731,7 +9780,7 @@ async function handleDeleteWpDoc(wpId, docId) {
     populateWorkingPaperDrawer();
     renderWorkingPapers();
   } catch (err) {
-    alert("Failed to delete document: " + err.message);
+    notifyError("Failed to delete document: " + err.message);
   }
 }
 
@@ -9758,10 +9807,10 @@ async function saveWpNotes(wpId) {
     await FinAuditAPI.updateWorkingPaperNotes(wpId, { notes: notesText });
     const updated = await FinAuditAPI.getWorkingPaperDetail(wpId);
     currentDrawerWp = updated;
-    alert("Working notes saved successfully.");
+    notifySuccess("Working notes saved successfully.");
     renderWorkingPapers();
   } catch (err) {
-    alert("Failed to save notes: " + err.message);
+    notifyError("Failed to save notes: " + err.message);
   }
 }
 
@@ -9898,7 +9947,7 @@ async function unlinkWpEntity(wpId, entityType, itemId) {
     populateWorkingPaperDrawer();
     renderWorkingPapers();
   } catch (err) {
-    alert("Failed to unlink: " + err.message);
+    notifyError("Failed to unlink: " + err.message);
   }
 }
 
@@ -10009,7 +10058,7 @@ async function openLinkEntityModal(wpId, entityType) {
       </div>
     `;
   } catch (err) {
-    alert("Failed to load items: " + err.message);
+    notifyError("Failed to load items: " + err.message);
     closeModal(modalId);
   }
 }
@@ -10036,7 +10085,7 @@ async function executeLinkItem(wpId, entityType, itemId) {
     populateWorkingPaperDrawer();
     renderWorkingPapers();
   } catch (err) {
-    alert("Failed to link item: " + err.message);
+    notifyError("Failed to link item: " + err.message);
   }
 }
 
@@ -10091,7 +10140,7 @@ function renderWpCommentsTab(wp) {
 async function handlePostWpComment(wpId) {
   const input = document.getElementById("wp-new-comment-text");
   if (!input || !input.value.trim()) {
-    alert("Please enter a comment.");
+    notifyWarning("Please enter a comment.");
     return;
   }
 
@@ -10103,7 +10152,7 @@ async function handlePostWpComment(wpId) {
     populateWorkingPaperDrawer();
     renderWorkingPapers();
   } catch (err) {
-    alert("Failed to post comment: " + err.message);
+    notifyError("Failed to post comment: " + err.message);
   }
 }
 
@@ -10154,7 +10203,7 @@ async function quickChangeWpStatus(wpId, newStatus) {
     populateWorkingPaperDrawer();
     renderWorkingPapers();
   } catch (err) {
-    alert("Failed to update status: " + err.message);
+    notifyError("Failed to update status: " + err.message);
   }
 }
 
@@ -10227,7 +10276,7 @@ async function handleConfirmWpReview(event, wpId) {
     }
     await renderWorkingPapers();
   } catch (err) {
-    alert("Failed to review working paper: " + err.message);
+    notifyError("Failed to review working paper: " + err.message);
     if (btn) btn.disabled = false;
   }
 }
@@ -10286,7 +10335,7 @@ async function handleExecuteWpDelete(event, wpId, isReviewed) {
   const reason = reasonInput ? reasonInput.value.trim() : "";
 
   if (isReviewed && !reason) {
-    alert("Mandatory Requirement: Please provide a justification for deleting a reviewed working paper.");
+    notifyWarning("Mandatory Requirement: Please provide a justification for deleting a reviewed working paper.");
     return;
   }
 
@@ -10299,7 +10348,7 @@ async function handleExecuteWpDelete(event, wpId, isReviewed) {
     closeWorkingPaperDrawer();
     await renderWorkingPapers();
   } catch (err) {
-    alert("Failed to delete working paper: " + err.message);
+    notifyError("Failed to delete working paper: " + err.message);
     if (btn) btn.disabled = false;
   }
 }
@@ -10564,14 +10613,14 @@ async function triggerGeneratePDFReport(reportType = "complete_audit_analysis") 
 
   try {
     const res = await FinAuditAPI.generatePDFReport(state.currentEngagementId, reportType);
-    alert(`Success! Generated PDF Report: ${res.report_title || res.filename}`);
+    notifySuccess(`Success! Generated PDF Report: ${res.report_title || res.filename}`);
     await renderReports();
     // Prompt download
     if (res.download_url) {
       window.open(res.download_url, "_blank");
     }
   } catch (e) {
-    alert("Failed to generate PDF report: " + e.message);
+    notifyError("Failed to generate PDF report: " + e.message);
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = `Generate PDF`;
@@ -10853,11 +10902,11 @@ async function handleCreateClientSubmit(event) {
     await FinAuditAPI.createClient({
       name, entity_type, industry, pan, gstin, address, contact_person, email, phone, notes
     });
-    alert(`Client master '${name}' created successfully!`);
+    notifySuccess(`Client master '${name}' created successfully!`);
     closeModal("client-modal");
     renderClients();
   } catch (err) {
-    alert("Failed to create client: " + err.message);
+    notifyError("Failed to create client: " + err.message);
   }
 }
 
@@ -10957,11 +11006,11 @@ async function handleEditClientSubmit(event, clientId) {
     await FinAuditAPI.updateClient(clientId, {
       name, entity_type, industry, pan, gstin, address, contact_person, email, phone, notes
     });
-    alert("Client updated successfully!");
+    notifySuccess("Client updated successfully!");
     closeModal("edit-client-modal");
     renderClients();
   } catch (err) {
-    alert("Update failed: " + err.message);
+    notifyError("Update failed: " + err.message);
   }
 }
 
@@ -11177,11 +11226,11 @@ function filterEngagementsLive() {
 async function updateEngagementStatusDirect(engId, newStatus) {
   try {
     await FinAuditAPI.updateEngagementStatus(engId, newStatus);
-    alert(`Engagement status updated to '${newStatus}'.`);
+    notifySuccess(`Engagement status updated to '${newStatus}'.`);
     await loadEngagements();
     renderEngagements();
   } catch (err) {
-    alert("Failed to update status: " + err.message);
+    notifyError("Failed to update status: " + err.message);
     renderEngagements();
   }
 }
@@ -11299,12 +11348,12 @@ async function handleCreateEngagementSubmit(event) {
     const res = await FinAuditAPI.createEngagement({
       client_id, title, audit_type, financial_year, period_start, period_end, lead_auditor_id, assigned_staff_id, notes
     });
-    alert(`Engagement '${title}' created successfully!`);
+    notifySuccess(`Engagement '${title}' created successfully!`);
     closeModal("eng-modal");
     await loadEngagements();
     selectEngagementAndGo(res.id);
   } catch (err) {
-    alert("Error creating engagement: " + err.message);
+    notifyError("Error creating engagement: " + err.message);
   }
 }
 
@@ -11404,12 +11453,12 @@ async function handleEditEngagementSubmit(event, engagementId) {
     await FinAuditAPI.updateEngagement(engagementId, {
       title, audit_type, financial_year, period_start, period_end, lead_auditor_id, assigned_staff_id, notes
     });
-    alert("Engagement updated successfully!");
+    notifySuccess("Engagement updated successfully!");
     closeModal("edit-eng-modal");
     await loadEngagements();
     renderEngagements();
   } catch (err) {
-    alert("Failed to update engagement: " + err.message);
+    notifyError("Failed to update engagement: " + err.message);
   }
 }
 
@@ -11481,12 +11530,12 @@ async function handleDuplicateEngagementSubmit(event, sourceEngagementId) {
       copy_checklists,
       copy_working_paper_templates
     });
-    alert(`Success! Cloned ${res.cloned_checklists} checklists and ${res.cloned_working_papers} working paper structures to FY ${target_financial_year}.`);
+    notifySuccess(`Success! Cloned ${res.cloned_checklists} checklists and ${res.cloned_working_papers} working paper structures to FY ${target_financial_year}.`);
     closeModal("duplicate-eng-modal");
     await loadEngagements();
     selectEngagementAndGo(res.new_engagement_id);
   } catch (err) {
-    alert("Duplication failed: " + err.message);
+    notifyError("Duplication failed: " + err.message);
   }
 }
 
@@ -11563,9 +11612,9 @@ async function renderSettings() {
 async function triggerBackup() {
   try {
     const res = await FinAuditAPI.createBackup();
-    alert(`Backup created successfully: ${res.backup_file}`);
+    notifySuccess(`Backup created successfully: ${res.backup_file}`);
   } catch (e) {
-    alert("Backup failed: " + e.message);
+    notifyError("Backup failed: " + e.message);
   }
 }
 
@@ -11677,12 +11726,12 @@ async function saveFindingReview(findingId) {
 
   try {
     await FinAuditAPI.updateFinding(findingId, { status: status, auditor_comment: comment });
-    alert("Audit finding status and comments saved.");
+    notifySuccess("Audit finding status and comments saved.");
     closeEvidenceDrawer();
     if (state.currentTab === "findings") renderFindings();
     else if (state.currentTab === "dashboard") renderDashboard();
   } catch (e) {
-    alert("Failed to update finding: " + e.message);
+    notifyError("Failed to update finding: " + e.message);
   }
 }
 
@@ -12346,11 +12395,11 @@ async function handleFSExplanationSubmit(event, itemKey) {
       auditor_explanation: explanation,
       review_status: review_status
     });
-    alert("Auditor explanation saved to Working Papers successfully.");
+    notifySuccess("Auditor explanation saved to Working Papers successfully.");
     closeModal("fs-explanation-modal");
     await renderFinancialStatements();
   } catch (err) {
-    alert("Error saving explanation: " + err.message);
+    notifyError("Error saving explanation: " + err.message);
   }
 }
 
@@ -12707,7 +12756,7 @@ async function actionDuplicateGroup(groupCode, newStatus) {
     }
     renderDuplicateAndMissing();
   } catch (err) {
-    alert("Error updating duplicate group: " + err.message);
+    notifyError("Error updating duplicate group: " + err.message);
   }
 }
 
@@ -12762,7 +12811,7 @@ async function handleDuplicateCommentSubmit(event, groupCode) {
     closeModal("dup-comment-modal");
     await renderDuplicateAndMissing();
   } catch (err) {
-    alert("Failed to save note: " + err.message);
+    notifyError("Failed to save note: " + err.message);
   }
 }
 
@@ -12924,7 +12973,7 @@ async function handleSequenceGapSubmit(event, seqType, prefix, expFrom, expTo) {
     closeModal("gap-review-modal");
     await renderDuplicateAndMissing();
   } catch (err) {
-    alert("Failed to save sequence documentation: " + err.message);
+    notifyError("Failed to save sequence documentation: " + err.message);
   }
 }
 
@@ -13267,7 +13316,7 @@ async function triggerFreshAnomalyRun() {
     await FinAuditAPI.triggerAnomalyDetection(state.currentEngagementId);
     await renderAnomalyDetection();
   } catch (err) {
-    alert("Failed to re-run anomaly engine: " + err.message);
+    notifyError("Failed to re-run anomaly engine: " + err.message);
   }
 }
 
@@ -13279,7 +13328,7 @@ async function quickUpdateAnomalyStatus(anomalyId, newStatus) {
     });
     await renderAnomalyDetection();
   } catch (err) {
-    alert("Failed to update anomaly status: " + err.message);
+    notifyError("Failed to update anomaly status: " + err.message);
   }
 }
 
@@ -13333,7 +13382,7 @@ async function handleAnomalyReviewSubmit(event, anomalyId) {
     closeModal("anomaly-review-modal");
     await renderAnomalyDetection();
   } catch (err) {
-    alert("Failed to save anomaly review: " + err.message);
+    notifyError("Failed to save anomaly review: " + err.message);
   }
 }
 
@@ -13351,7 +13400,7 @@ async function openAIExplanationModal(anomalyId) {
             <pre style="background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 6px; font-family: monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; max-height: 480px; overflow-y: auto;">${res.ai_memo}</pre>
             
             <div class="modal-footer" style="padding: 12px 0 0 0; margin-top: 14px; display: flex; justify-content: space-between;">
-              <button class="btn btn-secondary" onclick="navigator.clipboard.writeText(\`${res.ai_memo.replace(/`/g, '\\`')}\`); alert('Copied Working Paper Memorandum to clipboard!');">
+              <button class="btn btn-secondary" onclick="navigator.clipboard.writeText(\`${res.ai_memo.replace(/`/g, '\\`')}\`); notifyInfo('Copied Working Paper Memorandum to clipboard!');">
                 📋 Copy Memo
               </button>
               <button class="btn btn-primary" onclick="closeModal('ai-explanation-modal')">Close</button>
@@ -13362,7 +13411,7 @@ async function openAIExplanationModal(anomalyId) {
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Failed to generate AI explanation: " + err.message);
+    notifyError("Failed to generate AI explanation: " + err.message);
   }
 }
 
@@ -13774,7 +13823,7 @@ async function handleYoYCommentSubmit(event, itemKey, category, accountName) {
     closeModal("yoy-comment-modal");
     await renderYoYComparison();
   } catch (err) {
-    alert("Failed to save comment: " + err.message);
+    notifyError("Failed to save comment: " + err.message);
   }
 }
 
@@ -13804,7 +13853,7 @@ async function triggerYoYFactualAI(itemKey) {
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Failed to generate factual AI explanation: " + err.message);
+    notifyError("Failed to generate factual AI explanation: " + err.message);
   }
 }
 
@@ -14140,15 +14189,22 @@ async function loadExecutiveSummaryNarrative() {
       ]
     });
   } catch (err) {
-    alert("Failed to generate executive summary: " + err.message);
+    notifyError("Failed to generate executive summary: " + err.message);
   } finally {
     state.assistantState.isLoading = false;
     await renderAIAssistant();
   }
 }
 
-function clearAssistantChat() {
-  if (confirm("Clear local conversation history for this session?")) {
+async function clearAssistantChat() {
+  const confirmed = await FinConfirm({
+    title: "Clear AI Conversation History",
+    message: "Clear local conversation history for this session?",
+    consequences: ["Current conversation context will be reset"],
+    confirmText: "Clear Chat",
+    isDanger: false
+  });
+  if (confirmed) {
     state.assistantState.messages = [];
     renderAIAssistant();
   }
@@ -14494,10 +14550,10 @@ async function syncCentralizedFindings() {
 
   try {
     const res = await FinAuditAPI.syncAllFindings(state.currentEngagementId);
-    alert(`✅ Centralized Findings Sync Complete!\n\nSynchronized ${res.data.total_collected} audit exceptions across all modules (${res.data.new_findings_created} new, ${res.data.existing_findings_updated} updated).`);
+    notifyError(`✅ Centralized Findings Sync Complete!\n\nSynchronized ${res.data.total_collected} audit exceptions across all modules (${res.data.new_findings_created} new, ${res.data.existing_findings_updated} updated).`);
     await renderFindings();
   } catch (err) {
-    alert("❌ Error syncing centralized findings: " + err.message);
+    notifyError("❌ Error syncing centralized findings: " + err.message);
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -14692,7 +14748,7 @@ async function openFindingDetailModal(findingId) {
 
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
-    alert("Error opening finding details: " + err.message);
+    notifyError("Error opening finding details: " + err.message);
   }
 }
 
@@ -14715,17 +14771,17 @@ async function updateFindingReview(findingId) {
     closeModal("finding-detail-modal");
     await renderFindings();
   } catch (err) {
-    alert("Error updating finding: " + err.message);
+    notifyError("Error updating finding: " + err.message);
   }
 }
 
 async function generateFindingAIExplanation(findingId) {
   try {
     const res = await FinAuditAPI.getFindingAIExplanation(findingId);
-    alert(`🤖 AI Explainability Analysis for ${res.finding_code}:\n\n${res.ai_explanation}`);
+    notifyInfo(`🤖 AI Explainability Analysis for ${res.finding_code}:\n\n${res.ai_explanation}`);
     await renderFindings();
   } catch (err) {
-    alert("Error generating AI explanation: " + err.message);
+    notifyError("Error generating AI explanation: " + err.message);
   }
 }
 
@@ -14844,7 +14900,7 @@ async function handleCreateCustomFindingSubmit(event) {
     closeModal("create-custom-finding-modal");
     await renderFindings();
   } catch (err) {
-    alert("Error creating manual finding: " + err.message);
+    notifyError("Error creating manual finding: " + err.message);
   }
 }
 
@@ -15593,9 +15649,9 @@ async function handleSaveSettings(event) {
 
   try {
     await FinAuditAPI.updateAppSettings(payload);
-    alert("Application settings saved successfully and logged in the audit trail.");
+    notifySuccess("Application settings saved successfully and logged in the audit trail.");
   } catch (err) {
-    alert("Error saving settings: " + err.message);
+    notifyError("Error saving settings: " + err.message);
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -15613,11 +15669,11 @@ async function handleCreateBackupClick() {
 
   try {
     const res = await FinAuditAPI.createDatabaseBackup();
-    alert(`Database backup created successfully!\n\nFile: ${res.filename}\nSize: ${res.size_kb} KB\nSHA-256: ${res.checksum_sha256}`);
+    notifySuccess(`Database backup created successfully!\n\nFile: ${res.filename}\nSize: ${res.size_kb} KB\nSHA-256: ${res.checksum_sha256}`);
     await loadBackupsList();
     await loadSystemInfo();
   } catch (err) {
-    alert("Failed to create database backup: " + err.message);
+    notifyError("Failed to create database backup: " + err.message);
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -15632,22 +15688,25 @@ async function handleCreateBackupClick() {
 }
 
 async function handleRestoreBackupClick(filename) {
-  const confirmed = confirm(
-    `WARNING: You are about to restore the active audit database from backup:\n\n` +
-    `"${filename}"\n\n` +
-    `FinAuditPro will automatically take a pre-restore safety snapshot of your active database before overwriting.\n\n` +
-    `Do you wish to proceed?`
-  );
-
+  const confirmed = await FinConfirm({
+    title: "Restore Audit Database Backup",
+    message: `You are about to restore the active audit database from backup '${filename}'.`,
+    consequences: [
+      "Active database will be overwritten with the backup state",
+      "FinAuditPro will automatically create a pre-restore safety snapshot before restoring"
+    ],
+    confirmText: "Restore Database",
+    isDanger: true
+  });
   if (!confirmed) return;
 
   try {
     const res = await FinAuditAPI.restoreDatabaseBackup(filename);
-    alert(`Database restored successfully from "${filename}"!\n\nSafety snapshot saved as: "${res.safety_snapshot_created}".`);
+    notifySuccess(`Database restored successfully from "${filename}"!\n\nSafety snapshot saved as: "${res.safety_snapshot_created}".`);
     await loadEngagements();
     await renderSettings();
   } catch (err) {
-    alert("Database restore failed: " + err.message);
+    notifyError("Database restore failed: " + err.message);
   }
 }
 
@@ -15655,11 +15714,16 @@ async function handleUploadRestoreFile(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const confirmed = confirm(
-    `WARNING: You selected external SQLite database file "${file.name}" to restore.\n\n` +
-    `FinAuditPro will validate the database and automatically create a pre-restore safety snapshot of current data before overwriting.\n\n` +
-    `Do you wish to restore from "${file.name}"?`
-  );
+  const confirmed = await FinConfirm({
+    title: "Restore External SQLite Database",
+    message: `You selected external SQLite database file "${file.name}" to restore.`,
+    consequences: [
+      "Active database will be replaced with data from the uploaded file",
+      "A pre-restore safety snapshot will be created automatically"
+    ],
+    confirmText: "Proceed with Restore",
+    isDanger: true
+  });
 
   if (!confirmed) {
     event.target.value = "";
@@ -15668,11 +15732,11 @@ async function handleUploadRestoreFile(event) {
 
   try {
     const res = await FinAuditAPI.restoreDatabaseUpload(file);
-    alert(`Database restored successfully from uploaded file!\n\nSafety snapshot saved as: "${res.safety_snapshot_created}".`);
+    notifySuccess(`Database restored successfully from uploaded file!\n\nSafety snapshot saved as: "${res.safety_snapshot_created}".`);
     await loadEngagements();
     await renderSettings();
   } catch (err) {
-    alert("Database upload and restore failed: " + err.message);
+    notifyError("Database upload and restore failed: " + err.message);
   } finally {
     event.target.value = "";
   }
@@ -15977,16 +16041,16 @@ async function handleRefreshLMStudioModels() {
       if (hintEl) {
         hintEl.innerHTML = `Found ${res.models.length} model(s): <b>${res.models.join(", ")}</b>`;
       }
-      alert(`Found ${res.models.length} model(s) in LM Studio:\n\n${res.models.join("\n")}`);
+      notifyInfo(`Found ${res.models.length} model(s) in LM Studio:\n\n${res.models.join("\n")}`);
     } else {
       if (hintEl) {
         hintEl.innerHTML = `No models currently loaded in LM Studio. Please load a model in LM Studio.`;
       }
-      alert("No models detected in LM Studio. Please open LM Studio, load a model, and click Start Server.");
+      notifyWarning("No models detected in LM Studio. Please open LM Studio, load a model, and click Start Server.");
     }
   } catch (err) {
     if (hintEl) hintEl.innerHTML = `<span style="color: #dc2626;">Failed to query LM Studio: ${err.message}</span>`;
-    alert("Could not reach LM Studio at configured URL: " + err.message);
+    notifyError("Could not reach LM Studio at configured URL: " + err.message);
   }
 }
 
@@ -16015,11 +16079,11 @@ async function saveAIManagerSettings() {
     };
 
     await FinAuditAPI.updateAISettings(payload);
-    alert("LM Studio configuration saved successfully!");
+    notifySuccess("LM Studio configuration saved successfully!");
     await refreshTopBarAIStatus();
     await renderAIManager();
   } catch (err) {
-    alert("Failed to save AI configuration: " + err.message);
+    notifyError("Failed to save AI configuration: " + err.message);
   } finally {
     if (saveBtn) {
       saveBtn.innerText = "Save Settings";
@@ -16038,14 +16102,14 @@ async function testAIManagerConnection() {
   try {
     const res = await FinAuditAPI.testAIConnection();
     if (res.is_available) {
-      alert(`✅ LM Studio Connection Successful!\n\nEngine: ${res.engine}\nStatus: ${res.status_message}\nLatency: ${res.latency_ms} ms`);
+      notifySuccess(`✅ LM Studio Connection Successful!\n\nEngine: ${res.engine}\nStatus: ${res.status_message}\nLatency: ${res.latency_ms} ms`);
     } else {
-      alert(`⚠️ ${res.status_message}\n\nNotice: ${res.fallback_notice}`);
+      notifyInfo(`⚠️ ${res.status_message}\n\nNotice: ${res.fallback_notice}`);
     }
     await refreshTopBarAIStatus();
     await renderAIManager();
   } catch (err) {
-    alert("LM Studio test connection error: " + err.message);
+    notifyError("LM Studio test connection error: " + err.message);
   } finally {
     if (testBtn) {
       testBtn.innerText = "Test Connection";

@@ -91,6 +91,29 @@ def list_clients(
     finally:
         conn.close()
 
+def check_client_access(conn, client_id: int, current_user: dict) -> bool:
+    """Enforce engagement-based client confidentiality scoping for non-Admin users."""
+    role = current_user.get("role")
+    if role == "Admin":
+        return True
+    user_id = current_user.get("id")
+    if role == "Auditor":
+        has_access = conn.execute("""
+            SELECT 1 FROM clients c
+            WHERE c.id = ? AND (
+                c.id IN (SELECT client_id FROM engagements WHERE lead_auditor_id = ? OR assigned_staff_id = ?)
+                OR NOT EXISTS (SELECT 1 FROM engagements WHERE client_id = ?)
+            )
+            LIMIT 1
+        """, (client_id, user_id, user_id, client_id)).fetchone()
+    else: # Audit Staff
+        has_access = conn.execute("""
+            SELECT 1 FROM engagements e
+            WHERE e.client_id = ? AND (e.lead_auditor_id = ? OR e.assigned_staff_id = ?)
+            LIMIT 1
+        """, (client_id, user_id, user_id)).fetchone()
+    return bool(has_access)
+
 @router.get("/{client_id}")
 def get_client(
     client_id: int,
@@ -104,29 +127,11 @@ def get_client(
             raise HTTPException(status_code=404, detail="Client not found")
 
         # Confidentiality check for non-Admin users
-        role = current_user.get("role")
-        if role != "Admin":
-            user_id = current_user.get("id")
-            if role == "Auditor":
-                has_access = conn.execute("""
-                    SELECT 1 FROM clients c
-                    WHERE c.id = ? AND (
-                        c.id IN (SELECT client_id FROM engagements WHERE lead_auditor_id = ? OR assigned_staff_id = ?)
-                        OR NOT EXISTS (SELECT 1 FROM engagements WHERE client_id = ?)
-                    )
-                    LIMIT 1
-                """, (client_id, user_id, user_id, client_id)).fetchone()
-            else:
-                has_access = conn.execute("""
-                    SELECT 1 FROM engagements e
-                    WHERE e.client_id = ? AND (e.lead_auditor_id = ? OR e.assigned_staff_id = ?)
-                    LIMIT 1
-                """, (client_id, user_id, user_id)).fetchone()
-
-            if not has_access:
-                raise HTTPException(status_code=403, detail="Access denied: You are not assigned to any engagements for this client.")
+        if not check_client_access(conn, client_id, current_user):
+            raise HTTPException(status_code=403, detail="Access denied: You are not assigned to any engagements for this client.")
 
         client = dict(row)
+        role = current_user.get("role")
         
         eng_query = """
             SELECT e.*, 
@@ -227,6 +232,10 @@ def update_client(client_id: int, update_data: ClientUpdate, current_user: dict 
     if not client:
         conn.close()
         raise HTTPException(status_code=404, detail="Client not found")
+
+    if not check_client_access(conn, client_id, current_user):
+        conn.close()
+        raise HTTPException(status_code=403, detail="Access denied: You are not assigned to this client.")
 
     old_client_data = dict(client)
     updates = []
@@ -330,6 +339,9 @@ def get_client_history(
         client_row = conn.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
         if not client_row:
             raise HTTPException(status_code=404, detail="Client not found")
+
+        if not check_client_access(conn, client_id, current_user):
+            raise HTTPException(status_code=403, detail="Access denied: You are not assigned to any engagements for this client.")
 
         eng_rows = conn.execute("""
             SELECT e.*, 

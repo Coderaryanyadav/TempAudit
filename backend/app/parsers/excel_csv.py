@@ -12,6 +12,13 @@ from backend.app.database import get_db_connection
 
 GSTIN_REGEX = r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
 
+# Safety limits for enterprise document parsing & memory protection
+MAX_PDF_PAGES = 500
+MAX_PDF_EXTRACTED_CHARS = 15_000_000
+MAX_EXCEL_ROWS = 500_000
+MAX_EXCEL_COLS = 250
+MAX_EXCEL_SHEETS = 30
+
 STANDARD_COLUMNS = {
     "date": ["date", "voucher date", "vch date", "txn date", "posting date", "bill date", "invoice date", "trans date", "txndate", "value date", "entry date"],
     "voucher_no": ["voucher no", "voucher", "vch no", "vch", "voucher_no", "entry no", "trans no", "vch_no", "journal no", "doc no", "document number"],
@@ -101,16 +108,21 @@ def auto_detect_mapping(columns: List[str]) -> Dict[str, str]:
     return mapping
 
 def parse_raw_dataframe(file_path: str, file_type: str, limit: Optional[int] = None) -> pd.DataFrame:
-    """Reads various file formats (CSV, XLSX, XLS, JSON, PDF) into a pandas DataFrame."""
+    """Reads various file formats (CSV, XLSX, XLS, JSON, PDF) into a pandas DataFrame with strict bounds checking."""
     ext = file_type.lower().strip()
     if not ext.startswith("."):
         ext = f".{ext}"
 
     if ext == ".csv":
-        # Auto-detect encoding & delimiter
+        bad_lines_encountered = []
+        def track_bad_line(bad_line):
+            bad_lines_encountered.append(bad_line)
+            return None
+
+        # Try clean encodings in priority order
         for encoding in ['utf-8-sig', 'utf-8', 'latin1', 'cp1252', 'utf-16']:
             try:
-                with open(file_path, 'r', encoding=encoding, errors='replace') as f:
+                with open(file_path, 'r', encoding=encoding, errors='strict') as f:
                     sample = f.read(4096)
                     try:
                         dialect = csv.Sniffer().sniff(sample)
@@ -118,14 +130,39 @@ def parse_raw_dataframe(file_path: str, file_type: str, limit: Optional[int] = N
                     except Exception:
                         delimiter = ',' if ',' in sample else ('\t' if '\t' in sample else ';')
 
-                df = pd.read_csv(file_path, delimiter=delimiter, encoding=encoding, nrows=limit, on_bad_lines='skip')
+                df = pd.read_csv(
+                    file_path,
+                    delimiter=delimiter,
+                    encoding=encoding,
+                    nrows=limit,
+                    on_bad_lines=track_bad_line,
+                    engine='python' if bad_lines_encountered is not None else 'c'
+                )
+                if bad_lines_encountered:
+                    df.attrs["bad_lines_count"] = len(bad_lines_encountered)
+                    df.attrs["bad_lines_sample"] = bad_lines_encountered[:5]
                 return df
+            except UnicodeDecodeError:
+                continue
             except Exception:
                 continue
-        return pd.read_csv(file_path, nrows=limit, on_bad_lines='skip')
+
+        # Fallback with error tracking
+        df = pd.read_csv(file_path, nrows=limit, on_bad_lines=track_bad_line, engine='python')
+        if bad_lines_encountered:
+            df.attrs["bad_lines_count"] = len(bad_lines_encountered)
+            df.attrs["bad_lines_sample"] = bad_lines_encountered[:5]
+        return df
 
     elif ext in [".xlsx", ".xls"]:
-        return pd.read_excel(file_path, nrows=limit)
+        xl = pd.ExcelFile(file_path)
+        if len(xl.sheet_names) > MAX_EXCEL_SHEETS:
+            raise ValueError(f"Excel file exceeds maximum allowable sheets ({len(xl.sheet_names)} > {MAX_EXCEL_SHEETS}). Please upload a workbook with fewer sheets.")
+
+        df = pd.read_excel(file_path, nrows=limit or MAX_EXCEL_ROWS)
+        if len(df.columns) > MAX_EXCEL_COLS:
+            raise ValueError(f"Excel table exceeds maximum column limit ({len(df.columns)} > {MAX_EXCEL_COLS}).")
+        return df
 
     elif ext == ".json":
         with open(file_path, "r", encoding="utf-8") as f:
@@ -149,13 +186,22 @@ def parse_raw_dataframe(file_path: str, file_type: str, limit: Optional[int] = N
         raise ValueError(f"Unsupported file format: '{ext}'. Supported formats: CSV, Excel (.xlsx, .xls), PDF (.pdf), JSON (.json).")
 
 def parse_pdf_to_dataframe(file_path: str, limit: Optional[int] = None) -> pd.DataFrame:
-    """Extracts text tables or line records from PDF bank statements or audit reports."""
+    """Extracts text tables or line records from PDF bank statements or audit reports with resource protection."""
     try:
         reader = PdfReader(file_path)
+        total_pages = len(reader.pages)
+        if total_pages > MAX_PDF_PAGES:
+            raise ValueError(f"PDF document exceeds the maximum limit of {MAX_PDF_PAGES} pages (uploaded file has {total_pages} pages). Please split the document.")
+
         all_lines = []
+        total_extracted_chars = 0
+
         for page in reader.pages:
             text = page.extract_text()
             if text:
+                total_extracted_chars += len(text)
+                if total_extracted_chars > MAX_PDF_EXTRACTED_CHARS:
+                    raise ValueError(f"PDF text extraction exceeded safety limit of {MAX_PDF_EXTRACTED_CHARS:,} characters.")
                 all_lines.extend([line.strip() for line in text.splitlines() if line.strip()])
         
         if not all_lines:
@@ -200,6 +246,8 @@ def parse_pdf_to_dataframe(file_path: str, limit: Optional[int] = None) -> pd.Da
         return df
 
     except Exception as e:
+        if isinstance(e, ValueError):
+            raise e
         raise ValueError(f"Could not extract tabular financial data from PDF: {str(e)}")
 
 def read_file_preview(file_path: str, file_type: str, data_category: Optional[str] = None) -> Dict[str, Any]:
@@ -697,10 +745,17 @@ def import_and_save_transactions(
     conn.commit()
     conn.close()
 
+    rows_rejected = val_report["failed_rows"]
+    data_quality_warning = (rows_rejected > 0) or (val_report["warning_count"] > 0)
+
     return {
+        "rows_received": len(df),
+        "rows_imported": imported_count,
+        "rows_rejected": rows_rejected,
+        "data_quality_warning": data_quality_warning,
         "imported_rows": imported_count,
         "total_rows": len(df),
-        "failed_rows": val_report["failed_rows"],
+        "failed_rows": rows_rejected,
         "warning_count": val_report["warning_count"],
         "validation_report": val_report
     }
