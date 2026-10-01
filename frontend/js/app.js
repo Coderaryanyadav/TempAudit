@@ -351,9 +351,6 @@ async function checkAuthSession() {
       FinAuditAPI.setToken(null);
       showWelcomeSplash();
       return;
-    } else if (status.state === "SETUP_REQUIRED") {
-      showSetupWizard(2);
-      return;
     } else if (status.state === "DATABASE_ERROR") {
       showSystemDatabaseError(status.error);
       return;
@@ -1077,11 +1074,11 @@ function showLoginScreen(errorMsg = null) {
 
   overlay.style.display = "flex";
   overlay.innerHTML = `
-    <div class="welcome-splash-card" style="width: 440px; padding: 40px;">
-      <div class="login-header" style="background: transparent; border: none; padding: 0 0 24px;">
-        <div class="login-logo" style="width: 40px; height: 40px; font-size: 20px;">F</div>
-        <div class="login-title" style="color: var(--text-main); font-size: 20px;">Sign in to FinAuditPro</div>
-        <div class="login-subtitle" style="color: var(--text-secondary);">Offline-First AI Audit Workspace</div>
+    <div class="welcome-splash-card" style="width: 440px; padding: 36px 32px; background: #ffffff;">
+      <div class="login-header" style="background: transparent; border: none; padding: 0 0 20px; text-align: center;">
+        <div class="login-logo" style="width: 44px; height: 44px; font-size: 20px; margin: 0 auto 12px auto;">F</div>
+        <div class="login-title" style="color: #0f172a; font-size: 20px; font-weight: 700;">Sign in to FinAuditPro</div>
+        <div class="login-subtitle" style="color: #64748b; margin-top: 4px;">Offline-First AI Audit Workspace</div>
       </div>
 
       <div class="login-body" style="padding: 0;">
@@ -1099,6 +1096,7 @@ function showLoginScreen(errorMsg = null) {
             <label class="form-label">Password</label>
             <div class="password-input-wrap">
               <input type="password" id="login-password" class="form-control" placeholder="Enter password" required>
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('login-password')">👁️</button>
             </div>
           </div>
 
