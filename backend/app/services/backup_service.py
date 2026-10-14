@@ -6,6 +6,7 @@ import sqlite3
 import shutil
 import uuid
 from datetime import datetime
+from pathlib import PurePosixPath
 from typing import Dict, Any, Optional, Tuple
 
 from backend.app.database import get_db_connection, get_db_path
@@ -109,113 +110,196 @@ class BackupService:
         return bundle_path, manifest
 
     @classmethod
+    def _safe_extract_tar(cls, archive: tarfile.TarFile, target_dir: str) -> None:
+        """Extract only regular backup members under known paths; reject links and traversal."""
+        root = os.path.realpath(target_dir)
+        members = archive.getmembers()
+        seen = set()
+        total_size = 0
+        max_members = 100_000
+        max_total_size = 2 * 1024 * 1024 * 1024  # 2 GiB decompressed safety limit
+
+        if len(members) > max_members:
+            raise ValueError("Backup archive contains too many entries.")
+
+        for member in members:
+            raw_name = member.name or ""
+            normalized_input = raw_name.rstrip("/")
+            if (
+                not normalized_input
+                or raw_name.startswith(("/", "\\"))
+                or "\\" in raw_name
+                or ":" in normalized_input.split("/")[0]
+            ):
+                raise ValueError("Backup archive contains an unsafe member path.")
+
+            raw_parts = normalized_input.split("/")
+            if any(part in {"", ".", ".."} for part in raw_parts):
+                raise ValueError("Backup archive contains a path traversal entry.")
+
+            member_path = PurePosixPath(normalized_input)
+            normalized_name = member_path.as_posix()
+            allowed = (
+                normalized_name in {"manifest.json", "finauditpro.db", "uploaded_files"}
+                or normalized_name.startswith("uploaded_files/")
+            )
+            if not allowed:
+                raise ValueError("Backup archive contains an unexpected file path.")
+            if normalized_name in seen:
+                raise ValueError("Backup archive contains duplicate member paths.")
+            seen.add(normalized_name)
+
+            # Reject symbolic links, hard links, devices, FIFOs and other special members.
+            if not (member.isdir() or member.isfile()):
+                raise ValueError("Backup archive may contain only regular files and directories.")
+
+            destination = os.path.realpath(os.path.join(root, *member_path.parts))
+            if os.path.commonpath([root, destination]) != root:
+                raise ValueError("Backup archive member escapes the extraction directory.")
+
+            if member.isdir():
+                os.makedirs(destination, exist_ok=True)
+                continue
+
+            total_size += member.size
+            if member.size < 0 or total_size > max_total_size:
+                raise ValueError("Backup archive exceeds the allowed uncompressed size.")
+
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            source_file = archive.extractfile(member)
+            if source_file is None:
+                raise ValueError("Backup archive contains an unreadable file entry.")
+            with source_file, open(destination, "xb") as destination_file:
+                shutil.copyfileobj(source_file, destination_file)
+
+        for required in ("manifest.json", "finauditpro.db"):
+            path = os.path.join(root, required)
+            if required not in seen or not os.path.isfile(path):
+                raise ValueError(f"Backup archive is missing root-level {required}.")
+
+
+    @classmethod
     def validate_bundle(cls, bundle_path: str) -> Dict[str, Any]:
-        """
-        Validates backup bundle structure, manifest, and database integrity before restoration.
-        """
+        """Validate bundle paths, manifest checksum, database checksum and SQLite integrity."""
         if not os.path.exists(bundle_path):
             return {"valid": False, "error": "Backup bundle file not found."}
 
-        temp_dir = os.path.join(BACKUP_DIR, f"val_{uuid.uuid4().hex[:8]}")
-        os.makedirs(temp_dir, exist_ok=True)
-
+        temp_dir = os.path.join(BACKUP_DIR, f"val_{uuid.uuid4().hex}")
+        os.makedirs(temp_dir, exist_ok=False)
+        preserve_extraction = False
         try:
-            with tarfile.open(bundle_path, "r:gz") as tar:
-                names = tar.getnames()
-                if "manifest.json" not in names or "finauditpro.db" not in names:
-                    return {"valid": False, "error": "Invalid backup archive: missing manifest.json or finauditpro.db"}
-                tar.extractall(path=temp_dir)
+            with tarfile.open(bundle_path, "r:gz") as archive:
+                cls._safe_extract_tar(archive, temp_dir)
 
             manifest_file = os.path.join(temp_dir, "manifest.json")
-            with open(manifest_file, "r", encoding="utf-8") as f:
-                manifest = json.load(f)
+            with open(manifest_file, "r", encoding="utf-8") as manifest_handle:
+                manifest = json.load(manifest_handle)
+            if not isinstance(manifest, dict):
+                raise ValueError("Backup manifest must be a JSON object.")
+
+            claimed_manifest_checksum = manifest.get("manifest_checksum")
+            unsigned_manifest = dict(manifest)
+            unsigned_manifest["manifest_checksum"] = ""
+            expected_manifest_checksum = hashlib.sha256(
+                json.dumps(unsigned_manifest, indent=2).encode("utf-8")
+            ).hexdigest()
+            if not claimed_manifest_checksum or claimed_manifest_checksum != expected_manifest_checksum:
+                raise ValueError("Backup manifest checksum validation failed.")
 
             db_file = os.path.join(temp_dir, "finauditpro.db")
             actual_db_hash = compute_file_sha256(db_file)
-
             if actual_db_hash != manifest.get("database_sha256"):
-                return {
-                    "valid": False,
-                    "error": f"Database checksum mismatch: expected {manifest.get('database_sha256')} got {actual_db_hash}"
-                }
+                raise ValueError("Backup database checksum validation failed.")
 
-            # Test sqlite connectivity
             conn = sqlite3.connect(db_file)
-            conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-            conn.close()
+            try:
+                quick_check = conn.execute("PRAGMA quick_check").fetchone()
+                if not quick_check or quick_check[0] != "ok":
+                    raise ValueError("Backup SQLite database failed PRAGMA quick_check.")
+                tables = {
+                    row[0]
+                    for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+                }
+                if not {"users", "app_settings"}.issubset(tables):
+                    raise ValueError("Backup SQLite database is missing core application tables.")
+            finally:
+                conn.close()
 
+            preserve_extraction = True
             return {
                 "valid": True,
                 "manifest": manifest,
                 "database_sha256": actual_db_hash,
-                "extracted_path": temp_dir
+                "extracted_path": temp_dir,
             }
-        except Exception as e:
-            return {"valid": False, "error": f"Archive extraction / validation failed: {str(e)}"}
+        except Exception as exc:
+            return {"valid": False, "error": f"Backup archive validation failed: {exc}"}
         finally:
-            # Note: caller will clean up temp_dir if used, otherwise remove
-            pass
+            if not preserve_extraction:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
 
     @classmethod
     def restore_verified_bundle(cls, bundle_path: str, user: Any = None) -> Dict[str, Any]:
-        """
-        Validates bundle and restores database + evidence safely with automatic safety snapshot.
-        """
-        val = cls.validate_bundle(bundle_path)
-        if not val.get("valid"):
-            raise ValueError(f"Backup validation failed: {val.get('error')}")
+        """Validate and restore database plus evidence, preserving an emergency snapshot."""
+        validation = cls.validate_bundle(bundle_path)
+        if not validation.get("valid"):
+            raise ValueError(f"Backup validation failed: {validation.get('error')}")
 
-        extracted = val.get("extracted_path")
-        manifest = val.get("manifest")
+        extracted = validation.get("extracted_path")
+        manifest = validation.get("manifest")
+        if not extracted or not os.path.isdir(extracted):
+            raise ValueError("Validated backup extraction directory is missing.")
 
-        # 1. Take safety snapshot of current active DB
-        safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
-        safety_filename = f"pre_restore_safety_{safety_ts}_{uuid.uuid4().hex[:6]}.db"
-        safety_filepath = os.path.join(BACKUP_DIR, safety_filename)
-        current_db_path = get_db_path()
-        if os.path.exists(current_db_path):
-            src_conn = sqlite3.connect(current_db_path)
-            snap_conn = sqlite3.connect(safety_filepath)
-            try:
-                src_conn.backup(snap_conn)
-            finally:
-                snap_conn.close()
-                src_conn.close()
-
-        # 2. Restore DB using Online Backup API
-        restored_db = os.path.join(extracted, "finauditpro.db")
-        backup_src = sqlite3.connect(restored_db)
-        active_target = sqlite3.connect(current_db_path)
         try:
-            backup_src.backup(active_target)
+            # 1. Take safety snapshot of current active DB.
+            safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
+            safety_filename = f"pre_restore_safety_{safety_ts}_{uuid.uuid4().hex[:6]}.db"
+            safety_filepath = os.path.join(BACKUP_DIR, safety_filename)
+            current_db_path = get_db_path()
+            if os.path.exists(current_db_path):
+                src_conn = sqlite3.connect(current_db_path)
+                snap_conn = sqlite3.connect(safety_filepath)
+                try:
+                    src_conn.backup(snap_conn)
+                finally:
+                    snap_conn.close()
+                    src_conn.close()
+
+            # 2. Restore DB using SQLite Online Backup API.
+            restored_db = os.path.join(extracted, "finauditpro.db")
+            backup_src = sqlite3.connect(restored_db)
+            active_target = sqlite3.connect(current_db_path)
+            try:
+                backup_src.backup(active_target)
+            finally:
+                active_target.close()
+                backup_src.close()
+
+            # 3. Restore uploaded evidence additively; links were rejected by safe extraction.
+            extracted_uploads = os.path.join(extracted, "uploaded_files")
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            target_uploads = os.path.join(project_root, "uploaded_files")
+            if os.path.exists(extracted_uploads):
+                os.makedirs(target_uploads, exist_ok=True)
+                for item in os.listdir(extracted_uploads):
+                    source_path = os.path.join(extracted_uploads, item)
+                    destination_path = os.path.join(target_uploads, item)
+                    if os.path.isdir(source_path):
+                        shutil.copytree(source_path, destination_path, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(source_path, destination_path)
+
+            from backend.app.database import init_db
+            init_db()
+
+            return {
+                "status": "SUCCESS",
+                "restored_manifest": manifest,
+                "safety_snapshot": safety_filename,
+                "message": "Database and evidence restored successfully with verified integrity.",
+            }
         finally:
-            active_target.close()
-            backup_src.close()
+            shutil.rmtree(extracted, ignore_errors=True)
 
-        # 3. Restore uploaded_files if present in archive
-        extracted_uploads = os.path.join(extracted, "uploaded_files")
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        target_uploads = os.path.join(base_dir, "uploaded_files")
-        if os.path.exists(extracted_uploads):
-            os.makedirs(target_uploads, exist_ok=True)
-            for item in os.listdir(extracted_uploads):
-                s = os.path.join(extracted_uploads, item)
-                d = os.path.join(target_uploads, item)
-                if os.path.isdir(s):
-                    shutil.copytree(s, d, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(s, d)
 
-        # 4. Clean up temp extraction
-        shutil.rmtree(extracted, ignore_errors=True)
-
-        # 5. Run migrations/init_db to verify schema consistency
-        from backend.app.database import init_db
-        init_db()
-
-        return {
-            "status": "SUCCESS",
-            "restored_manifest": manifest,
-            "safety_snapshot": safety_filename,
-            "message": "Database and evidence restored successfully with verified integrity."
-        }
