@@ -55,7 +55,7 @@ def get_jwt_secret() -> str:
         new_secret = secrets.token_hex(32)
         now_str = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "INSERT INTO app_settings (key, value, updated_at) VALUES ('jwt_secret_key', ?, ?)",
+            "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('jwt_secret_key', ?, ?)",
             (new_secret, now_str),
         )
         conn.commit()
