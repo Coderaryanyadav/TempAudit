@@ -48,7 +48,7 @@ def test_evidence_registration_hashing_and_integrity(tmp_path):
     # 4. Tamper with the physical file on disk
     ev_path.write_bytes(b"Tampered unauthorized content modification!")
 
-    tampered_result = repo.verify_physical_integrity(ev_id)
+    tampered_result = repo.verify_physical_integrity(ev_id, base_dir=str(tmp_path))
     assert tampered_result["valid"] is False
     assert tampered_result["status"] == "CORRUPTED"
     assert tampered_result["actual_hash"] != file_sha256
