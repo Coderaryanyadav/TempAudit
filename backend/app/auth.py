@@ -144,29 +144,42 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     return encoded_jwt
 
 def revoke_token_by_jti(jti: str, username: str, exp_timestamp: Optional[datetime] = None):
-    """Adds a token's JTI to revoked_tokens table."""
+    """Persist explicit token revocation; surface failures instead of falsely reporting success."""
     conn = get_db_connection()
     try:
-        now_str = datetime.now(timezone.utc).isoformat()
-        exp_str = exp_timestamp.isoformat() if exp_timestamp else (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
-        conn.execute("INSERT OR REPLACE INTO revoked_tokens (jti, username, revoked_at, expires_at) VALUES (?, ?, ?, ?)",
-                     (jti, username, now_str, exp_str))
+        now = datetime.now(timezone.utc)
+        expires = exp_timestamp or (now + timedelta(days=1))
+        conn.execute(
+            "INSERT OR REPLACE INTO revoked_tokens (jti, username, revoked_at, expires_at) VALUES (?, ?, ?, ?)",
+            (jti, username, now.isoformat(), expires.isoformat()),
+        )
         conn.commit()
     except Exception:
-        pass
+        if conn.in_transaction:
+            conn.rollback()
+        raise
     finally:
         conn.close()
 
+
 def invalidate_user_sessions(user_id: int):
-    """Increments the user's token_version, instantly invalidating all previously issued JWTs."""
+    """Atomically increment token_version; never hide a failed session invalidation."""
     conn = get_db_connection()
     try:
-        conn.execute("UPDATE users SET token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (user_id,))
+        cursor = conn.execute(
+            "UPDATE users SET token_version = COALESCE(token_version, 1) + 1 WHERE id = ?",
+            (user_id,),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError(f"Cannot invalidate sessions: user id {user_id} was not found.")
         conn.commit()
     except Exception:
-        pass
+        if conn.in_transaction:
+            conn.rollback()
+        raise
     finally:
         conn.close()
+
 
 def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
     if not credentials or not credentials.credentials:
