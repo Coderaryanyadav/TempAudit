@@ -34,7 +34,7 @@ class BackupService:
         Creates a complete manifest-backed `.finpkg` / `.tar.gz` archive.
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        bundle_name = f"finauditpro_verified_backup_{timestamp}.finpkg"
+        bundle_name = f"finauditpro_verified_backup_{timestamp}_{uuid.uuid4().hex[:8]}.finpkg"
         bundle_path = os.path.join(BACKUP_DIR, bundle_name)
 
         # 1. Consistent DB Snapshot using SQLite Online Backup API
@@ -179,7 +179,7 @@ class BackupService:
 
 
     @classmethod
-    def validate_bundle(cls, bundle_path: str) -> Dict[str, Any]:
+    def validate_bundle(cls, bundle_path: str, retain_extracted_files: bool = False) -> Dict[str, Any]:
         """Validate bundle paths, manifest checksum, database checksum and SQLite integrity."""
         if not os.path.exists(bundle_path):
             return {"valid": False, "error": "Backup bundle file not found."}
@@ -225,13 +225,15 @@ class BackupService:
             finally:
                 conn.close()
 
-            preserve_extraction = True
-            return {
+            result = {
                 "valid": True,
                 "manifest": manifest,
                 "database_sha256": actual_db_hash,
-                "extracted_path": temp_dir,
             }
+            if retain_extracted_files:
+                preserve_extraction = True
+                result["extracted_path"] = temp_dir
+            return result
         except Exception as exc:
             return {"valid": False, "error": f"Backup archive validation failed: {exc}"}
         finally:
@@ -242,7 +244,7 @@ class BackupService:
     @classmethod
     def restore_verified_bundle(cls, bundle_path: str, user: Any = None) -> Dict[str, Any]:
         """Validate and restore database plus evidence, preserving an emergency snapshot."""
-        validation = cls.validate_bundle(bundle_path)
+        validation = cls.validate_bundle(bundle_path, retain_extracted_files=True)
         if not validation.get("valid"):
             raise ValueError(f"Backup validation failed: {validation.get('error')}")
 
