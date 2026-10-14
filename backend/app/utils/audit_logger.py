@@ -67,42 +67,65 @@ def log_audit_event(
     client_ip = ip_address if ip_address else None
 
     with _AUDIT_LOG_MUTEX:
-        # Get previous entry's hash for cryptographic chaining
+        # BEGIN IMMEDIATE serializes chain-head selection and append across processes,
+        # not just threads. Preserve any caller-owned transaction when one exists.
+        owns_transaction = not conn.in_transaction
         try:
-            last_log = conn.execute("SELECT entry_hash FROM audit_logs ORDER BY id DESC LIMIT 1").fetchone()
-            prev_hash = last_log["entry_hash"] if last_log and last_log["entry_hash"] else "GENESIS_HASH_00000000000000000000000000000000"
+            if owns_transaction:
+                conn.execute("BEGIN IMMEDIATE")
+
+            last_log = conn.execute(
+                "SELECT entry_hash FROM audit_logs ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if last_log is None:
+                prev_hash = "GENESIS_HASH_00000000000000000000000000000000"
+            else:
+                prev_hash = last_log["entry_hash"]
+                if not prev_hash:
+                    raise RuntimeError(
+                        "Cannot append to the audit trail because its latest entry has no hash."
+                    )
+
+            hash_payload = (
+                f"{prev_hash}|{now_str}|{user_id}|{username}|{action_str}|{module_str}|"
+                f"{record_id_str}|{old_val_str}|{new_val_str}|{details_str}|{engagement_id}"
+            )
+            entry_hash = hashlib.sha256(hash_payload.encode("utf-8")).hexdigest()
+
+            cursor = conn.execute(
+                """
+                INSERT INTO audit_logs (
+                    timestamp, user_id, username, action, module, record_id,
+                    old_value, new_value, details, engagement_id, ip_address,
+                    entity_type, entity_id, previous_hash, entry_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    now_str,
+                    user_id,
+                    username,
+                    action_str,
+                    module_str,
+                    record_id_str,
+                    old_val_str,
+                    new_val_str,
+                    details_str,
+                    engagement_id,
+                    client_ip,
+                    resolved_entity_type,
+                    entity_id_int,
+                    prev_hash,
+                    entry_hash,
+                ),
+            )
+            row_id = cursor.lastrowid
+            if owns_transaction:
+                conn.commit()
+            return row_id
         except Exception:
-            prev_hash = "GENESIS_HASH_00000000000000000000000000000000"
-
-        hash_payload = f"{prev_hash}|{now_str}|{user_id}|{username}|{action_str}|{module_str}|{record_id_str}|{old_val_str}|{new_val_str}|{details_str}|{engagement_id}"
-        entry_hash = hashlib.sha256(hash_payload.encode('utf-8')).hexdigest()
-
-        cursor = conn.execute("""
-            INSERT INTO audit_logs (
-                timestamp, user_id, username, action, module, record_id,
-                old_value, new_value, details, engagement_id, ip_address,
-                entity_type, entity_id, previous_hash, entry_hash
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            now_str,
-            user_id,
-            username,
-            action_str,
-            module_str,
-            record_id_str,
-            old_val_str,
-            new_val_str,
-            details_str,
-            engagement_id,
-            client_ip,
-            resolved_entity_type,
-            entity_id_int,
-            prev_hash,
-            entry_hash
-        ))
-        row_id = cursor.lastrowid
-
-    return row_id
+            if owns_transaction and conn.in_transaction:
+                conn.rollback()
+            raise
 
 def verify_audit_trail_integrity(conn=None) -> Dict[str, Any]:
     """
