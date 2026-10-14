@@ -1660,6 +1660,22 @@ body {
   letter-spacing: 0.04em;
 }
 
+
+/* Top-bar model status reflects the live provider state. */
+#top-ai-status-dot {
+  background: var(--text-muted);
+  flex: 0 0 6px;
+}
+#top-ai-status-dot.is-online {
+  background: #059669;
+}
+#top-ai-status-dot.is-offline {
+  background: #d97706;
+}
+#top-ai-status-dot.is-disabled {
+  background: #9ca3af;
+}
+
 /* AI Model Manager Styles */
 .ai-manager-card {
   background: #ffffff;
