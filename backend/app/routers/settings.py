@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend.app.auth import get_current_user, require_role
-from backend.app.database import DB_PATH, get_db_connection
+from backend.app.database import get_db_connection, get_db_path
 from backend.app.utils.audit_logger import log_audit_event
 
 router = APIRouter(prefix="/api/settings", tags=["Settings & Application Config"])
@@ -209,14 +209,15 @@ def get_system_info(current_user: dict = Depends(get_current_user)):
     audit_log_count = conn.execute("SELECT COUNT(*) as c FROM audit_logs").fetchone()["c"]
     conn.close()
 
-    db_size_kb = round(os.path.getsize(DB_PATH) / 1024, 2) if os.path.exists(DB_PATH) else 0
+    db_path = get_db_path()
+    db_size_kb = round(os.path.getsize(db_path) / 1024, 2) if os.path.exists(db_path) else 0
 
     return {
         "app_name": "FinAuditPro",
         "version": "1.0.0 (Offline Desktop Edition)",
         "mode": "100% Offline (Local SQLite Database)",
         "database_engine": "SQLite 3 (Immutable Audit Trail Enabled)",
-        "database_path": os.path.basename(DB_PATH),
+        "database_path": os.path.basename(get_db_path()),
         "database_size_kb": db_size_kb,
         "statistics": {
             "users": user_count,
@@ -233,7 +234,8 @@ def get_system_info(current_user: dict = Depends(get_current_user)):
 @router.post("/backup")
 def create_backup(current_user: dict = Depends(require_role(["Admin"]))):
     """Admin: Creates a timestamped local SQLite backup using SQLite Online Backup API and records an audit trail entry."""
-    if not os.path.exists(DB_PATH):
+    db_path = get_db_path()
+    if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database file not found")
 
     # Fetch retention setting
@@ -252,7 +254,7 @@ def create_backup(current_user: dict = Depends(require_role(["Admin"]))):
     backup_path = os.path.join(BACKUP_DIR, backup_file)
 
     # Use SQLite Online Backup API for point-in-time consistency
-    src_conn = sqlite3.connect(DB_PATH)
+    src_conn = sqlite3.connect(get_db_path())
     dest_conn = sqlite3.connect(backup_path)
     try:
         src_conn.backup(dest_conn)

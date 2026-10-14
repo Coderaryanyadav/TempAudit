@@ -1,0 +1,147 @@
+---
+- name: Provision and deploy TempAudit on a Debian-family Linux host
+  hosts: tempaudit_hosts
+  become: true
+  vars:
+    app_user: tempaudit
+    app_group: tempaudit
+    app_dir: /opt/tempaudit
+    data_dir: /var/lib/tempaudit
+    repo_url: https://github.com/Coderaryanyadav/TempAudit.git
+    app_branch: main
+    python_packages:
+      - python3
+      - python3-venv
+      - python3-pip
+      - git
+      - curl
+
+  tasks:
+    - name: Stop if target is not a Debian-family Linux host
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family == "Debian"
+          - ansible_service_mgr == "systemd"
+        fail_msg: "This playbook expects Ubuntu/Debian Linux with systemd. Do not run it directly on macOS or native Windows."
+
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Python and Git prerequisites
+      ansible.builtin.apt:
+        name: "{{ python_packages }}"
+        state: present
+
+    - name: Create dedicated application group
+      ansible.builtin.group:
+        name: "{{ app_group }}"
+        system: true
+        state: present
+
+    - name: Create dedicated application user
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        system: true
+        create_home: true
+        shell: /usr/sbin/nologin
+        state: present
+
+    - name: Create application checkout directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0750"
+
+    - name: Clone or update TempAudit repository
+      become_user: "{{ app_user }}"
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: "{{ app_branch }}"
+        update: true
+        accept_hostkey: true
+      notify: Restart TempAudit service
+
+    - name: Create application data and output directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0750"
+      loop:
+        - "{{ data_dir }}"
+        - "{{ app_dir }}/backend/backups"
+        - "{{ app_dir }}/backend/uploaded_files"
+        - "{{ app_dir }}/backend/reports_generated"
+        - "{{ app_dir }}/backend/logs"
+
+    - name: Install Python dependencies into isolated virtual environment
+      become_user: "{{ app_user }}"
+      ansible.builtin.pip:
+        requirements: "{{ app_dir }}/requirements.txt"
+        virtualenv: "{{ app_dir }}/venv"
+        virtualenv_command: "python3 -m venv"
+      notify: Restart TempAudit service
+
+    - name: Install systemd service unit for TempAudit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/tempaudit.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=TempAudit / FinAuditPro FastAPI application
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ app_user }}
+          Group={{ app_group }}
+          WorkingDirectory={{ app_dir }}
+          Environment=PYTHONPATH={{ app_dir }}
+          Environment=FINAUDIT_DB_PATH={{ data_dir }}/finauditpro.db
+          ExecStart={{ app_dir }}/venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+          Restart=on-failure
+          RestartSec=3
+          NoNewPrivileges=true
+          PrivateTmp=true
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart TempAudit service
+
+    - name: Enable and start TempAudit service
+      ansible.builtin.systemd_service:
+        name: tempaudit.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Wait for TempAudit health endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8000/api/health
+        method: GET
+        status_code: 200
+        return_content: true
+      register: health_response
+      retries: 15
+      delay: 3
+      until: health_response.status == 200
+
+    - name: Display deployment verification
+      ansible.builtin.debug:
+        msg: "TempAudit health check succeeded on {{ inventory_hostname }}: {{ health_response.json }}"
+
+  handlers:
+    - name: Restart TempAudit service
+      ansible.builtin.systemd_service:
+        name: tempaudit.service
+        state: restarted
+        daemon_reload: true

@@ -20,30 +20,31 @@ from datetime import datetime
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, PROJECT_ROOT)
 
-from backend.app.database import DB_PATH, init_db, get_db_connection
+from backend.app.database import get_db_connection, get_db_path, init_db
 
 def perform_clean_room_reset(confirm: bool = False):
     print("=" * 80)
-    print("🧹 FINAUDITPRO - PRODUCTION CLEAN-ROOM RESET UTILITY")
+    print("FINAUDITPRO - PRODUCTION CLEAN-ROOM RESET UTILITY")
     print("=" * 80)
 
     if not confirm:
-        print("\n⚠️  WARNING: This will reset the local database and remove temporary upload artifacts.")
+        print("\n[!] WARNING: This will reset the local database and remove temporary upload artifacts.")
         print("To proceed, re-run with --confirm-reset")
         sys.exit(1)
 
     # 1. Archive existing DB if present
-    if os.path.exists(DB_PATH):
+    db_path = get_db_path()
+    if os.path.exists(db_path):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_dir = os.path.join(PROJECT_ROOT, "backend", "backups")
         os.makedirs(backup_dir, exist_ok=True)
         archive_path = os.path.join(backup_dir, f"pre_clean_reset_backup_{timestamp}.db")
-        shutil.copy2(DB_PATH, archive_path)
-        print(f"[✓] Archived existing database to: {archive_path}")
+        shutil.copy2(db_path, archive_path)
+        print(f"[OK] Archived existing database to: {archive_path}")
 
         # Remove active DB
-        os.remove(DB_PATH)
-        print(f"[✓] Removed existing database: {DB_PATH}")
+        os.remove(db_path)
+        print(f"[OK] Removed existing database: {db_path}")
 
     # 2. Clean temporary upload and generated report directories
     uploads_dir = os.path.join(PROJECT_ROOT, "backend", "uploaded_files")
@@ -60,15 +61,15 @@ def perform_clean_room_reset(confirm: bool = False):
                         shutil.rmtree(fpath)
                 except Exception as e:
                     print(f"[!] Warning cleaning {fpath}: {e}")
-            print(f"[✓] Cleaned directory: {target_dir}")
+            print(f"[OK] Cleaned directory: {target_dir}")
         else:
             os.makedirs(target_dir, exist_ok=True)
-            print(f"[✓] Initialized empty directory: {target_dir}")
+            print(f"[OK] Initialized empty directory: {target_dir}")
 
     # 3. Initialize Pristine Production Database Schema
     print("\n[+] Initializing pristine production schema and indexes...")
     init_db()
-    print("[✓] Database initialized successfully.")
+    print("[OK] Database initialized successfully.")
 
     # 4. Strict Zero-Data Assertions
     print("\n[+] Verifying Clean-Room Zero-Data Invariants...")
@@ -98,24 +99,24 @@ def perform_clean_room_reset(confirm: bool = False):
         try:
             count = cursor.execute(f"SELECT COUNT(*) as c FROM {tbl}").fetchone()["c"]
             if count == 0:
-                print(f"  [✓] Table '{tbl}': 0 records (CLEAN)")
+                print(f"  [OK] Table '{tbl}': 0 records (CLEAN)")
             else:
-                print(f"  [❌] Table '{tbl}': {count} records (NOT CLEAN)")
+                print(f"  [X] Table '{tbl}': {count} records (NOT CLEAN)")
                 all_clean = False
         except sqlite3.OperationalError:
             # Table might not exist in optional modules, which is clean
-            print(f"  [✓] Table '{tbl}': not present or optional (CLEAN)")
+            print(f"  [OK] Table '{tbl}': not present or optional (CLEAN)")
 
     conn.close()
 
     print("\n" + "=" * 80)
     if all_clean:
-        print("🎉 CLEAN-ROOM RESET COMPLETE: Application is in genuine 100% clean production state.")
+        print("[SUCCESS] CLEAN-ROOM RESET COMPLETE: Application is in genuine 100% clean production state.")
         print("Start the application with: python run.py")
         print("=" * 80)
         return 0
     else:
-        print("❌ CLEAN-ROOM RESET FAILED: Non-zero records detected.")
+        print("[FAIL] CLEAN-ROOM RESET FAILED: Non-zero records detected.")
         print("=" * 80)
         return 1
 

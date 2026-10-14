@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from backend.app.auth import get_current_user, require_role, require_engagement_access
-from backend.app.database import DB_PATH, get_db_connection
+from backend.app.database import get_db_connection, get_db_path
 from backend.app.utils.audit_logger import log_audit_event
 
 router = APIRouter(prefix="/api/audit-trail", tags=["Audit Trail & Database Backup"])
@@ -489,7 +489,8 @@ EVIDENCE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__fi
 @router.post("/backup/create")
 def create_local_backup(current_user: dict = Depends(require_role(["Admin"]))):
     """Admin: Create a point-in-time local SQLite database snapshot with SQLite Online Backup API and SHA-256 integrity verification."""
-    if not os.path.exists(DB_PATH):
+    current_db_path = get_db_path()
+    if not os.path.exists(current_db_path):
         raise HTTPException(status_code=404, detail="Primary database file not found")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
@@ -498,7 +499,8 @@ def create_local_backup(current_user: dict = Depends(require_role(["Admin"]))):
     backup_filepath = os.path.join(BACKUP_DIR, backup_filename)
 
     # Use SQLite Online Backup API for point-in-time consistency
-    src_conn = sqlite3.connect(DB_PATH)
+    current_db_path = get_db_path()
+    src_conn = sqlite3.connect(current_db_path)
     dest_conn = sqlite3.connect(backup_filepath)
     try:
         src_conn.backup(dest_conn)
@@ -537,7 +539,8 @@ def create_local_backup(current_user: dict = Depends(require_role(["Admin"]))):
 @router.post("/backup/create-full-bundle")
 def create_full_backup_bundle(current_user: dict = Depends(require_role(["Admin"]))):
     """Admin: Create a complete point-in-time backup bundle containing SQLite DB AND uploaded evidence files."""
-    if not os.path.exists(DB_PATH):
+    current_db_path = get_db_path()
+    if not os.path.exists(current_db_path):
         raise HTTPException(status_code=404, detail="Primary database file not found")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
@@ -546,7 +549,7 @@ def create_full_backup_bundle(current_user: dict = Depends(require_role(["Admin"
     temp_db_path = os.path.join(BACKUP_DIR, temp_db_name)
 
     # 1. Snapshot DB
-    src_conn = sqlite3.connect(DB_PATH)
+    src_conn = sqlite3.connect(current_db_path)
     dest_conn = sqlite3.connect(temp_db_path)
     try:
         src_conn.backup(dest_conn)
@@ -673,8 +676,9 @@ def restore_database_backup(filename: str, current_user: dict = Depends(require_
     safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
     safety_filename = f"pre_restore_safety_{safety_ts}_{uuid.uuid4().hex[:6]}.db"
     safety_filepath = os.path.join(BACKUP_DIR, safety_filename)
-    if os.path.exists(DB_PATH):
-        src_conn = sqlite3.connect(DB_PATH)
+    current_db_path = get_db_path()
+    if os.path.exists(current_db_path):
+        src_conn = sqlite3.connect(current_db_path)
         snap_conn = sqlite3.connect(safety_filepath)
         try:
             src_conn.backup(snap_conn)
@@ -684,7 +688,7 @@ def restore_database_backup(filename: str, current_user: dict = Depends(require_
 
     # 2. Restore active DB using SQLite Online Backup API
     backup_src_conn = sqlite3.connect(backup_filepath)
-    active_target_conn = sqlite3.connect(DB_PATH)
+    active_target_conn = sqlite3.connect(current_db_path)
     try:
         backup_src_conn.backup(active_target_conn)
     finally:
@@ -758,8 +762,9 @@ async def restore_database_upload(
     # 1. Take automatic pre-restore safety snapshot
     safety_filename = f"pre_restore_safety_{timestamp}.db"
     safety_filepath = os.path.join(BACKUP_DIR, safety_filename)
-    if os.path.exists(DB_PATH):
-        src_conn = sqlite3.connect(DB_PATH)
+    current_db_path = get_db_path()
+    if os.path.exists(current_db_path):
+        src_conn = sqlite3.connect(current_db_path)
         snap_conn = sqlite3.connect(safety_filepath)
         try:
             src_conn.backup(snap_conn)
@@ -769,7 +774,7 @@ async def restore_database_upload(
 
     # 2. Restore active DB using SQLite Online Backup API
     uploaded_src_conn = sqlite3.connect(uploaded_filepath)
-    active_target_conn = sqlite3.connect(DB_PATH)
+    active_target_conn = sqlite3.connect(current_db_path)
     try:
         uploaded_src_conn.backup(active_target_conn)
     finally:

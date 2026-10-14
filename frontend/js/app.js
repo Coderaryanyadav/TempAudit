@@ -14,11 +14,41 @@ const state = {
 };
 
 // ==========================================
+// Standardized Monochrome SVG Icon Registry (Consistent 24x24 viewBox, stroke-width 2, currentColor)
+const ICONS = {
+  eye: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`,
+  check: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`,
+  close: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`,
+  alertTriangle: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`,
+  info: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+  help: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+  search: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
+  download: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>`,
+  upload: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>`,
+  plus: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>`,
+  settings: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>`,
+  refresh: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>`,
+  trash: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`,
+  fileText: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>`,
+  bell: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>`,
+  lock: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>`,
+  logout: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>`,
+  externalLink: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>`,
+  clipboard: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>`,
+  edit: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>`,
+  folder: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>`,
+  shield: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>`,
+  calendar: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`,
+  chartBar: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>`,
+  scale: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>`,
+  book: `<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>`
+};
+
 // UNIFIED NOTIFICATION SYSTEM (FinNotify)
 // ==========================================
 const FinNotify = {
   container: null,
-  
+
   init() {
     if (!this.container) {
       this.container = document.getElementById("notification-toast-container");
@@ -39,10 +69,10 @@ const FinNotify = {
     toast.setAttribute("aria-live", "polite");
 
     const icons = {
-      success: "✓",
-      error: "✕",
-      warning: "⚠",
-      info: "ℹ"
+      success: ICONS.check,
+      error: ICONS.close,
+      warning: ICONS.alertTriangle,
+      info: ICONS.info
     };
 
     const defaultTitles = {
@@ -61,7 +91,7 @@ const FinNotify = {
         <div class="toast-title">${escapeHTML(displayTitle)}</div>
         ${message ? `<div class="toast-message">${escapeHTML(message)}</div>` : ""}
       </div>
-      <button type="button" class="toast-close-btn" aria-label="Dismiss notification">✕</button>
+      <button type="button" class="toast-close-btn" aria-label="Dismiss notification">${ICONS.close}</button>
       <div class="toast-progress" style="animation-duration: ${duration}ms;"></div>
     `;
 
@@ -153,7 +183,7 @@ function FinConfirm({
       <div class="fin-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <div class="fin-confirm-card ${isDanger ? 'confirm-danger' : ''}">
           <div class="fin-confirm-header">
-            <div class="fin-confirm-icon">${isDanger ? '⚠️' : '❓'}</div>
+            <div class="fin-confirm-icon">${isDanger ? ICONS.alertTriangle : ICONS.help}</div>
             <h3 id="confirm-modal-title" class="fin-confirm-title">${escapeHTML(title)}</h3>
           </div>
           <div class="fin-confirm-body">
@@ -243,7 +273,7 @@ function renderErrorBanner(err, contextTitle = "Action Failed") {
   return `
     <div class="error-banner-card">
       <div class="error-banner-header">
-        <div class="error-banner-icon">⚠️</div>
+        <div class="error-banner-icon">${ICONS.alertTriangle}</div>
         <div>
           <h4 class="error-banner-title">${escapeHTML(translated.title)}</h4>
           <p class="error-banner-message">${escapeHTML(translated.friendlyMessage)}</p>
@@ -257,7 +287,7 @@ function renderErrorBanner(err, contextTitle = "Action Failed") {
         <div class="error-diagnostic-body">
           <code>${escapeHTML(translated.rawError)}</code>
           <button type="button" class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${escapeHTML(translated.rawError).replace(/'/g, "\\'")}'); FinNotify.info('Diagnostic details copied to clipboard');" style="margin-top: 8px;">
-            📋 Copy Diagnostic Info
+            ${ICONS.clipboard} Copy Diagnostic Info
           </button>
         </div>
       </details>
@@ -308,7 +338,7 @@ function updateUserTopBar() {
   const nameEl = document.getElementById("top-user-name");
   const avatarEl = document.getElementById("top-user-avatar");
   const roleBadgeEl = document.getElementById("top-user-role-badge");
-  
+
   if (state.currentUser) {
     if (nameEl) nameEl.textContent = state.currentUser.full_name || state.currentUser.username || "User";
     if (avatarEl) {
@@ -338,16 +368,21 @@ function applyRoleNavigationPermissions() {
 window.applyRoleNavigationPermissions = applyRoleNavigationPermissions;
 
 // App Initialization
-document.addEventListener("DOMContentLoaded", async () => {
+async function initApp() {
   setupNavigation();
   setupDrawer();
   setupUserMenu();
   setupSidebarControls();
   setupGlobalSearch();
   setupKeyboardShortcuts();
-  refreshTopBarAIStatus().catch(() => {});
   await checkAuthSession();
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}
 
 // Authentication & Session Bootstrap
 // Global setup wizard transient state
@@ -376,44 +411,81 @@ let _wizardState = {
   }
 };
 
+// In-flight singleton promise to prevent competing or recursive session restoration
+let _authSessionPromise = null;
+
 // Authentication & Session Bootstrap
 async function checkAuthSession() {
-  try {
-    const status = await FinAuditAPI.getSetupStatus();
-    if (status.state === "UNINITIALIZED" || status.user_count === 0) {
-      FinAuditAPI.setToken(null);
-      showWelcomeSplash();
-      return;
-    } else if (status.state === "DATABASE_ERROR") {
-      showSystemDatabaseError(status.error);
+  if (_authSessionPromise) {
+    return _authSessionPromise;
+  }
+
+  _authSessionPromise = (async () => {
+    try {
+      const status = await FinAuditAPI.getSetupStatus();
+      if (status.state === "UNINITIALIZED" || status.user_count === 0) {
+        FinAuditAPI.setToken(null);
+        showWelcomeSplash();
+        return;
+      } else if (status.state === "SETUP_REQUIRED" && !status.wizard_completed) {
+        showSetupWizard(status.user_count > 0 ? 2 : 1);
+        return;
+      } else if (status.state === "DATABASE_ERROR") {
+        showSystemDatabaseError(status.error);
+        return;
+      }
+    } catch (e) {
+      console.warn("Could not check setup status:", e);
+    }
+
+    const token = FinAuditAPI.getToken();
+    if (!token) {
+      showLoginScreen();
       return;
     }
-  } catch (e) {
-    console.warn("Could not check setup status:", e);
-  }
 
-  const token = FinAuditAPI.getToken();
-  if (!token) {
-    showLoginScreen();
-    return;
-  }
+    let user;
+    try {
+      user = await FinAuditAPI.getMe();
+    } catch (err) {
+      console.warn("Auth check failed:", err.message);
+      FinAuditAPI.setToken(null);
+      showLoginScreen(err.message && err.message.includes("disabled") ? err.message : null);
+      return;
+    }
 
-  try {
-    const user = await FinAuditAPI.getMe();
+    // Authentication restored successfully
     state.currentUser = user;
     state.isAuthenticated = true;
     hideLoginScreen();
     updateUserTopBar();
     applyRoleNavigationPermissions();
-    await loadEngagements();
-    await refreshTopBarAIStatus();
-    navigateTo("dashboard");
-  } catch (err) {
-    console.warn("Auth check failed:", err.message);
-    FinAuditAPI.setToken(null);
-    showLoginScreen(err.message && err.message.includes("disabled") ? err.message : null);
-  }
+
+    // Load dashboard and protected status safely after authentication
+    try {
+      await loadEngagements();
+    } catch (engErr) {
+      console.error("Error loading engagements during session restoration:", engErr);
+    }
+
+    try {
+      navigateTo("dashboard");
+    } catch (navErr) {
+      console.error("Error navigating to dashboard during session restoration:", navErr);
+    }
+
+    try {
+      await refreshTopBarAIStatus();
+    } catch (aiErr) {
+      console.warn("Error refreshing top bar AI status:", aiErr);
+    }
+  })().finally(() => {
+    _authSessionPromise = null;
+  });
+
+  return _authSessionPromise;
 }
+window.checkAuthSession = checkAuthSession;
 
 // ----------------- STATE A: FRESH LAUNCH WELCOME SPLASH -----------------
 function showWelcomeSplash() {
@@ -487,7 +559,7 @@ function showWelcomeSplash() {
       </div>
     </div>
   `;
-}window.showWelcomeSplash = showWelcomeSplash;
+} window.showWelcomeSplash = showWelcomeSplash;
 
 
 // ----------------- STATE B: FIRST-RUN SETUP WIZARD (STEPS 1 TO 5) -----------------
@@ -505,22 +577,22 @@ function showSetupWizard(step = 1, errorMsg = null) {
   const renderStepper = (activeStep) => `
     <div class="wizard-stepper">
       <div class="wizard-step-item ${activeStep === 1 ? 'active' : activeStep > 1 ? 'completed' : ''}">
-        <span class="wizard-step-num">${activeStep > 1 ? '✓' : '1'}</span>
+        <span class="wizard-step-num">${activeStep > 1 ? ICONS.check : '1'}</span>
         <span>Administrator</span>
       </div>
       <div style="color: var(--text-secondary);">→</div>
       <div class="wizard-step-item ${activeStep === 2 ? 'active' : activeStep > 2 ? 'completed' : ''}">
-        <span class="wizard-step-num">${activeStep > 2 ? '✓' : '2'}</span>
+        <span class="wizard-step-num">${activeStep > 2 ? ICONS.check : '2'}</span>
         <span>Firm Profile</span>
       </div>
       <div style="color: var(--text-secondary);">→</div>
       <div class="wizard-step-item ${activeStep === 3 ? 'active' : activeStep > 3 ? 'completed' : ''}">
-        <span class="wizard-step-num">${activeStep > 3 ? '✓' : '3'}</span>
-        <span>Security & AI</span>
+        <span class="wizard-step-num">${activeStep > 3 ? ICONS.check : '3'}</span>
+        <span>Security & Assistant</span>
       </div>
       <div style="color: var(--text-secondary);">→</div>
       <div class="wizard-step-item ${activeStep === 4 ? 'active' : activeStep > 4 ? 'completed' : ''}">
-        <span class="wizard-step-num">${activeStep > 4 ? '✓' : '4'}</span>
+        <span class="wizard-step-num">${activeStep > 4 ? ICONS.check : '4'}</span>
         <span>Backups</span>
       </div>
       <div style="color: var(--text-secondary);">→</div>
@@ -582,20 +654,20 @@ function showSetupWizard(step = 1, errorMsg = null) {
               <label class="form-label">Master Password <span style="color: #ef4444;">*</span></label>
               <div class="password-input-wrap">
                 <input type="password" id="wz-password" class="form-control" placeholder="Min. 10 characters" minlength="10" required>
-                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('wz-password')">👁️</button>
+                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('wz-password')">${ICONS.eye}</button>
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">Confirm Password <span style="color: #ef4444;">*</span></label>
               <div class="password-input-wrap">
                 <input type="password" id="wz-confirm-password" class="form-control" placeholder="Re-enter password" minlength="10" required>
-                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('wz-confirm-password')">👁️</button>
+                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('wz-confirm-password')">${ICONS.eye}</button>
               </div>
             </div>
           </div>
 
           <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 16px; font-size: 11px; color: var(--text-secondary);">
-            🔒 Passwords are cryptographically salted and hashed using PBKDF2-HMAC-SHA256 (100,000 rounds).
+            Passwords are cryptographically salted and hashed using PBKDF2-HMAC-SHA256 (100,000 rounds).
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -686,7 +758,7 @@ function showSetupWizard(step = 1, errorMsg = null) {
       <div style="padding: 24px;">
         <form id="wizard-step3-form" onsubmit="handleWizardStep3(event)">
           <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
-            <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 6px;">⏱️ Session Inactivity Timeout</div>
+            <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 6px;">Session Inactivity Timeout</div>
             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Automatically locks the workstation session after a period of inactivity to prevent unauthorized physical access.</div>
             <select id="wz-session-timeout" class="form-control" style="max-width: 240px;">
               <option value="15">15 Minutes</option>
@@ -697,7 +769,7 @@ function showSetupWizard(step = 1, errorMsg = null) {
           </div>
 
           <div style="background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
-            <div style="font-weight: 700; font-size: 14px; color: #0284c7; margin-bottom: 6px;">🤖 Local AI Inference Privacy Shield</div>
+            <div style="font-weight: 700; font-size: 14px; color: #0284c7; margin-bottom: 6px;">Local Processing & Privacy Guard</div>
             <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
               FinAuditPro connects strictly to offline local LLMs (LM Studio / Ollama / Built-in Reasoner). All prompts automatically sanitize client PANs, GSTINs, bank accounts, and entity names.
             </div>
@@ -729,7 +801,7 @@ function showSetupWizard(step = 1, errorMsg = null) {
       <div style="padding: 24px;">
         <form id="wizard-step4-form" onsubmit="handleWizardStep4(event)">
           <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
-            <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 4px;">💾 Local Backup Directory</div>
+            <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 4px;">Local Backup Directory</div>
             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Backups include full SQLite database, uploaded evidence artifacts, and SHA-256 verification manifest.</div>
             <input type="text" id="wz-backup-dir" class="form-control" value="backups" placeholder="Folder path or external drive folder">
           </div>
@@ -757,7 +829,7 @@ function showSetupWizard(step = 1, errorMsg = null) {
     // STEP 5: SETUP SUMMARY & OPEN FINIPRO
     bodyContent = `
       <div class="login-header" style="background: #0f172a; padding: 24px; text-align: center;">
-        <div class="login-logo" style="width: 48px; height: 48px; font-size: 24px; margin: 0 auto 10px auto; background: linear-gradient(135deg, #10b981, #059669);">✓</div>
+        <div class="login-logo" style="width: 48px; height: 48px; margin: 0 auto 10px auto; background: #10b981; color: white; display: flex; align-items: center; justify-content: center;">${ICONS.check}</div>
         <div class="login-title" style="font-size: 22px;">You're Ready to Audit!</div>
         <div class="login-subtitle" style="margin-top: 4px;">FinAuditPro has been successfully initialized and configured.</div>
       </div>
@@ -769,20 +841,20 @@ function showSetupWizard(step = 1, errorMsg = null) {
           </div>
           <div style="padding: 16px; font-size: 13px; display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>👤 Master Administrator</span>
-              <strong style="color: #059669;">✓ Created & Authenticated</strong>
+              <span>Master Administrator</span>
+              <strong style="color: #059669;">Created & Authenticated</strong>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>🏢 Audit Firm Profile</span>
-              <strong style="color: #059669;">✓ ${_wizardState.firm.firm_name || 'Configured'}</strong>
+              <span>Audit Firm Profile</span>
+              <strong style="color: #059669;">${_wizardState.firm.firm_name || 'Configured'}</strong>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>🔒 Session Security & Offline AI</span>
-              <strong style="color: #059669;">✓ Enforced (100% Offline)</strong>
+              <span>Session Security & Assistant</span>
+              <strong style="color: #059669;">Enforced (Local Standalone)</strong>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>💾 Backup Storage</span>
-              <strong style="color: #059669;">✓ ${_wizardState.backup.backup_location || 'Configured'}</strong>
+              <span>Backup Storage</span>
+              <strong style="color: #059669;">${_wizardState.backup.backup_location || 'Configured'}</strong>
             </div>
           </div>
         </div>
@@ -929,22 +1001,38 @@ function skipWizardStep4() {
 async function handleFinishSetupAndOpen() {
   try {
     await FinAuditAPI.setupComplete();
-  } catch (e) {}
+  } catch (e) { }
 
-  hideLoginScreen();
+  let user;
   try {
-    const user = await FinAuditAPI.getMe();
-    state.currentUser = user;
-    state.isAuthenticated = true;
-    updateUserTopBar();
-    applyRoleNavigationPermissions();
-    await loadEngagements();
-    await refreshTopBarAIStatus();
-    navigateTo("dashboard");
-    FinNotify.success("FinAuditPro setup complete! Welcome to your offline audit workspace.");
+    user = await FinAuditAPI.getMe();
   } catch (err) {
     showLoginScreen();
+    return;
   }
+
+  hideLoginScreen();
+  state.currentUser = user;
+  state.isAuthenticated = true;
+  updateUserTopBar();
+  applyRoleNavigationPermissions();
+
+  try {
+    await loadEngagements();
+  } catch (e) {
+    console.warn("Could not load engagements post setup:", e);
+  }
+  try {
+    navigateTo("dashboard");
+  } catch (e) {
+    console.error("Could not navigate to dashboard post setup:", e);
+  }
+  try {
+    await refreshTopBarAIStatus();
+  } catch (e) {
+    console.warn("Could not refresh AI status post setup:", e);
+  }
+  FinNotify.success("FinAuditPro setup complete! Welcome to your offline audit workspace.");
 }
 
 
@@ -961,7 +1049,7 @@ function showActivationModal(initialToken = "") {
   overlay.innerHTML = `
     <div class="login-card" style="max-width: 460px;">
       <div class="login-header" style="background: #0f172a; padding: 22px 24px; text-align: center;">
-        <div class="login-logo" style="margin: 0 auto 10px auto;">🔑</div>
+        <div class="login-logo" style="margin: 0 auto 10px auto;"><svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg></div>
         <div class="login-title" style="font-size: 19px;">Activate User Account</div>
         <div class="login-subtitle">Enter your activation code to join this audit workspace</div>
       </div>
@@ -979,7 +1067,7 @@ function showActivationModal(initialToken = "") {
             <label class="form-label">Create Your Permanent Password <span style="color: #ef4444;">*</span></label>
             <div class="password-input-wrap">
               <input type="password" id="act-password" class="form-control" placeholder="Min. 8 characters" minlength="8" required>
-              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('act-password')">👁️</button>
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('act-password')">${ICONS.eye}</button>
             </div>
           </div>
 
@@ -987,7 +1075,7 @@ function showActivationModal(initialToken = "") {
             <label class="form-label">Confirm Password <span style="color: #ef4444;">*</span></label>
             <div class="password-input-wrap">
               <input type="password" id="act-confirm-password" class="form-control" placeholder="Re-enter password" minlength="8" required>
-              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('act-confirm-password')">👁️</button>
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('act-confirm-password')">${ICONS.eye}</button>
             </div>
           </div>
 
@@ -998,7 +1086,7 @@ function showActivationModal(initialToken = "") {
 
         <div style="display: flex; justify-content: center; gap: 8px; margin-top: 14px;">
           <button class="btn btn-secondary btn-sm" onclick="checkAuthSession()">← Back to Setup / Login</button>
-          <button class="btn btn-outline btn-sm" onclick="showSetupWizard(1)" style="color: #0284c7; border-color: #0284c7;">🚀 First-Time Setup</button>
+          <button class="btn btn-outline btn-sm" onclick="showSetupWizard(1)" style="color: #0284c7; border-color: #0284c7;">First-Time Setup</button>
         </div>
       </div>
     </div>
@@ -1024,31 +1112,61 @@ async function handleActivationSubmit(event) {
   btn.disabled = true;
   btn.innerText = "Activating account...";
 
+  let res;
   try {
-    const res = await FinAuditAPI.activateUser({
+    res = await FinAuditAPI.activateUser({
       activation_token: token,
       password: password
     });
-
     if (res.access_token) {
       FinAuditAPI.setToken(res.access_token);
     }
-    const user = await FinAuditAPI.getMe();
-    state.currentUser = user;
-    state.isAuthenticated = true;
-    hideLoginScreen();
-    updateUserTopBar();
-    applyRoleNavigationPermissions();
-    await loadEngagements();
-    navigateTo("dashboard");
-    FinNotify.success(`Account activated! Welcome to FinAuditPro, ${user.full_name}.`);
   } catch (err) {
     alertBox.className = "login-alert-box error";
     alertBox.style.display = "block";
     alertBox.innerText = err.message || "Failed to activate account.";
     btn.disabled = false;
     btn.innerText = "Activate Account & Log In →";
+    return;
   }
+
+  let user;
+  try {
+    user = await FinAuditAPI.getMe();
+  } catch (err) {
+    FinAuditAPI.setToken(null);
+    alertBox.className = "login-alert-box error";
+    alertBox.style.display = "block";
+    alertBox.innerText = err.message || "Failed to confirm activated session.";
+    btn.disabled = false;
+    btn.innerText = "Activate Account & Log In →";
+    return;
+  }
+
+  state.currentUser = user;
+  state.isAuthenticated = true;
+  hideLoginScreen();
+  updateUserTopBar();
+  applyRoleNavigationPermissions();
+  btn.disabled = false;
+  btn.innerText = "Activate Account & Log In →";
+
+  try {
+    await loadEngagements();
+  } catch (e) {
+    console.warn("Could not load engagements post activation:", e);
+  }
+  try {
+    navigateTo("dashboard");
+  } catch (e) {
+    console.error("Could not navigate to dashboard post activation:", e);
+  }
+  try {
+    await refreshTopBarAIStatus();
+  } catch (e) {
+    console.warn("Could not refresh AI status post activation:", e);
+  }
+  FinNotify.success(`Account activated! Welcome to FinAuditPro, ${user.full_name}.`);
 }
 
 
@@ -1065,7 +1183,7 @@ function showSystemDatabaseError(errorMsg) {
   overlay.innerHTML = `
     <div class="login-card" style="max-width: 500px; border-top: 4px solid #ef4444;">
       <div class="login-header" style="background: #0f172a; padding: 24px; text-align: center;">
-        <div style="font-size: 36px; margin-bottom: 8px;">⚠️</div>
+        <div style="margin-bottom: 8px; color: #f87171;"><svg width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg></div>
         <div class="login-title" style="font-size: 20px; color: #f87171;">Installation Diagnostic Alert</div>
         <div class="login-subtitle">FinAuditPro could not safely open this installation</div>
       </div>
@@ -1086,7 +1204,7 @@ function showSystemDatabaseError(errorMsg) {
 
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-primary" onclick="checkAuthSession()" style="flex: 1; padding: 12px;">
-            🔄 Retry Connection
+            ${ICONS.refresh} Retry Connection
           </button>
         </div>
       </div>
@@ -1129,7 +1247,7 @@ function showLoginScreen(errorMsg = null) {
             <label class="form-label">Password</label>
             <div class="password-input-wrap">
               <input type="password" id="login-password" class="form-control" placeholder="Enter password" required>
-              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('login-password')">👁️</button>
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('login-password')">${ICONS.eye}</button>
             </div>
           </div>
 
@@ -1166,35 +1284,97 @@ function togglePasswordVisibility(inputId) {
 
 async function handleLoginFormSubmit(event) {
   event.preventDefault();
-  const username = document.getElementById("login-username").value.trim();
-  const password = document.getElementById("login-password").value;
+  const usernameInput = document.getElementById("login-username");
+  const passwordInput = document.getElementById("login-password");
   const alertBox = document.getElementById("login-alert");
   const submitBtn = document.getElementById("login-submit-btn");
 
+  const username = usernameInput ? usernameInput.value.trim() : "";
+  const password = passwordInput ? passwordInput.value : "";
+
   if (!username || !password) return;
 
-  submitBtn.disabled = true;
-  submitBtn.innerText = "Verifying locally...";
-  alertBox.className = "login-alert-box";
-  alertBox.style.display = "none";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Verifying locally...";
+  }
+  if (alertBox) {
+    alertBox.className = "login-alert-box";
+    alertBox.style.display = "none";
+  }
 
+  // 1. Authenticate with backend and receive token
+  let loginRes;
   try {
-    const res = await FinAuditAPI.login(username, password);
-    state.currentUser = res.user;
-    state.isAuthenticated = true;
-    hideLoginScreen();
-    updateUserTopBar();
-    applyRoleNavigationPermissions();
-    await loadEngagements();
-    navigateTo("dashboard");
-    FinNotify.success(`Welcome back, ${res.user.full_name}!`);
+    loginRes = await FinAuditAPI.login(username, password);
+    if (!loginRes || !loginRes.access_token) {
+      throw new Error("No access token returned from authentication service.");
+    }
   } catch (err) {
-    alertBox.innerText = err.message || "Invalid username or password.";
-    alertBox.className = "login-alert-box error";
-    alertBox.style.display = "block";
+    if (alertBox) {
+      alertBox.innerText = err.message || "Invalid username or password.";
+      alertBox.className = "login-alert-box error";
+      alertBox.style.display = "block";
+    }
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Secure Offline Sign In";
+    }
+    return;
+  }
+
+  // 2. Confirm the session with /api/auth/me
+  let userProfile;
+  try {
+    userProfile = await FinAuditAPI.getMe();
+  } catch (err) {
+    FinAuditAPI.setToken(null);
+    if (alertBox) {
+      alertBox.innerText = err.message || "Session verification failed. Please try again.";
+      alertBox.className = "login-alert-box error";
+      alertBox.style.display = "block";
+    }
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Secure Offline Sign In";
+    }
+    return;
+  }
+
+  // 3. Restore user, apply role permissions, and dismiss login screen
+  state.currentUser = userProfile;
+  state.isAuthenticated = true;
+  hideLoginScreen();
+  updateUserTopBar();
+  applyRoleNavigationPermissions();
+  if (submitBtn) {
     submitBtn.disabled = false;
     submitBtn.innerText = "Secure Offline Sign In";
   }
+
+  // 4. Load dashboard data & refresh protected status indicators
+  // Note: Failure in dashboard loading should NOT invalidate the session or present as an invalid password
+  try {
+    await loadEngagements();
+  } catch (engErr) {
+    console.error("Failed loading engagements after login:", engErr);
+    FinNotify.warning("Could not load engagements: " + (engErr.message || "Unknown error"));
+  }
+
+  try {
+    navigateTo("dashboard");
+  } catch (navErr) {
+    console.error("Failed navigating to dashboard after login:", navErr);
+    FinNotify.error("Could not render dashboard: " + (navErr.message || "Unknown error"));
+  }
+
+  try {
+    await refreshTopBarAIStatus();
+  } catch (aiErr) {
+    console.warn("Failed refreshing AI status after login:", aiErr);
+  }
+
+  FinNotify.success(`Welcome back, ${userProfile.full_name || userProfile.username}!`);
 }
 
 async function handleLogout() {
@@ -1286,7 +1466,7 @@ function toggleMobileSidebar(forceState) {
 }
 window.toggleMobileSidebar = toggleMobileSidebar;
 
-window.closeDrawer = function() {
+window.closeDrawer = function () {
   if (typeof closeEvidenceDrawer === "function") {
     closeEvidenceDrawer();
   } else {
@@ -1335,23 +1515,23 @@ function openGlobalSearchModal() {
     <div class="global-search-overlay" id="global-search-modal-overlay">
       <div class="global-search-dialog">
         <div class="global-search-header">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon">${ICONS.search}</span>
           <input type="text" id="global-search-input" class="global-search-input" placeholder="Search engagements, clients, findings, working papers, or navigation tabs..." autofocus />
-          <button type="button" class="global-search-close-btn" onclick="closeGlobalSearchModal()" aria-label="Close search">✕</button>
+          <button type="button" class="global-search-close-btn" onclick="closeGlobalSearchModal()" aria-label="Close search">${ICONS.close}</button>
         </div>
         <div class="global-search-body" id="global-search-results">
           <div class="search-empty-hint">Type to start searching across your workspace or use navigation shortcuts below.</div>
           <div class="search-quick-nav-section">
             <div class="search-section-title">Quick Navigation</div>
             <div class="search-quick-grid">
-              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('dashboard')">📊 Dashboard</button>
-              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('import')">📥 Import Data</button>
-              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('trial_balance')">⚖️ Trial Balance</button>
-              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('general_ledger')">📖 General Ledger</button>
-              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('findings')">🚩 Audit Findings</button>
-              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('working_papers')">📝 Working Papers</button>
-              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('clients')">🏢 Clients</button>
-              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('engagements')">📁 Engagements</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('dashboard')">Dashboard</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('import')">Import Data</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('trial_balance')">Trial Balance</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('general_ledger')">General Ledger</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('findings')">Audit Findings</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('working_papers')">Working Papers</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('clients')">Clients</button>
+              <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('engagements')">Engagements</button>
             </div>
           </div>
         </div>
@@ -1393,7 +1573,7 @@ window.navigateToTabFromSearch = navigateToTabFromSearch;
 
 function debounce(func, wait) {
   let timeout;
-  return function(...args) {
+  return function (...args) {
     clearTimeout(timeout);
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
@@ -1410,14 +1590,14 @@ async function handleGlobalSearchQuery(e) {
       <div class="search-quick-nav-section">
         <div class="search-section-title">Quick Navigation</div>
         <div class="search-quick-grid">
-          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('dashboard')">📊 Dashboard</button>
-          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('import')">📥 Import Data</button>
-          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('trial_balance')">⚖️ Trial Balance</button>
-          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('general_ledger')">📖 General Ledger</button>
-          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('findings')">🚩 Audit Findings</button>
-          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('working_papers')">📝 Working Papers</button>
-          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('clients')">🏢 Clients</button>
-          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('engagements')">📁 Engagements</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('dashboard')">Dashboard</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('import')">Import Data</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('trial_balance')">Trial Balance</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('general_ledger')">General Ledger</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('findings')">Audit Findings</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('working_papers')">Working Papers</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('clients')">Clients</button>
+          <button type="button" class="quick-nav-chip" onclick="navigateToTabFromSearch('engagements')">Engagements</button>
         </div>
       </div>
     `;
@@ -1425,7 +1605,7 @@ async function handleGlobalSearchQuery(e) {
   }
 
   // Filter engagements & clients
-  const matchedEngagements = (state.engagements || []).filter(eng => 
+  const matchedEngagements = (state.engagements || []).filter(eng =>
     (eng.title && eng.title.toLowerCase().includes(query)) ||
     (eng.client_name && eng.client_name.toLowerCase().includes(query)) ||
     (eng.financial_year && eng.financial_year.toLowerCase().includes(query))
@@ -1437,7 +1617,7 @@ async function handleGlobalSearchQuery(e) {
     matchedEngagements.forEach(eng => {
       html += `
         <div class="search-result-row" onclick="selectEngagementFromSearch(${eng.id})">
-          <div class="search-result-icon">📁</div>
+          <div class="search-result-icon">${ICONS.folder}</div>
           <div class="search-result-details">
             <div class="search-result-title">${escapeHTML(eng.client_name)} — ${escapeHTML(eng.title)}</div>
             <div class="search-result-sub">FY ${escapeHTML(eng.financial_year)} • ${escapeHTML(eng.audit_type || 'Statutory Audit')}</div>
@@ -1469,9 +1649,9 @@ async function handleGlobalSearchQuery(e) {
     { id: "settings", label: "Workspace Settings", desc: "Firm preferences and configuration" }
   ];
 
-  const matchedTabs = navTabs.filter(t => 
-    t.label.toLowerCase().includes(query) || 
-    t.desc.toLowerCase().includes(query) || 
+  const matchedTabs = navTabs.filter(t =>
+    t.label.toLowerCase().includes(query) ||
+    t.desc.toLowerCase().includes(query) ||
     t.id.toLowerCase().includes(query)
   );
 
@@ -1480,7 +1660,7 @@ async function handleGlobalSearchQuery(e) {
     matchedTabs.forEach(t => {
       html += `
         <div class="search-result-row" onclick="navigateToTabFromSearch('${t.id}')">
-          <div class="search-result-icon">⚡</div>
+          <div class="search-result-icon">${ICONS.fileText}</div>
           <div class="search-result-details">
             <div class="search-result-title">${escapeHTML(t.label)}</div>
             <div class="search-result-sub">${escapeHTML(t.desc)}</div>
@@ -1498,7 +1678,7 @@ async function handleGlobalSearchQuery(e) {
   resultsContainer.innerHTML = html;
 }
 
-window.selectEngagementFromSearch = async function(engId) {
+window.selectEngagementFromSearch = async function (engId) {
   closeGlobalSearchModal();
   state.currentEngagementId = engId;
   const select = document.getElementById("engagement-select");
@@ -1514,7 +1694,7 @@ window.selectEngagementFromSearch = async function(engId) {
 function renderEmptyEngagementGuide(container, tabName = "dashboard") {
   container.innerHTML = `
     <div class="onboarding-hero-card">
-      <div class="onboarding-hero-icon">🚀</div>
+      <div class="onboarding-hero-icon"><svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg></div>
       <h2 class="onboarding-hero-title">Welcome to FinAuditPro!</h2>
       <p class="onboarding-hero-desc">
         You don't have any audit engagements configured yet. To begin auditing, create a client record and initialize your first audit engagement.
@@ -1654,9 +1834,9 @@ function navigateTo(tab) {
 
   // Check if this tab requires an active engagement
   const engagementRequiredTabs = [
-    "dashboard", "import", "cleaning_logs", "trial_balance", "general_ledger", 
-    "ledgers", "reconciliation", "financial_statements", "yoy_comparison", 
-    "duplicate_missing", "anomaly_detection", "findings", "checklist", 
+    "dashboard", "import", "cleaning_logs", "trial_balance", "general_ledger",
+    "ledgers", "reconciliation", "financial_statements", "yoy_comparison",
+    "duplicate_missing", "anomaly_detection", "findings", "checklist",
     "working_papers", "reports"
   ];
 
@@ -1790,10 +1970,10 @@ async function renderUserManagement() {
                     <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
                       ${u.status === 'INVITED' && u.activation_token ? `
                         <button class="btn btn-sm btn-outline" onclick="copyActivationCode('${u.activation_token}', '${u.full_name}')" title="Copy Activation Code">
-                          📋 Code
+                          Copy Code
                         </button>
                         <button class="btn btn-sm btn-secondary" onclick="handleReissueActivation(${u.id}, '${u.username}')" title="Re-issue Token">
-                          🔄 New Code
+                          ${ICONS.refresh} New Code
                         </button>
                       ` : ''}
                       ${u.id !== state.currentUser.id ? `
@@ -1883,7 +2063,7 @@ function openCreateUserModal() {
       <div class="modal-card" style="width: 520px;">
         <div class="modal-header">
           <div class="modal-title">Add / Invite Audit Team User</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('user-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('user-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form id="create-user-form" onsubmit="handleCreateUserSubmit(event)">
@@ -1918,7 +2098,7 @@ function openCreateUserModal() {
             </div>
 
             <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px; font-size: 12px; color: #0284c7;">
-              🔑 <strong>Secure Offline Activation:</strong> An invitation token will be generated for the user to activate their own account and set their private password upon first launch.
+              <strong>Secure Offline Activation:</strong> An invitation token will be generated for the user to activate their own account and set their private password upon first launch.
             </div>
 
             <div class="modal-footer" style="padding: 10px 0 0 0; margin-top: 14px;">
@@ -1963,7 +2143,7 @@ function openAdminResetPasswordModal(userId, username) {
       <div class="modal-card">
         <div class="modal-header">
           <div class="modal-title">Admin Reset Password: ${username}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('reset-pwd-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('reset-pwd-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleAdminResetPasswordSubmit(event, ${userId}, '${username}')">
@@ -2002,7 +2182,7 @@ function openChangePasswordModal() {
       <div class="modal-card">
         <div class="modal-header">
           <div class="modal-title">Change Account Password</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('change-pwd-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('change-pwd-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleChangePasswordSubmit(event)">
@@ -2164,7 +2344,7 @@ async function renderClients(searchQuery = null, entityFilter = null) {
         </div>
         ${clients.length === 0 ? `
           <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 44px; margin-bottom: 10px;">🏢</div>
+            <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg></div>
             <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No clients yet</div>
             <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
               Register your audited entity to establish tenancy, define statutory identifiers (PAN, GSTIN), and begin creating audit engagements.
@@ -2202,8 +2382,8 @@ async function renderClients(searchQuery = null, entityFilter = null) {
                     <td>
                       <div style="font-size: 12px; font-weight: 600;">${c.industry || 'General'}</div>
                       <div style="font-size: 11px; color: var(--text-muted);">
-                        ${c.contact_person ? `👤 ${c.contact_person}` : ''}
-                        ${c.phone ? ` • 📞 ${c.phone}` : ''}
+                        ${c.contact_person ? `${c.contact_person}` : ''}
+                        ${c.phone ? ` • ${c.phone}` : ''}
                       </div>
                     </td>
                     <td>
@@ -2221,14 +2401,14 @@ async function renderClients(searchQuery = null, entityFilter = null) {
                     <td class="text-center">
                       <div style="display: flex; gap: 6px; justify-content: center;">
                         <button class="btn btn-sm btn-secondary" onclick="openClientHistoryDrawer(${c.id})" title="View Historical Multi-Year Timeline">
-                          📅 Previous Years
+                          Previous Years
                         </button>
                         ${isAuditorOrAdmin ? `
                           <button class="btn btn-sm btn-secondary" onclick="openCreateEngagementModal(${c.id})" title="Create Audit Engagement">
                             + Engagement
                           </button>
                           <button class="btn btn-sm btn-secondary" onclick="openEditClientModal(${c.id})" title="Edit Client Profile">
-                            ✏️ Edit
+                            Edit
                           </button>
                         ` : ''}
                       </div>
@@ -2268,7 +2448,7 @@ function openCreateClientModal() {
       <div class="modal-card" style="max-width: 620px;">
         <div class="modal-header">
           <div class="modal-title">Register New Client Master Profile</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('client-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('client-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleClientFormSubmit(event, null)">
@@ -2373,7 +2553,7 @@ async function openEditClientModal(clientId) {
         <div class="modal-card" style="max-width: 620px;">
           <div class="modal-header">
             <div class="modal-title">Edit Client Profile: ${client.name}</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('client-modal')">✕</button>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('client-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <form onsubmit="handleClientFormSubmit(event, ${clientId})">
@@ -2724,7 +2904,7 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
                       </div>
                     </td>
                     <td>
-                      <div style="font-size: 12px;">👤 <b>${e.lead_auditor_name || 'Unassigned'}</b></div>
+                      <div style="font-size: 12px;"><b>${e.lead_auditor_name || 'Unassigned'}</b></div>
                       <div style="font-size: 11px; color: var(--text-muted);">Staff: ${e.assigned_staff_name || 'Unassigned'}</div>
                     </td>
                     <td>
@@ -2753,10 +2933,10 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
                         `}
                         ${isAuditorOrAdmin ? `
                           <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${e.id})" title="Duplicate structure to a new financial year">
-                            📑 Clone FY
+                            ${ICONS.clipboard} Clone FY
                           </button>
                           <button class="btn btn-sm btn-secondary" onclick="openEditEngagementModal(${e.id})" title="Edit Details">
-                            ✏️ Edit
+                            Edit
                           </button>
                         ` : ''}
                       </div>
@@ -2821,7 +3001,7 @@ async function openCreateEngagementModal(preselectedClientId = null) {
         <div class="modal-card" style="max-width: 600px;">
           <div class="modal-header">
             <div class="modal-title">Create New Audit Engagement</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('engagement-modal')">✕</button>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('engagement-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <form onsubmit="handleEngagementFormSubmit(event, null)">
@@ -2947,7 +3127,7 @@ async function openEditEngagementModal(engId) {
         <div class="modal-card" style="max-width: 600px;">
           <div class="modal-header">
             <div class="modal-title">Edit Engagement: #${eng.id} ${eng.title}</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('engagement-modal')">✕</button>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('engagement-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <form onsubmit="handleEngagementFormSubmit(event, ${engId})">
@@ -3084,7 +3264,7 @@ async function handleEngagementFormSubmit(event, engId) {
 async function openDuplicateEngagementModal(sourceEngId) {
   try {
     const src = await FinAuditAPI.getEngagementDetails(sourceEngId);
-    
+
     // Calculate next financial year suggestion (e.g. 2024-25 -> 2025-26)
     let nextFy = "2025-26";
     if (src.financial_year && src.financial_year.includes("-")) {
@@ -3102,7 +3282,7 @@ async function openDuplicateEngagementModal(sourceEngId) {
         <div class="modal-card" style="max-width: 540px;">
           <div class="modal-header">
             <div class="modal-title">Duplicate Engagement for New Financial Year</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('duplicate-modal')">✕</button>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('duplicate-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <div style="margin-bottom: 16px; padding: 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
@@ -3135,7 +3315,7 @@ async function openDuplicateEngagementModal(sourceEngId) {
               </div>
 
               <div style="font-size: 11.5px; color: #059669; padding: 10px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px;">
-                🔒 <b>Multi-Year Isolation Assurance:</b> Transaction vouchers, ledger balances, and prior-year exceptions will <b>NOT</b> be copied. The new engagement will start with completely clean financial tables.
+                <b>Multi-Year Isolation Assurance:</b> Transaction vouchers, ledger balances, and prior-year exceptions will <b>NOT</b> be copied. The new engagement will start with completely clean financial tables.
               </div>
 
               <div class="modal-footer" style="padding: 10px 0 0 0;">
@@ -3269,7 +3449,7 @@ async function renderImportData() {
             </div>
 
             <div style="padding: 10px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 11.5px; color: #065f46;">
-              🔒 <b>Security & Integrity:</b> Files are processed purely on your machine using Python & SQLite. No data is ever transmitted to external cloud APIs.
+              <b>Security & Integrity:</b> Files are processed purely on your machine using Python & SQLite. No data is ever transmitted to external cloud APIs.
             </div>
           </div>
 
@@ -3333,11 +3513,11 @@ async function renderImportData() {
                       <div style="display: flex; gap: 6px; justify-content: center;">
                         ${(f.failed_rows > 0 || f.warning_count > 0) ? `
                           <a href="/api/import/errors/${f.id}/download" target="_blank" class="btn btn-sm btn-secondary" title="Download CSV Error Log">
-                            📥 Error Log
+                            ${ICONS.download} Error Log
                           </a>
                         ` : ''}
                         <button class="btn btn-sm btn-secondary" style="color: #dc2626;" onclick="deleteImportedFile(${f.id}, '${f.file_name}')" title="Delete Dataset & Transactions">
-                          🗑️ Delete
+                          ${ICONS.trash} Delete
                         </button>
                       </div>
                     </td>
@@ -3396,10 +3576,10 @@ function renderMappingWorkspace(preview) {
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary" onclick="handleValidateData(${preview.file_id}, '${preview.data_category}')">
-            🔍 Validate Data Integrity
+            ${ICONS.search} Validate Integrity
           </button>
           <button class="btn btn-primary" onclick="handleConfirmImport(${preview.file_id}, '${preview.data_category}')">
-            ⚡ Confirm & Import Data
+            ${ICONS.upload} Confirm & Import Data
           </button>
         </div>
       </div>
@@ -3432,23 +3612,23 @@ function renderMappingWorkspace(preview) {
         </div>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
           ${STANDARD_TARGET_FIELDS.map(f => {
-            // Find if source column maps to this target field
-            let mappedSource = "";
-            for (const [src, tgt] of Object.entries(suggested)) {
-              if (tgt === f.key) {
-                mappedSource = src;
-                break;
-              }
-            }
+    // Find if source column maps to this target field
+    let mappedSource = "";
+    for (const [src, tgt] of Object.entries(suggested)) {
+      if (tgt === f.key) {
+        mappedSource = src;
+        break;
+      }
+    }
 
-            let statusBadge = `<span class="badge" style="background: var(--bg-sidebar); color: var(--text-muted);">Not detected</span>`;
-            if (mappedSource) {
-              statusBadge = `<span class="badge badge-resolved">● Detected</span>`;
-            } else if (f.required) {
-              statusBadge = `<span class="badge" style="background:#fffbeb; color:#d97706; border: 1px solid var(--border);">Needs mapping</span>`;
-            }
+    let statusBadge = `<span class="badge" style="background: var(--bg-sidebar); color: var(--text-muted);">Not detected</span>`;
+    if (mappedSource) {
+      statusBadge = `<span class="badge badge-resolved">● Detected</span>`;
+    } else if (f.required) {
+      statusBadge = `<span class="badge" style="background:#fffbeb; color:#d97706; border: 1px solid var(--border);">Needs mapping</span>`;
+    }
 
-            return `
+    return `
               <div style="padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                 <div style="flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px;">
@@ -3467,12 +3647,12 @@ function renderMappingWorkspace(preview) {
                 </div>
               </div>
             `;
-          }).join("")}
+  }).join("")}
         </div>
 
         <div style="margin-top: 16px; padding: 12px; background: var(--bg-app); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
           <div style="font-size: 12px; color: var(--text-muted);">
-            💡 <b>Auditor Tip:</b> FinAuditPro never alters raw values. Original strings are stored for audit defense.
+            <b>Auditor Tip:</b> FinAuditPro never alters raw values. Original strings are stored for audit defense.
           </div>
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-secondary" onclick="document.getElementById('mapping-workspace-container').innerHTML = ''">Cancel</button>
@@ -3520,7 +3700,7 @@ async function handleValidateData(fileId, dataCategory) {
         <div class="modal-card" style="max-width: 720px;">
           <div class="modal-header">
             <div class="modal-title">Pre-Import Validation Report</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('val-report-modal')">✕</button>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('val-report-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <!-- Metrics Badges -->
@@ -3561,7 +3741,7 @@ async function handleValidateData(fileId, dataCategory) {
             <!-- Sample Error Table -->
             ${(errors.length === 0 && warnings.length === 0) ? `
               <div style="padding: 20px; text-align: center; color: #059669; font-weight: 600;">
-                ✓ Perfect Data Integrity! Zero errors or anomalies detected.
+                Perfect Data Integrity! Zero errors or anomalies detected.
               </div>
             ` : `
               <div style="font-weight: 700; font-size: 12.5px; color: var(--text-main); margin-bottom: 6px;">
@@ -3617,13 +3797,13 @@ async function handleConfirmImport(fileId, dataCategory) {
 
   try {
     const res = await FinAuditAPI.applyMapping(fileId, mapping, dataCategory);
-    
+
     const summaryHtml = `
       <div class="modal-overlay" id="import-success-modal">
         <div class="modal-card" style="max-width: 580px;">
           <div class="modal-header" style="background: #ecfdf5;">
-            <div class="modal-title" style="color: #065f46;">✓ Data Import Completed Successfully</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('import-success-modal')">✕</button>
+            <div class="modal-title" style="color: #065f46;">Data Import Completed Successfully</div>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('import-success-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
@@ -3651,17 +3831,17 @@ async function handleConfirmImport(fileId, dataCategory) {
             <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
               ${(res.failed_rows > 0 || res.warning_count > 0) ? `
                 <a href="/api/import/errors/${fileId}/download" target="_blank" class="btn btn-secondary" style="flex: 1; text-align: center;">
-                  📥 Download CSV Errors
+                  ${ICONS.download} Download Errors (CSV)
                 </a>
               ` : ''}
               <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('import-success-modal'); navigateTo('cleaning_logs')">
-                🧹 View Cleaning Log
+                View Cleaning Log
               </button>
               <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('import-success-modal'); navigateTo('trial_balance')">
-                📊 View Trial Balance
+                View Trial Balance
               </button>
               <button class="btn btn-primary" style="flex: 1;" onclick="closeModal('import-success-modal'); triggerRunHybridEngine()">
-                ⚡ Run Audit Engine
+                ${ICONS.refresh} Run Audit Engine
               </button>
             </div>
           </div>
@@ -3725,7 +3905,7 @@ async function renderDataCleaningLogs() {
 
   try {
     const summary = await FinAuditAPI.getCleaningSummary(state.currentEngagementId);
-    
+
     const params = {
       limit: cleaningLogFilterState.limit,
       offset: cleaningLogFilterState.offset
@@ -3754,7 +3934,7 @@ async function renderDataCleaningLogs() {
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary" onclick="openNormalizationSandboxModal()">
-            ⚡ Rule Sandbox & Tester
+            Rule Sandbox & Tester
           </button>
           <button class="btn btn-primary" onclick="navigateTo('import')">
             + Import More Data
@@ -3769,7 +3949,7 @@ async function renderDataCleaningLogs() {
             <div style="font-size: 10px; font-weight: 700; color: #93c5fd; letter-spacing: 0.5px;">LAYER 1</div>
             <div style="font-size: 12px; font-weight: 700; color: #ffffff;">RAW DATA</div>
           </div>
-          <div style="color: var(--text-muted); font-size: 18px;">➔</div>
+          <div style="color: var(--text-muted); font-size: 18px;">&rarr;</div>
           <div style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; text-align: center;">
             <div style="font-size: 10px; font-weight: 700; color: #a7f3d0; letter-spacing: 0.5px;">LAYER 2</div>
             <div style="font-size: 12px; font-weight: 700; color: #ffffff;">NORMALIZED</div>
@@ -3826,8 +4006,8 @@ async function renderDataCleaningLogs() {
           <div>
             <select id="cleaning-quest-filter" class="form-control" onchange="applyCleaningFilters()">
               <option value="All" ${cleaningLogFilterState.isQuestionable === 'All' ? 'selected' : ''}>All Ambiguity Levels</option>
-              <option value="1" ${cleaningLogFilterState.isQuestionable === '1' ? 'selected' : ''}>⚠️ Questionable Only (${summary.questionable_count || 0})</option>
-              <option value="0" ${cleaningLogFilterState.isQuestionable === '0' ? 'selected' : ''}>✓ High Confidence (${summary.auto_applied_count || 0})</option>
+              <option value="1" ${cleaningLogFilterState.isQuestionable === '1' ? 'selected' : ''}>Questionable Only (${summary.questionable_count || 0})</option>
+              <option value="0" ${cleaningLogFilterState.isQuestionable === '0' ? 'selected' : ''}>High Confidence (${summary.auto_applied_count || 0})</option>
             </select>
           </div>
           <div>
@@ -3879,15 +4059,15 @@ async function renderDataCleaningLogs() {
               </thead>
               <tbody>
                 ${logs.map(log => {
-                  let statusBadge = `<span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary);">Auto-Applied</span>`;
-                  if (log.review_status === 'Accepted') statusBadge = `<span class="badge badge-resolved">Accepted</span>`;
-                  if (log.review_status === 'Overridden') statusBadge = `<span class="badge" style="background:#eff6ff; color:#2563eb; border: 1px solid var(--border);">Overridden</span>`;
-                  if (log.review_status === 'Reverted') statusBadge = `<span class="badge" style="background:#fff1f2; color:#e11d48; border: 1px solid var(--border);">Reverted</span>`;
+      let statusBadge = `<span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary);">Auto-Applied</span>`;
+      if (log.review_status === 'Accepted') statusBadge = `<span class="badge badge-resolved">Accepted</span>`;
+      if (log.review_status === 'Overridden') statusBadge = `<span class="badge" style="background:#eff6ff; color:#2563eb; border: 1px solid var(--border);">Overridden</span>`;
+      if (log.review_status === 'Reverted') statusBadge = `<span class="badge" style="background:#fff1f2; color:#e11d48; border: 1px solid var(--border);">Reverted</span>`;
 
-                  const isQuest = log.is_questionable === 1;
-                  const confPct = Math.round((log.confidence_score || 1.0) * 100);
+      const isQuest = log.is_questionable === 1;
+      const confPct = Math.round((log.confidence_score || 1.0) * 100);
 
-                  return `
+      return `
                     <tr style="${isQuest && log.review_status === 'Auto-Applied' ? 'background-color: #fffdf5;' : ''}">
                       <td>
                         <div class="font-mono font-bold" style="font-size: 11.5px; color: var(--text-secondary);">
@@ -3918,7 +4098,7 @@ async function renderDataCleaningLogs() {
                         </div>
                         ${log.auditor_comment ? `
                           <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-                            💬 <i>${escapeHtml(log.auditor_comment)}</i>
+                            <i>${escapeHtml(log.auditor_comment)}</i>
                           </div>
                         ` : ''}
                       </td>
@@ -3926,11 +4106,11 @@ async function renderDataCleaningLogs() {
                         <div style="display: flex; align-items: center; gap: 4px;">
                           ${isQuest ? `
                             <span class="badge" style="background: #fffbeb; color: #b45309; border: 1px solid var(--border); font-size: 10px;">
-                              ⚠️ ${confPct}%
+                              ${confPct}%
                             </span>
                           ` : `
                             <span class="badge badge-resolved" style="font-size: 10px;">
-                              ✓ ${confPct}%
+                              ${confPct}%
                             </span>
                           `}
                         </div>
@@ -3938,12 +4118,12 @@ async function renderDataCleaningLogs() {
                       <td>${statusBadge}</td>
                       <td class="text-center">
                         <button class="btn btn-sm btn-secondary" onclick='openReviewCleaningModal(${log.id}, ${JSON.stringify(JSON.stringify(log))})' title="Auditor Review">
-                          🔍 Review
+                          Review
                         </button>
                       </td>
                     </tr>
                   `;
-                }).join("")}
+    }).join("")}
               </tbody>
             </table>
           </div>
@@ -4009,13 +4189,13 @@ function changeCleaningOffset(delta) {
 
 function openReviewCleaningModal(logId, logJsonStr) {
   const log = typeof logJsonStr === "string" ? JSON.parse(logJsonStr) : logJsonStr;
-  
+
   const modalHtml = `
     <div class="modal-overlay" id="review-cleaning-modal">
       <div class="modal-card" style="max-width: 580px;">
         <div class="modal-header">
           <div class="modal-title">Auditor Transformation Review (Record #${log.id})</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('review-cleaning-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('review-cleaning-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; margin-bottom: 16px;">
@@ -4023,7 +4203,7 @@ function openReviewCleaningModal(logId, logJsonStr) {
               <div><b style="color: var(--text-secondary);">Target Field:</b> <span class="badge" style="background:#e2e8f0; color: var(--text-main);">${escapeHtml(log.field_name)}</span></div>
               <div><b style="color: var(--text-secondary);">Row / Ref:</b> Row #${log.row_number || 'N/A'} (Txn #${log.transaction_id || 'N/A'})</div>
               <div><b style="color: var(--text-secondary);">Rule Applied:</b> <code>${escapeHtml(log.transformation_rule)}</code></div>
-              <div><b style="color: var(--text-secondary);">Ambiguity Status:</b> ${log.is_questionable ? '<span class="badge" style="background:#fffbeb; color:#b45309;">⚠️ Questionable</span>' : '<span class="badge badge-resolved">✓ Confident</span>'}</div>
+              <div><b style="color: var(--text-secondary);">Ambiguity Status:</b> ${log.is_questionable ? '<span class="badge" style="background:#fffbeb; color:#b45309;">Questionable</span>' : '<span class="badge badge-resolved">Confident</span>'}</div>
             </div>
           </div>
 
@@ -4111,8 +4291,8 @@ function openNormalizationSandboxModal() {
     <div class="modal-overlay" id="sandbox-modal">
       <div class="modal-card" style="max-width: 650px;">
         <div class="modal-header">
-          <div class="modal-title">⚡ Interactive Data Normalization Sandbox</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('sandbox-modal')">✕</button>
+          <div class="modal-title">Interactive Data Normalization Sandbox</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('sandbox-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
@@ -4123,15 +4303,15 @@ function openNormalizationSandboxModal() {
           <div style="margin-bottom: 14px;">
             <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">QUICK PRESET TEST CASES:</div>
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('date', '01/04/2026')">📅 Date: 01/04/2026</button>
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('date', '01-Apr-2026')">📅 Date: 01-Apr-2026</button>
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('date', '2026-04-01')">📅 Date: 2026-04-01</button>
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('amount', '₹ 1,50,000.00/-')">💰 Amt: ₹ 1,50,000.00/-</button>
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('amount', '(50,000.00)')">💰 Bracketed: (50,000.00)</button>
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('amount', 'Rs. 24,500.00 Dr')">💰 Suffix: Rs. 24,500.00 Dr</button>
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('party_name', 'apex solutions private limited')">🏢 Legal: apex solutions private limited</button>
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('gstin', '27aabcu9603r1zm')">📑 GSTIN: 27aabcu9603r1zm</button>
-              <button type="button" class="demo-chip" onclick="loadSandboxExample('invoice_no', '  INV / 2026 / 0042  ')">🧾 Inv: INV / 2026 / 0042</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('date', '01/04/2026')">Date: 01/04/2026</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('date', '01-Apr-2026')">Date: 01-Apr-2026</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('date', '2026-04-01')">Date: 2026-04-01</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('amount', '₹ 1,50,000.00/-')">Amt: ₹ 1,50,000.00/-</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('amount', '(50,000.00)')">Bracketed: (50,000.00)</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('amount', 'Rs. 24,500.00 Dr')">Suffix: Rs. 24,500.00 Dr</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('party_name', 'apex solutions private limited')">Legal: apex solutions private limited</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('gstin', '27aabcu9603r1zm')">GSTIN: 27aabcu9603r1zm</button>
+              <button type="button" class="demo-chip" onclick="loadSandboxExample('invoice_no', '  INV / 2026 / 0042  ')">Inv: INV / 2026 / 0042</button>
             </div>
           </div>
 
@@ -4152,7 +4332,7 @@ function openNormalizationSandboxModal() {
                 <input type="text" id="sandbox-raw-input" class="form-control font-mono" placeholder="e.g. 01-Apr-2026 or ₹ 1,50,000.00" value="01-Apr-2026" required>
               </div>
               <div>
-                <button type="submit" class="btn btn-primary" style="padding: 8px 14px;">⚡ Transform</button>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 14px;">Transform</button>
               </div>
             </div>
           </form>
@@ -4192,7 +4372,7 @@ async function handleSandboxPreviewSubmit(event) {
 
   try {
     const res = await FinAuditAPI.previewNormalization(field, raw);
-    
+
     const confPct = Math.round((res.confidence_score || 1.0) * 100);
     const isQuest = res.is_questionable === 1;
 
@@ -4201,7 +4381,7 @@ async function handleSandboxPreviewSubmit(event) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">Normalization Engine Output</div>
           <span class="badge ${isQuest ? '' : 'badge-resolved'}" style="${isQuest ? 'background:#fffbeb; color:#b45309; border: 1px solid var(--border);' : ''}">
-            ${isQuest ? `⚠️ Ambiguity Flagged (${confPct}%)` : `✓ Deterministic Match (${confPct}%)`}
+            ${isQuest ? `Ambiguity Flagged (${confPct}%)` : `Deterministic Match (${confPct}%)`}
           </span>
         </div>
 
@@ -4225,7 +4405,7 @@ async function handleSandboxPreviewSubmit(event) {
             <b>Applied Rule:</b> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${escapeHtml(res.transformation_rule)}</code>
           </div>
           <div style="font-size: 11px; color: var(--text-muted);">
-            ${res.is_transformed ? '✨ Transformed from raw' : 'Identical to raw'}
+            ${res.is_transformed ? 'Transformed from raw' : 'Identical to raw'}
           </div>
         </div>
       </div>
@@ -4296,10 +4476,10 @@ async function renderDashboard() {
               </button>
             ` : ''}
             <button class="btn btn-secondary" onclick="navigateTo('clients')">
-              🏢 Clients
+              Clients
             </button>
             <button class="btn btn-secondary" onclick="navigateTo('settings')">
-              ⚙️ Settings
+              ${ICONS.settings} Settings
             </button>
           </div>
         </div>
@@ -4309,7 +4489,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-blue" onclick="navigateTo('clients')" title="Click to view all active clients">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Active Clients</span>
-              <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">🏢</div>
+              <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">${ICONS.folder}</div>
             </div>
             <div class="dash-stat-val">${cards.active_clients_count || 0}</div>
             <div class="dash-stat-sub"><span>Registered audit clients</span></div>
@@ -4318,7 +4498,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-indigo" onclick="navigateTo('engagements')" title="Click to view all active audit engagements">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Active Engagements</span>
-              <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">📁</div>
+              <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">${ICONS.folder}</div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #4f46e5;">${cards.active_engagements_count || 0}</div>
             <div class="dash-stat-sub"><span>In Progress / Draft audits</span></div>
@@ -4327,7 +4507,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-amber">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Open Findings</span>
-              <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">⚠️</div>
+              <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">${ICONS.alertTriangle}</div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #d97706;">0</div>
             <div class="dash-stat-sub"><span>Unresolved observations</span></div>
@@ -4336,7 +4516,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-red">
             <div class="dash-stat-header">
               <span class="dash-stat-title">High-Risk Findings</span>
-              <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">🚨</div>
+              <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">${ICONS.alertTriangle}</div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #dc2626;">0</div>
             <div class="dash-stat-sub"><span>Critical & High severity</span></div>
@@ -4345,7 +4525,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-purple">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Unmatched Txns</span>
-              <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">⚖️</div>
+              <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">${ICONS.scale}</div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #9333ea;">0</div>
             <div class="dash-stat-sub"><span>BRS & GST 2B unreconciled</span></div>
@@ -4354,7 +4534,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-orange">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Pending Reviews</span>
-              <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">⏳</div>
+              <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">${ICONS.clipboard}</div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #ea580c;">0</div>
             <div class="dash-stat-sub"><span>Awaiting sign-off / WPs</span></div>
@@ -4365,7 +4545,7 @@ async function renderDashboard() {
         <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--primary);">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div class="card-title" style="font-size: 16px; font-weight: 700;">🚀 Practice Setup & Getting Started Guide</div>
+              <div class="card-title" style="font-size: 16px; font-weight: 700;">Practice Setup & Getting Started Guide</div>
               <div class="card-subtitle">Zero data has been preloaded. Follow the sequential workflow below to initialize your practice:</div>
             </div>
           </div>
@@ -4478,7 +4658,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-blue" onclick="navigateTo('clients')" title="Click to view all active clients">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Active Clients</span>
-            <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">🏢</div>
+            <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">${ICONS.folder}</div>
           </div>
           <div class="dash-stat-val">${cards.active_clients_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4489,7 +4669,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-indigo" onclick="navigateTo('engagements')" title="Click to view all active audit engagements">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Active Engagements</span>
-            <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">📁</div>
+            <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">${ICONS.folder}</div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #4f46e5;">${cards.active_engagements_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4500,7 +4680,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-amber" onclick="openDashboardFindingsModal('OPEN', null)" title="Click to inspect all Open findings">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Open Findings</span>
-            <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">⚠️</div>
+            <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">${ICONS.alertTriangle}</div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #d97706;">${cards.open_findings_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4511,7 +4691,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-red" onclick="openDashboardFindingsModal('HIGH', null)" title="Click to inspect Critical & High risk findings">
           <div class="dash-stat-header">
             <span class="dash-stat-title">High-Risk Findings</span>
-            <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">🚨</div>
+            <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">${ICONS.alertTriangle}</div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #dc2626;">${cards.high_risk_findings_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4522,7 +4702,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-purple" onclick="openDashboardReconciliationModal('UNMATCHED')" title="Click to inspect unmatched BRS / GST records">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Unmatched Txns</span>
-            <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">⚖️</div>
+            <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">${ICONS.scale}</div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #9333ea;">${cards.unmatched_transactions_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4533,7 +4713,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-orange" onclick="openDashboardPendingReviewsModal()" title="Click to inspect pending Partner reviews">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Pending Reviews</span>
-            <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">⏳</div>
+            <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">${ICONS.clipboard}</div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #ea580c;">${cards.pending_reviews_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4551,13 +4731,13 @@ async function renderDashboard() {
           </div>
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-sm btn-secondary" onclick="openClientHistoryDrawer(${eng.client_id || 1})">
-              📅 Multi-Year History
+              ${ICONS.calendar} Multi-Year History
             </button>
             <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${state.currentEngagementId})">
-              📑 Clone for Next FY
+              ${ICONS.clipboard} Clone for Next FY
             </button>
             <button class="btn btn-sm btn-secondary" onclick="navigateTo('trial_balance')">
-              📊 Trial Balance
+              ${ICONS.scale} Trial Balance
             </button>
           </div>
         </div>
@@ -4594,7 +4774,7 @@ async function renderDashboard() {
           <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); cursor: pointer;" onclick="openDashboardTransactionsModal('', 'All Transactions')">
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL TRANSACTIONS</div>
             <div class="font-mono font-bold" style="font-size: 18px; color: #2563eb; margin-top: 2px;">${(overview.total_transactions || 0).toLocaleString()} Entries</div>
-            <div style="font-size: 11.5px; color: #2563eb;">🔍 Click to inspect all</div>
+            <div style="font-size: 11.5px; color: #2563eb;">Click to inspect all</div>
           </div>
           <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL DEBIT TURNOVER</div>
@@ -4672,8 +4852,8 @@ async function renderDashboard() {
             ${Object.keys(risk.area_counts || {}).length === 0 ? `
               <div style="text-align: center; color: var(--text-muted); padding: 20px 0;">No risk areas flagged yet.</div>
             ` : Object.entries(risk.area_counts || {}).map(([area, cnt]) => {
-              const pct = Math.round((cnt / maxAreaFinding) * 100);
-              return `
+      const pct = Math.round((cnt / maxAreaFinding) * 100);
+      return `
                 <div class="chart-horizontal-bar-row" onclick="openDashboardFindingsModal(null, '${escapeHtml(area)}')" title="Click to filter findings in ${escapeHtml(area)}">
                   <div class="chart-h-label" title="${escapeHtml(area)}">${escapeHtml(area)}</div>
                   <div class="chart-h-track">
@@ -4682,7 +4862,7 @@ async function renderDashboard() {
                   <div class="chart-h-val">${cnt}</div>
                 </div>
               `;
-            }).join("")}
+    }).join("")}
           </div>
         </div>
       </div>
@@ -4725,8 +4905,8 @@ async function renderDashboard() {
               </thead>
               <tbody>
                 ${recentFindings.map(f => {
-                  const hideRow = (activeFindingsFilter !== 'ALL' && (f.severity || '').toUpperCase() !== activeFindingsFilter);
-                  return `
+      const hideRow = (activeFindingsFilter !== 'ALL' && (f.severity || '').toUpperCase() !== activeFindingsFilter);
+      return `
                     <tr style="${hideRow ? 'display: none;' : ''}" data-sev="${(f.severity || '').toUpperCase()}">
                       <td class="font-mono font-bold" style="color: var(--text-main);">
                         <span style="background: #e2e8f0; padding: 2px 5px; border-radius: 4px; font-size: 11px;">[ID: ${f.id}]</span>
@@ -4751,7 +4931,7 @@ async function renderDashboard() {
                       </td>
                     </tr>
                   `;
-                }).join("")}
+    }).join("")}
               </tbody>
             </table>
           </div>
@@ -4776,15 +4956,15 @@ async function renderDashboard() {
             ${monthlyTrends.length === 0 ? `
               <div style="width: 100%; text-align: center; color: var(--text-muted); align-self: center;">No transactions found for active engagement.</div>
             ` : monthlyTrends.map(m => {
-              const heightPct = Math.max(12, Math.round((m.transaction_count / maxTxMonth) * 100));
-              return `
+      const heightPct = Math.max(12, Math.round((m.transaction_count / maxTxMonth) * 100));
+      return `
                 <div class="chart-bar-interactive" style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end;" onclick="openDashboardTransactionsModal('${m.month}', '${m.month_label}')" title="${m.month_label}: ${m.transaction_count} transactions (Click to inspect)">
                   <div style="font-size: 10.5px; font-weight: 700; color: #2563eb; margin-bottom: 4px;">${m.transaction_count}</div>
                   <div style="width: 100%; height: ${heightPct}%; background: linear-gradient(180deg, #3b82f6, #1d4ed8); border-radius: 4px 4px 0 0;"></div>
                   <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48px;">${m.month_label.split(' ')[0]}</div>
                 </div>
               `;
-            }).join("")}
+    }).join("")}
           </div>
         </div>
 
@@ -4804,15 +4984,15 @@ async function renderDashboard() {
             ${monthlyTrends.length === 0 ? `
               <div style="width: 100%; text-align: center; color: var(--text-muted); align-self: center;">No transaction values recorded.</div>
             ` : monthlyTrends.map(m => {
-              const heightPct = Math.max(12, Math.round((m.total_value / maxValMonth) * 100));
-              return `
+      const heightPct = Math.max(12, Math.round((m.total_value / maxValMonth) * 100));
+      return `
                 <div class="chart-bar-interactive" style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end;" onclick="openDashboardTransactionsModal('${m.month}', '${m.month_label}')" title="${m.month_label}: ${formatINR(m.total_value)} turnover (Click to inspect)">
                   <div style="font-size: 10px; font-weight: 700; color: #059669; margin-bottom: 4px;">${formatCompactINR(m.total_value)}</div>
                   <div style="width: 100%; height: ${heightPct}%; background: linear-gradient(180deg, #10b981, #059669); border-radius: 4px 4px 0 0;"></div>
                   <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48px;">${m.month_label.split(' ')[0]}</div>
                 </div>
               `;
-            }).join("")}
+    }).join("")}
           </div>
         </div>
       </div>
@@ -4891,9 +5071,9 @@ async function renderDashboard() {
           <!-- Benford's 1st-Digit Comparison Mini-Chart -->
           <div style="display: flex; align-items: flex-end; gap: 6px; height: 110px; margin-bottom: 12px; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
             ${(anomaly.benford_digits || []).map(d => {
-              const actHeight = Math.max(8, Math.round(d.actual_pct * 2.5));
-              const expHeight = Math.max(8, Math.round(d.expected_pct * 2.5));
-              return `
+      const actHeight = Math.max(8, Math.round(d.actual_pct * 2.5));
+      const expHeight = Math.max(8, Math.round(d.expected_pct * 2.5));
+      return `
                 <div class="chart-bar-interactive" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;" onclick="openDashboardDigitModal(${d.digit})" title="Digit ${d.digit}: Actual ${d.actual_pct}% (Expected ${d.expected_pct}%, Diff: ${d.difference}%) - Click to view transactions">
                   <div style="display: flex; gap: 2px; width: 100%; justify-content: center; align-items: flex-end;">
                     <div style="width: 45%; height: ${actHeight}px; background: #2563eb; border-radius: 2px;" title="Actual: ${d.actual_pct}%"></div>
@@ -4902,7 +5082,7 @@ async function renderDashboard() {
                   <div style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); margin-top: 4px;">D${d.digit}</div>
                 </div>
               `;
-            }).join("")}
+    }).join("")}
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11.5px; text-align: center;">
@@ -4941,13 +5121,13 @@ async function renderDashboard() {
           ` : `
             <div style="display: flex; flex-direction: column; gap: 8px;">
               ${yoy.map(item => {
-                const varPct = Number(item.variance_pct) || 0;
-                const isSig = item.is_significant;
-                return `
+      const varPct = Number(item.variance_pct) || 0;
+      const isSig = item.is_significant;
+      return `
                   <div class="chart-horizontal-bar-row" style="border: 1px solid var(--border); padding: 6px 10px;" onclick="openDashboardYoYModal('${escapeHtml(item.account_name)}')" title="Click to view ledger breakdown for ${escapeHtml(item.account_name)}">
                     <div style="flex: 1; font-weight: 600; color: var(--text-main); font-size: 12px;">
                       ${escapeHtml(item.account_name)}
-                      ${isSig ? `<span class="badge badge-critical" style="margin-left: 6px; font-size: 10px;">⚠️ Variance</span>` : ''}
+                      ${isSig ? `<span class="badge badge-critical" style="margin-left: 6px; font-size: 10px;">Variance</span>` : ''}
                     </div>
                     <div class="font-mono" style="font-size: 11.5px; color: var(--text-muted); margin-right: 12px;">
                       CY: ${formatCompactINR(item.cy_amount || 0)} | PY: ${formatCompactINR(item.py_amount || 0)}
@@ -4957,7 +5137,7 @@ async function renderDashboard() {
                     </div>
                   </div>
                 `;
-              }).join("")}
+    }).join("")}
             </div>
           `}
         </div>
@@ -5076,7 +5256,7 @@ function switchDashboardEngagement(engId) {
 // 1. Findings Drill-Down Modal (Triggered by Severity or Area Click)
 async function openDashboardFindingsModal(severity = null, area = null) {
   const title = severity ? `${severity} Severity Findings` : area ? `Findings in ${area}` : `Audit Findings`;
-  
+
   let findings = [];
   try {
     findings = await FinAuditAPI.getFindings(state.currentEngagementId);
@@ -5101,10 +5281,10 @@ async function openDashboardFindingsModal(severity = null, area = null) {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">🔍 Drill-Down: ${escapeHtml(title)}</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">Drill-Down: ${escapeHtml(title)}</div>
             <div style="font-size: 12px; color: var(--text-muted);">Showing ${findings.length} underlying audit findings from active engagement database</div>
           </div>
-          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
+          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">${ICONS.close}</button>
         </div>
         <div class="dash-modal-body">
           ${findings.length === 0 ? `
@@ -5176,10 +5356,10 @@ async function openDashboardTransactionsModal(monthStr = '', monthLabel = 'Trans
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">📊 Monthly Transactions: ${escapeHtml(monthLabel)}</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">Monthly Transactions: ${escapeHtml(monthLabel)}</div>
             <div style="font-size: 12px; color: var(--text-muted);">Examining underlying vouchers recorded in general ledger for this period</div>
           </div>
-          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
+          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">${ICONS.close}</button>
         </div>
         <div class="dash-modal-body">
           ${txns.length === 0 ? `
@@ -5246,10 +5426,10 @@ async function openDashboardReconciliationModal(statusType = 'UNMATCHED') {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">⚖️ Reconciliation Status Drill-Down (${statusType})</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">Reconciliation Status Drill-Down (${statusType})</div>
             <div style="font-size: 12px; color: var(--text-muted);">Bank BRS statements and GSTR-2B discrepancy schedules</div>
           </div>
-          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
+          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">${ICONS.close}</button>
         </div>
         <div class="dash-modal-body">
           ${recons.length === 0 ? `
@@ -5315,10 +5495,10 @@ async function openDashboardPendingReviewsModal() {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">⏳ Pending Reviews & Sign-Off Schedule</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">Pending Reviews & Sign-Off Schedule</div>
             <div style="font-size: 12px; color: var(--text-muted);">Working papers and audit engagements awaiting Partner / Manager review</div>
           </div>
-          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
+          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">${ICONS.close}</button>
         </div>
         <div class="dash-modal-body">
           ${pendingWPs.length === 0 ? `
@@ -5383,10 +5563,10 @@ async function openDashboardYoYModal(accountName) {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">📊 YoY Movement Drill-Down: ${escapeHtml(accountName)}</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">YoY Movement Drill-Down: ${escapeHtml(accountName)}</div>
             <div style="font-size: 12px; color: var(--text-muted);">Inspecting vouchers posted to this account line for the current financial year</div>
           </div>
-          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
+          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">${ICONS.close}</button>
         </div>
         <div class="dash-modal-body">
           ${txns.length === 0 ? `
@@ -5451,10 +5631,10 @@ async function openDashboardDigitModal(digit) {
       <div class="dash-modal-box">
         <div class="dash-modal-header">
           <div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">🔢 Benford's Law Drill-Down: Leading Digit ${digit}</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main);">Benford's Law Drill-Down: Leading Digit ${digit}</div>
             <div style="font-size: 12px; color: var(--text-muted);">Found ${txns.length} transactions whose integer amount starts with digit ${digit}</div>
           </div>
-          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">✕</button>
+          <button class="btn btn-sm btn-secondary" onclick="closeDashboardModal()">${ICONS.close}</button>
         </div>
         <div class="dash-modal-body">
           ${txns.length === 0 ? `
@@ -5474,8 +5654,8 @@ async function openDashboardDigitModal(digit) {
                 </thead>
                 <tbody>
                   ${txns.map(t => {
-                    const amt = Number(t.amount) || Math.max(Number(t.debit) || 0, Number(t.credit) || 0);
-                    return `
+    const amt = Number(t.amount) || Math.max(Number(t.debit) || 0, Number(t.credit) || 0);
+    return `
                       <tr>
                         <td class="font-mono">${t.date || '—'}</td>
                         <td class="font-mono font-bold">${t.voucher_no || '—'}</td>
@@ -5485,7 +5665,7 @@ async function openDashboardDigitModal(digit) {
                         <td style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(t.description || '')}</td>
                       </tr>
                     `;
-                  }).join("")}
+  }).join("")}
                 </tbody>
               </table>
             </div>
@@ -5540,12 +5720,12 @@ async function renderAnomalyDetection() {
   let findings = [];
   try {
     findings = await FinAuditAPI.getFindings(state.currentEngagementId);
-  } catch (e) {}
+  } catch (e) { }
 
   let statEngine = null;
   try {
     statEngine = await FinAuditAPI.runHybridEngine(state.currentEngagementId);
-  } catch (e) {}
+  } catch (e) { }
 
   const benford = statEngine?.benford_analysis || { digit_distribution: [], mad: 0.0, conformity: "Conformant" };
   const digits = benford.digit_distribution || [];
@@ -5577,9 +5757,9 @@ async function renderAnomalyDetection() {
 
       <div class="chart-bar-container">
         ${digits.map(d => {
-          const actHeight = Math.min(100, d.actual_percent * 2.5);
-          const expHeight = Math.min(100, d.expected_percent * 2.5);
-          return `
+    const actHeight = Math.min(100, d.actual_percent * 2.5);
+    const expHeight = Math.min(100, d.expected_percent * 2.5);
+    return `
             <div class="chart-bar-group">
               <div class="chart-bars-wrap">
                 <div class="bar-actual" style="height: ${actHeight}%;" title="Digit ${d.digit}: Actual ${d.actual_percent}% (${d.count} txns)"></div>
@@ -5588,7 +5768,7 @@ async function renderAnomalyDetection() {
               <div class="chart-digit-label">Digit ${d.digit}</div>
             </div>
           `;
-        }).join("")}
+  }).join("")}
       </div>
 
       <div style="margin-top: 14px; font-size: 12px; color: var(--text-muted);">
@@ -5758,10 +5938,10 @@ async function renderTrialBalance() {
         </div>
         <div style="display: flex; gap: 8px;">
           <a href="${FinAuditAPI.getTrialBalanceReportDownloadUrl(state.currentEngagementId)}" target="_blank" class="btn btn-secondary">
-            📥 Download Analysis Report (CSV)
+            ${ICONS.download} Download TB Report (CSV)
           </a>
           <button class="btn btn-primary" onclick="renderTrialBalance()">
-            ⚡ Re-Analyze TB
+            ${ICONS.refresh} Re-Analyze TB
           </button>
         </div>
       </div>
@@ -5770,8 +5950,8 @@ async function renderTrialBalance() {
       ${!isBalanced ? `
         <div style="padding: 16px 20px; border-radius: var(--radius-lg); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background-color: #fef2f2; border: 2px solid #ef4444; ">
           <div style="display: flex; align-items: center; gap: 14px;">
-            <div style="background: #ef4444; color: white; width: 40px; height: 40px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold;">
-              ⚠️
+            <div style="background: #ef4444; color: white; width: 40px; height: 40px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
+              ${ICONS.alertTriangle}
             </div>
             <div>
               <div style="font-size: 15px; font-weight: 800; color: #991b1b; letter-spacing: -0.2px;">
@@ -5789,8 +5969,8 @@ async function renderTrialBalance() {
       ` : `
         <div style="padding: 14px 20px; border-radius: var(--radius-lg); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background-color: #ecfdf5; border: 1px solid var(--border);">
           <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="background: #10b981; color: white; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px;">
-              ✓
+            <div style="background: #10b981; color: white; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+              ${ICONS.check}
             </div>
             <div>
               <div style="font-weight: 700; color: #065f46; font-size: 14px;">
@@ -5857,7 +6037,7 @@ async function renderTrialBalance() {
 
         ${exceptions.length === 0 ? `
           <div style="padding: 30px; text-align: center; color: #059669;">
-            <div style="font-size: 24px; margin-bottom: 6px;">✓</div>
+            <div style="margin-bottom: 6px; color: #10b981;"><svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div>
             <b>All 12 Trial Balance Audit Checks Passed Successfully!</b>
             <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">No arithmetic imbalances, unusual balances, suspense heads, or roll-forward inconsistencies detected.</p>
           </div>
@@ -5886,7 +6066,7 @@ async function renderTrialBalance() {
                       <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(ex.description)}</div>
                       ${ex.exact_difference ? `
                         <div style="font-size: 11px; color: #dc2626; font-weight: 700; margin-top: 3px;" class="font-mono">
-                          Exact Difference: ₹${Number(ex.exact_difference).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                          Exact Difference: ₹${Number(ex.exact_difference).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </div>
                       ` : ''}
                     </td>
@@ -5894,7 +6074,7 @@ async function renderTrialBalance() {
                       <div style="display: flex; gap: 4px; flex-wrap: wrap; max-height: 70px; overflow-y: auto;">
                         ${(ex.affected_accounts || []).slice(0, 4).map(acc => `
                           <span class="demo-chip" style="font-size: 10.5px; padding: 2px 6px; cursor: pointer;" onclick="viewLedgerDrilldown('${escapeHtml(acc).replace(/'/g, "\\'")}')" title="Click to Inspect Ledger">
-                            🔍 ${escapeHtml(acc)}
+                            ${escapeHtml(acc)}
                           </span>
                         `).join('')}
                         ${(ex.affected_accounts || []).length > 4 ? `
@@ -5909,11 +6089,11 @@ async function renderTrialBalance() {
                       <div style="display: flex; flex-direction: column; gap: 4px;">
                         ${(ex.affected_accounts && ex.affected_accounts.length > 0) ? `
                           <button class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 3px 6px;" onclick="viewLedgerDrilldown('${escapeHtml(ex.affected_accounts[0]).replace(/'/g, "\\'")}')">
-                            🔍 Inspect Ledger
+                            ${ICONS.search} Inspect Ledger
                           </button>
                         ` : ''}
                         <button class="btn btn-sm btn-secondary" style="font-size: 10.5px; padding: 2px 6px; color: var(--primary);" onclick='openTBExceptionAIExplanation(${JSON.stringify(JSON.stringify(ex))})'>
-                          💡 AI Explanation
+                          ${ICONS.fileText} Explain Movement
                         </button>
                       </div>
                     </td>
@@ -5956,10 +6136,10 @@ async function renderTrialBalance() {
             </thead>
             <tbody>
               ${accounts.map(l => {
-                const isAffected = affectedAccSet.has(l.ledger.toLowerCase());
-                const isSuspense = ["suspense", "diff in tb", "difference", "unadjusted"].some(kw => l.ledger.toLowerCase().includes(kw));
+      const isAffected = affectedAccSet.has(l.ledger.toLowerCase());
+      const isSuspense = ["suspense", "diff in tb", "difference", "unadjusted"].some(kw => l.ledger.toLowerCase().includes(kw));
 
-                return `
+      return `
                   <tr data-ledger="${escapeHtml(l.ledger.toLowerCase())}" data-group="${escapeHtml(l.account_group.toLowerCase())}" data-has-exception="${isAffected ? '1' : '0'}" data-is-suspense="${isSuspense ? '1' : '0'}" style="${isAffected ? 'background: #fffdf5;' : ''}">
                     <td>
                       <div style="display: flex; align-items: center; gap: 6px;">
@@ -5990,12 +6170,12 @@ async function renderTrialBalance() {
                     <td class="text-center font-mono" style="font-size: 12px;">${l.transaction_count}</td>
                     <td class="text-center">
                       <button class="btn btn-sm btn-secondary" style="font-size: 11.5px; padding: 3px 8px;" onclick="viewLedgerDrilldown('${escapeHtml(l.ledger).replace(/'/g, "\\'")}')">
-                        🔍 Drilldown
+                        ${ICONS.search} Drilldown
                       </button>
                     </td>
                   </tr>
                 `;
-              }).join("")}
+    }).join("")}
             </tbody>
             <tfoot>
               <tr style="background-color: #f1f5f9; font-weight: 800; font-size: 13px;">
@@ -6007,7 +6187,7 @@ async function renderTrialBalance() {
                   Diff: ${formatINR(diff)}
                 </td>
                 <td colspan="2" class="text-center">
-                  ${isBalanced ? '<span class="badge badge-resolved">TALLIED ✓</span>' : '<span class="badge badge-critical">MISMATCH ⚠️</span>'}
+                  ${isBalanced ? '<span class="badge badge-resolved">TALLIED</span>' : '<span class="badge badge-critical">MISMATCH</span>'}
                 </td>
               </tr>
             </tfoot>
@@ -6050,13 +6230,13 @@ function filterTBGrid(filterType) {
 // AI / ICAI Grounded Analytical Explanation Drawer
 async function openTBExceptionAIExplanation(exJsonStr) {
   const ex = typeof exJsonStr === "string" ? JSON.parse(exJsonStr) : exJsonStr;
-  
+
   const drawerHeader = document.getElementById("drawer-title");
   const drawerBody = document.getElementById("drawer-content");
-  
+
   drawerHeader.innerText = `Audit Standard & AI Guidance: ${ex.check_name}`;
   drawerBody.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Retrieving ICAI Standard Guidance...</div>`;
-  
+
   document.getElementById("drawer-overlay").style.display = "block";
   document.getElementById("evidence-drawer").classList.add("open");
 
@@ -6099,7 +6279,7 @@ async function openTBExceptionAIExplanation(exJsonStr) {
       </div>
 
       <div style="padding: 12px; background: var(--bg-sidebar); border-radius: var(--radius-md); font-size: 11px; color: var(--text-muted);">
-        🔒 <b>Deterministic Guarantee:</b> ${escapeHtml(res.compliance_note)}
+        <b>Deterministic Guarantee:</b> ${escapeHtml(res.compliance_note)}
       </div>
     `;
   } catch (err) {
@@ -6109,10 +6289,10 @@ async function openTBExceptionAIExplanation(exJsonStr) {
 
 async function viewLedgerDrilldown(ledgerName) {
   const drill = await FinAuditAPI.getLedgerDrilldown(state.currentEngagementId, ledgerName);
-  
+
   const drawerHeader = document.getElementById("drawer-title");
   const drawerBody = document.getElementById("drawer-content");
-  
+
   drawerHeader.innerText = `Ledger Statement: ${ledgerName}`;
   drawerBody.innerHTML = `
     <div style="margin-bottom: 14px; background: var(--bg-app); padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
@@ -6267,10 +6447,10 @@ async function renderGeneralLedger() {
         </div>
         <div style="display: flex; gap: 8px;">
           <a href="${downloadUrl}" target="_blank" class="btn btn-secondary" title="Export current filtered view to CSV format">
-            📥 Download GL Audit Report (CSV)
+            ${ICONS.download} Download GL Report (CSV)
           </a>
           <button class="btn btn-primary" onclick="renderGeneralLedger()">
-            ⚡ Re-Scan Ledger
+            ${ICONS.refresh} Re-Scan Ledger
           </button>
         </div>
       </div>
@@ -6317,27 +6497,27 @@ async function renderGeneralLedger() {
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
-            ⚡ Quick 13-Point Anomaly Filter Chips
+            13-Point Anomaly Filter Chips
           </div>
           ${isFilterActive ? `
             <button class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 2px 8px; color: #dc2626;" onclick="resetGLFilters()">
-              ✕ Clear All Filters
+              ${ICONS.close} Clear All Filters
             </button>
           ` : ''}
         </div>
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
           <button class="demo-chip ${glFilterState.anomaly_rule === 'ALL' ? 'active' : ''}" style="${glFilterState.anomaly_rule === 'ALL' ? 'background: #0f172a; color: white;' : ''}" onclick="setGLAnomalyFilter('ALL')">
-            📋 All Transactions (${glData.total_transactions})
+            All Transactions (${glData.total_transactions})
           </button>
           ${Object.entries(GL_RULE_LABELS).map(([code, label]) => {
-            const count = ruleCountMap[code] || 0;
-            const isSelected = glFilterState.anomaly_rule === code;
-            return `
+      const count = ruleCountMap[code] || 0;
+      const isSelected = glFilterState.anomaly_rule === code;
+      return `
               <button class="demo-chip ${isSelected ? 'active' : ''}" style="${isSelected ? 'background: #dc2626; color: white;' : (count > 0 ? 'border-color: #fca5a5;' : '')}" onclick="setGLAnomalyFilter('${code}')">
                 ${label} ${count > 0 ? `<span class="badge" style="background:${isSelected ? '#991b1b' : '#fee2e2'}; color:${isSelected ? '#fff' : '#991b1b'}; margin-left:4px; font-size:10px; padding:1px 5px;">${count}</span>` : ''}
               </button>
             `;
-          }).join('')}
+    }).join('')}
         </div>
       </div>
 
@@ -6345,7 +6525,7 @@ async function renderGeneralLedger() {
       <div class="card" style="margin-bottom: 20px;">
         <div class="card-header" style="background: var(--bg-app); padding: 10px 16px;">
           <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">
-            🔍 Multi-Attribute Ledger & Transaction Filter
+            Filter Transactions
           </div>
           <div style="font-size: 12px; color: var(--text-muted);">
             Filter by ledger, narration keyword, party, voucher, date window, or amount limits
@@ -6423,7 +6603,7 @@ async function renderGeneralLedger() {
           <div class="card-header" style="background: #fff1f2; display: flex; justify-content: space-between; align-items: center;">
             <div>
               <div class="card-title" style="color: #991b1b;">
-                ⚠️ Potential Audit Anomalies & Exceptions Requiring Review (${anomalies.length})
+                Potential Audit Anomalies & Exceptions Requiring Review (${anomalies.length})
               </div>
               <div class="card-subtitle" style="color: #b91c1c;">
                 Deterministic exceptions identified per ICAI Auditing Standards (SA 240 / SA 500 / SA 520). Note: Strictly labeled as "Requires review" or "Potential anomaly".
@@ -6434,9 +6614,9 @@ async function renderGeneralLedger() {
 
           <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto;">
             ${anomalies.map(a => {
-              const t = a.transaction || {};
-              const amt = floatVal(t.amount || Math.max(t.debit || 0, t.credit || 0));
-              return `
+      const t = a.transaction || {};
+      const amt = floatVal(t.amount || Math.max(t.debit || 0, t.credit || 0));
+      return `
                 <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
                   <div style="flex: 1;">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
@@ -6464,12 +6644,12 @@ async function renderGeneralLedger() {
                     <div class="font-mono font-bold" style="font-size: 14px; color: var(--text-main);">${formatINR(amt)}</div>
                     <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Date: ${t.date || '—'}</div>
                     <button class="btn btn-sm btn-secondary" style="margin-top: 8px; width: 100%;" onclick="openGLTransactionDrawer(${t.id})">
-                      🔍 Examine Txn
+                      ${ICONS.search} Examine
                     </button>
                   </div>
                 </div>
               `;
-            }).join('')}
+    }).join('')}
           </div>
         </div>
       ` : ''}
@@ -6489,14 +6669,14 @@ async function renderGeneralLedger() {
         </div>
 
         ${transactions.length === 0 ? (
-          isFilterActive ? `
+        isFilterActive ? `
             <div style="padding: 40px; text-align: center; color: var(--text-muted);">
               <p>No ledger transactions match the current filter criteria.</p>
               <button class="btn btn-secondary" style="margin-top: 10px;" onclick="resetGLFilters()">Clear Filters</button>
             </div>
           ` : `
             <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
-              <div style="font-size: 44px; margin-bottom: 10px;">📊</div>
+              <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg></div>
               <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No transactions imported yet</div>
               <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
                 Import your client's General Ledger or Day Book CSV/Excel file to begin 13-point anomaly detection and substantive audit testing.
@@ -6504,7 +6684,7 @@ async function renderGeneralLedger() {
               <button class="btn btn-primary" onclick="navigateTo('import')">+ Import Financial Data</button>
             </div>
           `
-        ) : `
+      ) : `
           <div class="table-container">
             <table class="data-table">
               <thead>
@@ -6523,10 +6703,10 @@ async function renderGeneralLedger() {
               </thead>
               <tbody>
                 ${transactions.map(t => {
-                  const txAnomalies = t.anomalies || [];
-                  const hasAnom = txAnomalies.length > 0;
-                  const highestSev = hasAnom ? txAnomalies[0].severity : null;
-                  return `
+        const txAnomalies = t.anomalies || [];
+        const hasAnom = txAnomalies.length > 0;
+        const highestSev = hasAnom ? txAnomalies[0].severity : null;
+        return `
                     <tr style="${hasAnom ? 'background-color: #fffbf5;' : ''}">
                       <td class="font-mono" style="font-size: 11.5px;">${t.date || '—'}</td>
                       <td class="font-mono font-bold" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(t.voucher_no || '—')}</td>
@@ -6555,7 +6735,7 @@ async function renderGeneralLedger() {
                             </span>
                           </div>
                         ` : `
-                          <span class="badge badge-resolved" style="font-size: 10.5px;">✓ Clear</span>
+                          <span class="badge badge-resolved" style="font-size: 10.5px;">Clear</span>
                         `}
                       </td>
                       <td class="text-center">
@@ -6565,7 +6745,7 @@ async function renderGeneralLedger() {
                       </td>
                     </tr>
                   `;
-                }).join('')}
+      }).join('')}
               </tbody>
             </table>
           </div>
@@ -6590,7 +6770,7 @@ function applyGLFilters(event) {
   glFilterState.voucher_no = document.getElementById("gl-voucher")?.value.trim() || "";
   glFilterState.start_date = document.getElementById("gl-start-date")?.value || "";
   glFilterState.end_date = document.getElementById("gl-end-date")?.value || "";
-  
+
   const minAmt = document.getElementById("gl-min-amount")?.value;
   const maxAmt = document.getElementById("gl-max-amount")?.value;
   const minDr = document.getElementById("gl-min-debit")?.value;
@@ -6631,10 +6811,10 @@ function setGLAnomalyFilter(ruleCode) {
 async function openGLTransactionDrawer(txId) {
   const drawerHeader = document.getElementById("drawer-title");
   const drawerBody = document.getElementById("drawer-content");
-  
+
   drawerHeader.innerText = `General Ledger Voucher Inspection: #${txId}`;
   drawerBody.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading transaction details...</div>`;
-  
+
   document.getElementById("drawer-overlay").style.display = "block";
   document.getElementById("evidence-drawer").classList.add("open");
 
@@ -6688,7 +6868,7 @@ async function openGLTransactionDrawer(txId) {
 
         ${txAnomalies.length === 0 ? `
           <div style="padding: 14px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px; color: #065f46;">
-            ✓ <b>No Anomalies Detected:</b> This transaction conforms to all standard 13-point General Ledger checks (valid dates, unique voucher, supported reference, non-round normal value).
+            <b>No Anomalies Detected:</b> This transaction conforms to all standard 13-point General Ledger checks (valid dates, unique voucher, supported reference, non-round normal value).
           </div>
         ` : `
           <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -6720,7 +6900,7 @@ async function openGLTransactionDrawer(txId) {
 
       <!-- Compliance Disclaimer -->
       <div style="padding: 10px 12px; background: var(--bg-sidebar); border-radius: var(--radius-md); font-size: 11px; color: var(--text-muted); margin-bottom: 16px;">
-        🛡️ <b>ICAI Audit Assistant Guideline:</b> FinAuditPro flags items as <i>"Potential anomaly"</i> or <i>"Requires review"</i>. Findings do not constitute a legal determination of fraud.
+        <b>ICAI Audit Guideline:</b> FinAuditPro flags items as <i>"Potential anomaly"</i> or <i>"Requires review"</i>. Findings do not constitute a legal determination of fraud.
       </div>
 
       <!-- Working Paper Notes -->
@@ -6729,7 +6909,7 @@ async function openGLTransactionDrawer(txId) {
         <textarea id="gl-wp-note" class="form-control" rows="3" placeholder="e.g. Inspected physical invoice #442 and delivery challan. Management confirmed non-routine weekend journal entry for emergency maintenance..."></textarea>
         <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
           <button class="btn btn-sm btn-primary" onclick="saveGLWorkingPaperNote(${tx.id})">
-            💾 Save to Working Papers
+            ${ICONS.fileText} Save to Working Papers
           </button>
         </div>
       </div>
@@ -6816,21 +6996,21 @@ async function renderReconciliation() {
         <div style="display: flex; gap: 8px;">
           ${reconActiveSubTab === "gst" ? `
             <button class="btn btn-secondary" onclick="openGSTRulesModal()">
-              ⚙️ Configurable GST Rules
+              ${ICONS.settings} GST Rules
             </button>
             <button class="btn btn-primary" onclick="openRunGSTReconModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Run GST Reconciliation
+              ${ICONS.refresh} Run GST Reconciliation
             </button>
           ` : (reconActiveSubTab === "sales_purchase" ? `
             <button class="btn btn-primary" onclick="openRunSalesPurchaseReconModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Run Sales & Purchase Reconciliation
+              ${ICONS.refresh} Run Sales & Purchase Reconciliation
             </button>
           ` : `
             <button class="btn btn-primary" onclick="openRunBRSModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Execute Bank BRS Reconciliation
+              ${ICONS.refresh} Run Bank BRS Reconciliation
             </button>
           `)}
         </div>
@@ -6839,13 +7019,13 @@ async function renderReconciliation() {
       <!-- Sub Navigation Tabs -->
       <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">
         <button class="btn ${reconActiveSubTab === 'gst' ? 'btn-primary' : 'btn-secondary'}" onclick="switchReconSubTab('gst')">
-          🧾 GST Reconciliation (GSTR-2B/1 vs Books) (${gstRecons.length})
+          GST Reconciliation (GSTR-2B/1 vs Books) (${gstRecons.length})
         </button>
         <button class="btn ${reconActiveSubTab === 'sales_purchase' ? 'btn-primary' : 'btn-secondary'}" onclick="switchReconSubTab('sales_purchase')">
-          📊 Sales & Purchase Reconciliation (${spRecons.length})
+          Sales & Purchase Reconciliation (${spRecons.length})
         </button>
         <button class="btn ${reconActiveSubTab === 'brs' ? 'btn-primary' : 'btn-secondary'}" onclick="switchReconSubTab('brs')">
-          🏦 Bank Reconciliation (BRS Engine) (${brsRecons.length})
+          Bank Reconciliation (BRS Engine) (${brsRecons.length})
         </button>
       </div>
 
@@ -6870,13 +7050,13 @@ function renderGSTListView(gstRecons) {
   if (gstRecons.length === 0) {
     return `
       <div class="card" style="padding: 40px; text-align: center;">
-        <div style="font-size: 36px; margin-bottom: 10px;">🧾</div>
+        <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
         <h3 style="color: var(--text-main); margin-bottom: 6px;">No GST Reconciliations Generated Yet</h3>
         <p style="color: var(--text-muted); max-width: 540px; margin: 0 auto 16px auto; font-size: 13px;">
           Perform deterministic multi-source reconciliation between GST Portal downloads (GSTR-2B, GSTR-1, JSON/Excel) and internal Purchase/Sales Registers or Books with configurable tolerance rules.
         </p>
         <div style="display: flex; gap: 8px; justify-content: center;">
-          <button class="btn btn-secondary" onclick="openGSTRulesModal()">⚙️ Configure GST Rules</button>
+          <button class="btn btn-secondary" onclick="openGSTRulesModal()">${ICONS.settings} Configure GST Rules</button>
           <button class="btn btn-primary" onclick="openRunGSTReconModal()">Run GST Reconciliation Now</button>
         </div>
       </div>
@@ -6887,7 +7067,7 @@ function renderGSTListView(gstRecons) {
     <div class="card">
       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div class="card-title">Completed GST Reconciliations (${gstRecons.length})</div>
-        <button class="btn btn-sm btn-secondary" onclick="openGSTRulesModal()">⚙️ Configurable GST Rule Engine</button>
+        <button class="btn btn-sm btn-secondary" onclick="openGSTRulesModal()">${ICONS.settings} Configurable GST Rules</button>
       </div>
       <div class="table-container">
         <table class="data-table">
@@ -6913,14 +7093,14 @@ function renderGSTListView(gstRecons) {
                 </td>
                 <td>
                   <span class="badge" style="background: #eff6ff; color: #1e40af; font-weight: 600;">
-                    🧾 ${escapeHtml(r.bank_account_name || 'GSTR-2B vs Books')}
+                    ${escapeHtml(r.bank_account_name || 'GSTR-2B vs Books')}
                   </span>
                 </td>
                 <td class="text-center font-mono font-bold">${r.total_bank_tx || 0}</td>
                 <td class="text-center font-mono font-bold">${r.total_book_tx || 0}</td>
                 <td class="text-center">
                   <span class="badge badge-resolved" style="font-size: 11px;">
-                    ✓ ${r.matched_count || 0}
+                    ${r.matched_count || 0} Matched
                   </span>
                 </td>
                 <td class="text-center">
@@ -6937,10 +7117,10 @@ function renderGSTListView(gstRecons) {
                 <td class="text-center">
                   <div style="display: flex; gap: 6px; justify-content: center;">
                     <button class="btn btn-sm btn-primary" onclick="viewGSTReconciliationDetails(${r.id})">
-                      🔍 Open GST Workbench
+                      ${ICONS.search} Open Workbench
                     </button>
                     <a href="${FinAuditAPI.getGSTReportDownloadUrl(r.id)}" target="_blank" class="btn btn-sm btn-secondary" title="Download GST Reconciliation Report (CSV)">
-                      📥 CSV
+                      ${ICONS.download} CSV
                     </a>
                   </div>
                 </td>
@@ -6966,12 +7146,12 @@ async function openGSTRulesModal() {
         <div class="modal-card" style="max-width: 800px; max-height: 85vh; display: flex; flex-direction: column;">
           <div class="modal-header">
             <div>
-              <div class="modal-title">⚙️ Configurable GST Rule Definitions</div>
+              <div class="modal-title">Configurable GST Rule Definitions</div>
               <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
                 Tax rules, tolerances, and statutory criteria are updateable independently from application code
               </div>
             </div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('gst-rules-modal')">✕</button>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('gst-rules-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 16px 20px;">
             <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-app); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border);">
@@ -7008,7 +7188,7 @@ async function openGSTRulesModal() {
 
                   <div style="display: flex; justify-content: flex-end; gap: 6px;">
                     <button class="btn btn-sm btn-primary" onclick="handleSaveGSTRule('${r.rule_key}')">
-                      💾 Save Rule Configuration
+                      ${ICONS.download} Save Rule Configuration
                     </button>
                   </div>
                 </div>
@@ -7081,8 +7261,8 @@ async function openRunGSTReconModal() {
       <div class="modal-overlay" id="run-gst-recon-modal">
         <div class="modal-card" style="max-width: 620px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute GST Audit Reconciliation</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-gst-recon-modal')">✕</button>
+            <div class="modal-title">Execute GST Audit Reconciliation</div>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-gst-recon-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
@@ -7094,10 +7274,10 @@ async function openRunGSTReconModal() {
                 <label class="form-label">Source A Dataset (GST Portal / Filing Data) *</label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px;">
                   <select id="gst-source-a-type" class="form-control" onchange="autoFillGSTTitle()">
-                    <option value="GSTR-2B (Portal Download)">📥 GSTR-2B (Auto-Drafted ITC Statement)</option>
-                    <option value="GSTR-1 (Portal Download)">📤 GSTR-1 (Outward Supplies Return)</option>
-                    <option value="GSTR-2A (Static Return)">📥 GSTR-2A (Dynamic Tax Return)</option>
-                    <option value="GSTR-3B (Summary Return)">📋 GSTR-3B (Self-Assessed Summary)</option>
+                    <option value="GSTR-2B (Portal Download)">GSTR-2B (Auto-Drafted ITC Statement)</option>
+                    <option value="GSTR-1 (Portal Download)">GSTR-1 (Outward Supplies Return)</option>
+                    <option value="GSTR-2A (Static Return)">GSTR-2A (Dynamic Tax Return)</option>
+                    <option value="GSTR-3B (Summary Return)">GSTR-3B (Self-Assessed Summary)</option>
                   </select>
                   <select id="gst-source-a-file" class="form-control">
                     <option value="">-- Auto-Detect Uploaded File --</option>
@@ -7112,9 +7292,9 @@ async function openRunGSTReconModal() {
                 <label class="form-label">Source B Dataset (Internal Books / Registers) *</label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px;">
                   <select id="gst-source-b-type" class="form-control" onchange="autoFillGSTTitle()">
-                    <option value="Purchase Register (Books)">📦 Purchase Register (Vouchers)</option>
-                    <option value="Sales Register (Books)">🛒 Sales Register (Invoices)</option>
-                    <option value="General Ledger">📖 General Ledger / Expense Heads</option>
+                    <option value="Purchase Register (Books)">Purchase Register (Vouchers)</option>
+                    <option value="Sales Register (Books)">Sales Register (Invoices)</option>
+                    <option value="General Ledger">General Ledger / Expense Heads</option>
                   </select>
                   <select id="gst-source-b-file" class="form-control">
                     <option value="">-- Auto-Detect Uploaded File --</option>
@@ -7212,18 +7392,18 @@ async function viewGSTReconciliationDetails(reconId) {
 
     const getMatchCatBadge = (cat) => {
       const c = cat || "Mismatched";
-      if (c === "Matched") return `<span class="badge badge-resolved">✓ Matched</span>`;
-      if (c === "Partially matched") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">⚠️ Partially Matched</span>`;
-      if (c === "Missing in source A") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">❌ Missing in Source A</span>`;
-      if (c === "Missing in source B") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border: 1px solid var(--border);">📦 Missing in Source B</span>`;
-      return `<span class="badge badge-critical">⚡ Mismatched</span>`;
+      if (c === "Matched") return `<span class="badge badge-resolved">Matched</span>`;
+      if (c === "Partially matched") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">Partially Matched</span>`;
+      if (c === "Missing in source A") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">Missing in Source A</span>`;
+      if (c === "Missing in source B") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border: 1px solid var(--border);">Missing in Source B</span>`;
+      return `<span class="badge badge-critical">Mismatched</span>`;
     };
 
     const getStatusPill = (status) => {
       const s = status || "Suggested";
-      if (s === "Accepted") return `<span class="badge badge-resolved">✓ Accepted</span>`;
-      if (s === "Rejected") return `<span class="badge" style="background:#fee2e2; color:#b91c1c;">✕ Rejected</span>`;
-      if (s === "Marked for review") return `<span class="badge badge-medium">⚠️ In Review</span>`;
+      if (s === "Accepted") return `<span class="badge badge-resolved">Accepted</span>`;
+      if (s === "Rejected") return `<span class="badge" style="background:#fee2e2; color:#b91c1c;">Rejected</span>`;
+      if (s === "Marked for review") return `<span class="badge badge-medium">In Review</span>`;
       return `<span class="badge badge-disabled">Suggested</span>`;
     };
 
@@ -7243,10 +7423,10 @@ async function viewGSTReconciliationDetails(reconId) {
         </div>
         <div style="display: flex; gap: 8px;">
           <a href="${FinAuditAPI.getGSTReportDownloadUrl(reconId)}" target="_blank" class="btn btn-secondary">
-            📥 Download GST Report (CSV)
+            ${ICONS.download} Download GST Report (CSV)
           </a>
           <button class="btn btn-secondary" onclick="openGSTRulesModal()">
-            ⚙️ GST Rules
+            ${ICONS.settings} GST Rules
           </button>
           <button class="btn btn-secondary" onclick="renderReconciliation()">
             ◀ All Reconciliations
@@ -7297,7 +7477,7 @@ async function viewGSTReconciliationDetails(reconId) {
           <div class="kpi-value font-mono" style="font-size: 13px; color: ${(details.unreconciled_amount || 0) === 0 ? '#059669' : '#dc2626'};">
             ${formatINR(details.unreconciled_amount || 0)}
           </div>
-          <div class="kpi-subtext">${(details.unreconciled_amount || 0) === 0 ? '✓ Balanced' : 'Total tax disparity'}</div>
+          <div class="kpi-subtext">${(details.unreconciled_amount || 0) === 0 ? 'Balanced' : 'Total tax disparity'}</div>
         </div>
       </div>
 
@@ -7305,7 +7485,7 @@ async function viewGSTReconciliationDetails(reconId) {
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
-            🔍 Filter by Match Categorization
+            Filter by Match Categorization
           </div>
           <div style="width: 280px;">
             <input type="text" id="gst-recon-search-input" class="form-control" placeholder="Search invoice, party, GSTIN..." value="${escapeHtml(reconGSTFilterState.search)}" oninput="applyGSTFilters(${reconId})">
@@ -7314,22 +7494,22 @@ async function viewGSTReconciliationDetails(reconId) {
 
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'ALL' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'ALL' ? 'background:#0f172a; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'ALL')">
-            📋 All Records (${items.length})
+            All Records (${items.length})
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Matched' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Matched' ? 'background:#059669; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Matched')">
-            ✓ Matched
+            Matched
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Partially matched' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Partially matched' ? 'background:#b45309; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Partially matched')">
-            ⚠️ Partially Matched
+            Partially Matched
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Mismatched' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Mismatched' ? 'background:#dc2626; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Mismatched')">
-            ⚡ Mismatched
+            Mismatched
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Missing in source A' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Missing in source A' ? 'background:#7c2d12; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Missing in source A')">
-            ❌ Missing in Source A (Portal)
+            Missing in Source A (Portal)
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Missing in source B' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Missing in source B' ? 'background:#831843; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Missing in source B')">
-            📦 Missing in Source B (Books)
+            Missing in Source B (Books)
           </button>
         </div>
       </div>
@@ -7365,17 +7545,17 @@ async function viewGSTReconciliationDetails(reconId) {
               </thead>
               <tbody>
                 ${items.map(itm => {
-                  const invA = itm.ref_a || "—";
-                  const invB = itm.ref_b || "—";
-                  const ptyA = itm.party_a || "—";
-                  const ptyB = itm.party_b || "—";
-                  const gstA = itm.gstin_a || "";
-                  const gstB = itm.gstin_b || "";
-                  const hasDiff = (itm.difference || 0) > 0;
-                  const hasTaxDiff = (itm.tax_difference || 0) > 0;
-                  const hasTaxableDiff = (itm.taxable_difference || 0) > 0;
+      const invA = itm.ref_a || "—";
+      const invB = itm.ref_b || "—";
+      const ptyA = itm.party_a || "—";
+      const ptyB = itm.party_b || "—";
+      const gstA = itm.gstin_a || "";
+      const gstB = itm.gstin_b || "";
+      const hasDiff = (itm.difference || 0) > 0;
+      const hasTaxDiff = (itm.tax_difference || 0) > 0;
+      const hasTaxableDiff = (itm.taxable_difference || 0) > 0;
 
-                  return `
+      return `
                     <tr style="${itm.match_category !== 'Matched' ? 'background-color: #fffbf5;' : ''}">
                       <td>${getMatchCatBadge(itm.match_category)}</td>
                       <td>
@@ -7395,23 +7575,23 @@ async function viewGSTReconciliationDetails(reconId) {
                       <td class="text-right font-mono" style="font-size: 11.5px; color: var(--text-main);">
                         <div>A: ${formatINR(itm.taxable_a || 0)}</div>
                         <div>B: ${formatINR(itm.taxable_b || 0)}</div>
-                        ${hasTaxableDiff ? `<span style="font-size:10px; color:#dc2626; font-weight:bold;">Diff: ${formatINR(itm.taxable_difference)}</span>` : '<span style="font-size:10px; color:#059669;">✓ Match</span>'}
+                        ${hasTaxableDiff ? `<span style="font-size:10px; color:#dc2626; font-weight:bold;">Diff: ${formatINR(itm.taxable_difference)}</span>` : '<span style="font-size:10px; color:#059669;">Match</span>'}
                       </td>
                       <td class="text-right font-mono" style="font-size: 10.5px; color: var(--text-secondary);">
-                        <div>A: C ₹${(itm.cgst_a||0).toFixed(0)} | S ₹${(itm.sgst_a||0).toFixed(0)} | I ₹${(itm.igst_a||0).toFixed(0)}</div>
-                        <div>B: C ₹${(itm.cgst_b||0).toFixed(0)} | S ₹${(itm.sgst_b||0).toFixed(0)} | I ₹${(itm.igst_b||0).toFixed(0)}</div>
-                        ${hasTaxDiff ? `<span style="font-size:10px; color:#d97706; font-weight:bold;">Tax Diff: ${formatINR(itm.tax_difference)}</span>` : '<span style="font-size:10px; color:#059669;">✓ Tax Match</span>'}
+                        <div>A: C ₹${(itm.cgst_a || 0).toFixed(0)} | S ₹${(itm.sgst_a || 0).toFixed(0)} | I ₹${(itm.igst_a || 0).toFixed(0)}</div>
+                        <div>B: C ₹${(itm.cgst_b || 0).toFixed(0)} | S ₹${(itm.sgst_b || 0).toFixed(0)} | I ₹${(itm.igst_b || 0).toFixed(0)}</div>
+                        ${hasTaxDiff ? `<span style="font-size:10px; color:#d97706; font-weight:bold;">Tax Diff: ${formatINR(itm.tax_difference)}</span>` : '<span style="font-size:10px; color:#059669;">Tax Match</span>'}
                       </td>
                       <td class="text-right font-mono font-bold" style="font-size: 12px; color: var(--text-main);">
                         <div>A: ${formatINR(itm.amount_a || 0)}</div>
                         <div>B: ${formatINR(itm.amount_b || 0)}</div>
-                        ${hasDiff ? `<span style="font-size:10px; color:#dc2626;">Diff: ${formatINR(itm.difference)}</span>` : '<span style="font-size:10px; color:#059669;">✓ Match</span>'}
+                        ${hasDiff ? `<span style="font-size:10px; color:#dc2626;">Diff: ${formatINR(itm.difference)}</span>` : '<span style="font-size:10px; color:#059669;">Match</span>'}
                       </td>
                       <td style="font-size: 11.5px; color: var(--text-secondary);">
                         <div>${escapeHtml(itm.match_reason || 'Reconciled GST entry')}</div>
                         ${itm.notes && itm.notes !== itm.match_reason ? `
                           <div style="font-size: 10.5px; color: #1e40af; margin-top: 2px; background: #eff6ff; padding: 2px 5px; border-radius: 3px;">
-                            💬 ${escapeHtml(itm.notes)}
+                            ${ICONS.edit} ${escapeHtml(itm.notes)}
                           </div>
                         ` : ''}
                       </td>
@@ -7419,22 +7599,22 @@ async function viewGSTReconciliationDetails(reconId) {
                       <td class="text-center">
                         <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
                           <button class="btn btn-sm btn-success" style="padding: 2px 6px; font-size: 10.5px;" onclick="handleGSTItemAction(${reconId}, ${itm.id}, 'Accepted')" title="Accept finding">
-                            ✓ Accept
+                            ${ICONS.check} Accept
                           </button>
                           <button class="btn btn-sm btn-secondary" style="padding: 2px 6px; font-size: 10.5px; color: #dc2626;" onclick="handleGSTItemAction(${reconId}, ${itm.id}, 'Rejected')" title="Reject finding">
-                            ✕ Reject
+                            ${ICONS.close} Reject
                           </button>
                           <button class="btn btn-sm btn-secondary" style="padding: 2px 6px; font-size: 10.5px; color: #d97706;" onclick="handleGSTItemAction(${reconId}, ${itm.id}, 'Marked for review')" title="Mark for review">
-                            ⚠️ Review
+                            Review
                           </button>
                           <button class="btn btn-sm btn-secondary" style="padding: 2px 6px; font-size: 10.5px;" onclick="openGSTCommentModal(${reconId}, ${itm.id}, '${escapeHtml(itm.status || 'Suggested')}', '${escapeHtml(itm.notes || '')}')" title="Add working-paper comment">
-                            💬
+                            ${ICONS.edit}
                           </button>
                         </div>
                       </td>
                     </tr>
                   `;
-                }).join('')}
+    }).join('')}
               </tbody>
             </table>
           </div>
@@ -7473,17 +7653,17 @@ function openGSTCommentModal(reconId, itemId, currentStatus, currentNotes) {
     <div class="modal-overlay" id="gst-comment-modal">
       <div class="modal-card" style="max-width: 500px;">
         <div class="modal-header">
-          <div class="modal-title">💬 GST Finding Review & Working Paper Note</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('gst-comment-modal')">✕</button>
+          <div class="modal-title">GST Finding Review & Working Paper Note</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('gst-comment-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleGSTCommentSubmit(event, ${reconId}, ${itemId})">
             <div class="form-group">
               <label class="form-label">Audit Review Status *</label>
               <select id="gst-modal-status" class="form-control" required>
-                <option value="Accepted" ${currentStatus === 'Accepted' ? 'selected' : ''}>✓ Accept (Verified GST Finding)</option>
-                <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>✕ Reject (Valid Explanation Provided / Ineligible ITC)</option>
-                <option value="Marked for review" ${currentStatus === 'Marked for review' ? 'selected' : ''}>⚠️ Marked for Review (Pending Supplier Clarification)</option>
+                <option value="Accepted" ${currentStatus === 'Accepted' ? 'selected' : ''}>Accept (Verified GST Finding)</option>
+                <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>Reject (Valid Explanation Provided / Ineligible ITC)</option>
+                <option value="Marked for review" ${currentStatus === 'Marked for review' ? 'selected' : ''}>Marked for Review (Pending Supplier Clarification)</option>
               </select>
             </div>
 
@@ -7521,7 +7701,7 @@ function renderSalesPurchaseListView(spRecons) {
   if (spRecons.length === 0) {
     return `
       <div class="card" style="padding: 40px; text-align: center;">
-        <div style="font-size: 36px; margin-bottom: 10px;">📊</div>
+        <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg></div>
         <h3 style="color: var(--text-main); margin-bottom: 6px;">No Sales or Purchase Reconciliations Generated Yet</h3>
         <p style="color: var(--text-muted); max-width: 540px; margin: 0 auto 16px auto; font-size: 13px;">
           Run comprehensive 11-point deterministic cross-matching comparing Sales/Purchase Registers against General Ledger vouchers and GSTR-1/2B tax returns to detect missing invoices, tax discrepancies, party mismatches, and duplicate GSTINs.
@@ -7554,8 +7734,8 @@ function renderSalesPurchaseListView(spRecons) {
           </thead>
           <tbody>
             ${spRecons.map(r => {
-              const isSales = (r.recon_type || "").includes("Sales");
-              return `
+    const isSales = (r.recon_type || "").includes("Sales");
+    return `
                 <tr>
                   <td>
                     <b style="color: var(--text-main); font-size: 13px;">${escapeHtml(r.title)}</b><br/>
@@ -7563,7 +7743,7 @@ function renderSalesPurchaseListView(spRecons) {
                   </td>
                   <td>
                     <span class="badge" style="${isSales ? 'background: #eff6ff; color: #1e40af;' : 'background: #fdf2f8; color: #9d174d;'} font-weight: 600;">
-                      ${isSales ? '🛒 Sales Recon' : '📦 Purchase Recon'}
+                      ${isSales ? 'Sales Recon' : 'Purchase Recon'}
                     </span>
                   </td>
                   <td>
@@ -7573,7 +7753,7 @@ function renderSalesPurchaseListView(spRecons) {
                   <td class="text-center font-mono font-bold">${r.total_book_tx || 0}</td>
                   <td class="text-center">
                     <span class="badge badge-resolved" style="font-size: 11px;">
-                      ✓ ${r.matched_count || 0}
+                      ${r.matched_count || 0} Matched
                     </span>
                   </td>
                   <td class="text-center">
@@ -7590,16 +7770,16 @@ function renderSalesPurchaseListView(spRecons) {
                   <td class="text-center">
                     <div style="display: flex; gap: 6px; justify-content: center;">
                       <button class="btn btn-sm btn-primary" onclick="viewSalesPurchaseReconDetails(${r.id})">
-                        🔍 Open Workbench
+                        ${ICONS.search} Open Workbench
                       </button>
                       <a href="${FinAuditAPI.getSalesPurchaseReportDownloadUrl(r.id)}" target="_blank" class="btn btn-sm btn-secondary" title="Download Reconciliation Report (CSV)">
-                        📥 CSV
+                        ${ICONS.download} CSV
                       </a>
                     </div>
                   </td>
                 </tr>
               `;
-            }).join("")}
+  }).join("")}
           </tbody>
         </table>
       </div>
@@ -7611,7 +7791,7 @@ function renderBRSListView(brsRecons) {
   if (brsRecons.length === 0) {
     return `
       <div class="card" style="padding: 40px; text-align: center;">
-        <div style="font-size: 36px; margin-bottom: 10px;">🏦</div>
+        <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg></div>
         <h3 style="color: var(--text-main); margin-bottom: 6px;">No Bank Reconciliation Statements Generated Yet</h3>
         <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 16px auto; font-size: 13px;">
           Run automated 4-tier matching against internal bank ledger vouchers and bank statements to detect unpresented cheques, outstanding deposits, and unrecorded charges.
@@ -7650,14 +7830,14 @@ function renderBRSListView(brsRecons) {
                 </td>
                 <td>
                   <span class="badge" style="background: #eff6ff; color: #1e40af; font-weight: 600;">
-                    🏦 ${escapeHtml(r.bank_account_name || 'Bank Account')}
+                    ${escapeHtml(r.bank_account_name || 'Bank Account')}
                   </span>
                 </td>
                 <td class="text-center font-mono font-bold">${r.total_bank_tx || r.matched_count + r.mismatched_count}</td>
                 <td class="text-center font-mono font-bold">${r.total_book_tx || r.matched_count}</td>
                 <td class="text-center">
                   <span class="badge badge-resolved" style="font-size: 11px;">
-                    ✓ ${r.matched_count} Matched
+                    ${r.matched_count} Matched
                   </span>
                 </td>
                 <td class="text-center font-mono" style="font-size: 12px;">
@@ -7673,10 +7853,10 @@ function renderBRSListView(brsRecons) {
                 <td class="text-center">
                   <div style="display: flex; gap: 6px; justify-content: center;">
                     <button class="btn btn-sm btn-primary" onclick="viewReconciliationDetails(${r.id})">
-                      🔍 Open BRS Workbench
+                      ${ICONS.search} Open Workbench
                     </button>
                     <a href="${FinAuditAPI.getBRSReportDownloadUrl(r.id)}" target="_blank" class="btn btn-sm btn-secondary" title="Download CSV Report">
-                      📥 CSV
+                      ${ICONS.download} CSV
                     </a>
                   </div>
                 </td>
@@ -7703,11 +7883,11 @@ async function openRunSalesPurchaseReconModal() {
     const allLedgers = ledgersRes.all_ledgers || [];
     const files = Array.isArray(filesRes) ? filesRes : [];
     const getFileName = (f) => (f?.file_name || f?.filename || f?.original_filename || "").toLowerCase();
-    const registerFiles = files.filter(f => 
-      f?.data_category === "Sales Register" || 
-      f?.data_category === "Purchase Register" || 
+    const registerFiles = files.filter(f =>
+      f?.data_category === "Sales Register" ||
+      f?.data_category === "Purchase Register" ||
       f?.data_category === "GST Data" ||
-      getFileName(f).includes("sales") || 
+      getFileName(f).includes("sales") ||
       getFileName(f).includes("purchase") ||
       getFileName(f).includes("register")
     );
@@ -7716,8 +7896,8 @@ async function openRunSalesPurchaseReconModal() {
       <div class="modal-overlay" id="run-sp-recon-modal">
         <div class="modal-card" style="max-width: 600px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute Sales & Purchase Reconciliation</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-sp-recon-modal')">✕</button>
+            <div class="modal-title">Execute Sales & Purchase Reconciliation</div>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-sp-recon-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
@@ -7728,8 +7908,8 @@ async function openRunSalesPurchaseReconModal() {
               <div class="form-group">
                 <label class="form-label">Reconciliation Type *</label>
                 <select id="sp-recon-type" class="form-control" required onchange="autoFillSPTitle()">
-                  <option value="Sales Reconciliation">🛒 Sales Register vs Revenue Ledger vs GSTR-1</option>
-                  <option value="Purchase Reconciliation">📦 Purchase Register vs Expense Ledger vs GSTR-2B</option>
+                  <option value="Sales Reconciliation">Sales Register vs Revenue Ledger vs GSTR-1</option>
+                  <option value="Purchase Reconciliation">Purchase Register vs Expense Ledger vs GSTR-2B</option>
                 </select>
               </div>
 
@@ -7782,7 +7962,7 @@ function autoFillSPTitle() {
   const titleInput = document.getElementById("sp-title");
   if (titleInput) {
     const isSales = type.includes("Sales");
-    titleInput.value = isSales ? 
+    titleInput.value = isSales ?
       `Sales Register vs Ledger & GST Reconciliation FY ${state.activeEngagement?.financial_year || '2024-25'}` :
       `Purchase Register vs Ledger & ITC Reconciliation FY ${state.activeEngagement?.financial_year || '2024-25'}`;
   }
@@ -7826,26 +8006,26 @@ async function viewSalesPurchaseReconDetails(reconId) {
 
     const getExceptionBadge = (type) => {
       const t = type || "MATCHED";
-      if (t === "MISSING_IN_LEDGER") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">❌ Missing in Ledger</span>`;
-      if (t === "MISSING_IN_REGISTER") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">⚠️ Missing in Register</span>`;
-      if (t === "DUPLICATE_INVOICE") return `<span class="badge badge-critical">📑 Duplicate Invoice</span>`;
-      if (t === "AMOUNT_DIFFERENCE") return `<span class="badge badge-high">💵 Amount Difference</span>`;
-      if (t === "TAX_DIFFERENCE") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border: 1px solid var(--border);">⚖️ Tax Difference</span>`;
-      if (t === "DATE_DIFFERENCE") return `<span class="badge badge-medium">⏱️ Date Disparity (>15d)</span>`;
-      if (t === "PARTY_MISMATCH") return `<span class="badge" style="background:#f3e8ff; color:#6b21a8; border: 1px solid var(--border);">🏢 Party Mismatch</span>`;
-      if (t === "INVOICE_NUMBER_MISMATCH") return `<span class="badge badge-medium">🔢 Inv # Mismatch</span>`;
-      if (t === "MISSING_GSTIN") return `<span class="badge badge-critical">🚫 Missing GSTIN</span>`;
-      if (t === "DUPLICATE_GSTIN_INVOICE") return `<span class="badge badge-critical">📑 Duplicate GSTIN+Inv</span>`;
-      if (t === "CREDIT_NOTE_MISMATCH") return `<span class="badge" style="background:#fff7ed; color:#c2410c; border: 1px solid var(--border);">📜 Credit Note Diff</span>`;
-      if (t === "DEBIT_NOTE_MISMATCH") return `<span class="badge" style="background:#fff7ed; color:#c2410c; border: 1px solid var(--border);">📜 Debit Note Diff</span>`;
-      return `<span class="badge badge-resolved">✓ Matched</span>`;
+      if (t === "MISSING_IN_LEDGER") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">Missing in Ledger</span>`;
+      if (t === "MISSING_IN_REGISTER") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">Missing in Register</span>`;
+      if (t === "DUPLICATE_INVOICE") return `<span class="badge badge-critical">Duplicate Invoice</span>`;
+      if (t === "AMOUNT_DIFFERENCE") return `<span class="badge badge-high">Amount Difference</span>`;
+      if (t === "TAX_DIFFERENCE") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border: 1px solid var(--border);">Tax Difference</span>`;
+      if (t === "DATE_DIFFERENCE") return `<span class="badge badge-medium">Date Disparity (>15d)</span>`;
+      if (t === "PARTY_MISMATCH") return `<span class="badge" style="background:#f3e8ff; color:#6b21a8; border: 1px solid var(--border);">Party Mismatch</span>`;
+      if (t === "INVOICE_NUMBER_MISMATCH") return `<span class="badge badge-medium">Inv # Mismatch</span>`;
+      if (t === "MISSING_GSTIN") return `<span class="badge badge-critical">Missing GSTIN</span>`;
+      if (t === "DUPLICATE_GSTIN_INVOICE") return `<span class="badge badge-critical">Duplicate GSTIN+Inv</span>`;
+      if (t === "CREDIT_NOTE_MISMATCH") return `<span class="badge" style="background:#fff7ed; color:#c2410c; border: 1px solid var(--border);">Credit Note Diff</span>`;
+      if (t === "DEBIT_NOTE_MISMATCH") return `<span class="badge" style="background:#fff7ed; color:#c2410c; border: 1px solid var(--border);">Debit Note Diff</span>`;
+      return `<span class="badge badge-resolved">Matched</span>`;
     };
 
     const getStatusPill = (status) => {
       const s = status || "Suggested";
-      if (s === "Accepted") return `<span class="badge badge-resolved">✓ Accepted</span>`;
-      if (s === "Rejected") return `<span class="badge" style="background:#fee2e2; color:#b91c1c;">✕ Rejected</span>`;
-      if (s === "Marked for review") return `<span class="badge badge-medium">⚠️ In Review</span>`;
+      if (s === "Accepted") return `<span class="badge badge-resolved">Accepted</span>`;
+      if (s === "Rejected") return `<span class="badge" style="background:#fee2e2; color:#b91c1c;">Rejected</span>`;
+      if (s === "Marked for review") return `<span class="badge badge-medium">In Review</span>`;
       return `<span class="badge badge-disabled">Suggested</span>`;
     };
 
@@ -7867,7 +8047,7 @@ async function viewSalesPurchaseReconDetails(reconId) {
         </div>
         <div style="display: flex; gap: 8px;">
           <a href="${FinAuditAPI.getSalesPurchaseReportDownloadUrl(reconId)}" target="_blank" class="btn btn-secondary">
-            📥 Download Report (CSV)
+            ${ICONS.download} Download Report (CSV)
           </a>
           <button class="btn btn-secondary" onclick="renderReconciliation()">
             ◀ Back to Reconciliations
@@ -7902,14 +8082,14 @@ async function viewSalesPurchaseReconDetails(reconId) {
           <div class="kpi-value font-mono" style="font-size: 13px; color: ${(details.net_unreconciled_difference || 0) === 0 ? '#059669' : '#dc2626'};">
             ${formatINR(details.net_unreconciled_difference || 0)}
           </div>
-          <div class="kpi-subtext">${(details.net_unreconciled_difference || 0) === 0 ? '✓ Balanced' : 'Gross value mismatch'}</div>
+          <div class="kpi-subtext">${(details.net_unreconciled_difference || 0) === 0 ? 'Balanced' : 'Gross value mismatch'}</div>
         </div>
         <div class="kpi-card" style="border-left: 4px solid ${(details.unreconciled_amount || 0) === 0 ? '#10b981' : '#d97706'};">
           <div class="kpi-label">NET TAX VARIANCE</div>
           <div class="kpi-value font-mono" style="font-size: 13px; color: ${(details.unreconciled_amount || 0) === 0 ? '#059669' : '#d97706'};">
             ${formatINR(details.unreconciled_amount || 0)}
           </div>
-          <div class="kpi-subtext">${(details.unreconciled_amount || 0) === 0 ? '✓ GST Slabs Match' : 'GST/ITC difference'}</div>
+          <div class="kpi-subtext">${(details.unreconciled_amount || 0) === 0 ? 'GST Slabs Match' : 'GST/ITC difference'}</div>
         </div>
       </div>
 
@@ -7917,7 +8097,7 @@ async function viewSalesPurchaseReconDetails(reconId) {
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
-            🔍 Filter Exceptions & Mismatches
+            Filter Exceptions & Mismatches
           </div>
           <div style="width: 280px;">
             <input type="text" id="sp-recon-search-input" class="form-control" placeholder="Search invoice, party, GSTIN..." value="${escapeHtml(reconSPFilterState.search)}" oninput="applySPFilters(${reconId})">
@@ -7926,43 +8106,43 @@ async function viewSalesPurchaseReconDetails(reconId) {
 
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'ALL' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'ALL' ? 'background:#0f172a; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'ALL')">
-            📋 All Items (${items.length})
+            All Items (${items.length})
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'MISSING_IN_LEDGER' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'MISSING_IN_LEDGER' ? 'background:#dc2626; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'MISSING_IN_LEDGER')">
-            ❌ Missing in Ledger
+            Missing in Ledger
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'MISSING_IN_REGISTER' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'MISSING_IN_REGISTER' ? 'background:#b45309; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'MISSING_IN_REGISTER')">
-            ⚠️ Missing in Register
+            Missing in Register
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'DUPLICATE_INVOICE' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'DUPLICATE_INVOICE' ? 'background:#7c2d12; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'DUPLICATE_INVOICE')">
-            📑 Duplicate Invoices
+            Duplicate Invoices
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'AMOUNT_DIFFERENCE' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'AMOUNT_DIFFERENCE' ? 'background:#ea580c; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'AMOUNT_DIFFERENCE')">
-            💵 Amount Differences
+            Amount Differences
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'TAX_DIFFERENCE' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'TAX_DIFFERENCE' ? 'background:#9d174d; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'TAX_DIFFERENCE')">
-            ⚖️ Tax Differences
+            Tax Differences
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'DATE_DIFFERENCE' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'DATE_DIFFERENCE' ? 'background:#4338ca; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'DATE_DIFFERENCE')">
-            ⏱️ Date Cutoff (>15d)
+            Date Cutoff (>15d)
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'PARTY_MISMATCH' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'PARTY_MISMATCH' ? 'background:#6b21a8; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'PARTY_MISMATCH')">
-            🏢 Party Mismatches
+            Party Mismatches
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'MISSING_GSTIN' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'MISSING_GSTIN' ? 'background:#991b1b; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'MISSING_GSTIN')">
-            🚫 Missing GSTIN
+            Missing GSTIN
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'DUPLICATE_GSTIN_INVOICE' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'DUPLICATE_GSTIN_INVOICE' ? 'background:#831843; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'DUPLICATE_GSTIN_INVOICE')">
-            📑 Duplicate GSTIN+Inv
+            Duplicate GSTIN+Inv
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'CREDIT_NOTE_MISMATCH' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'CREDIT_NOTE_MISMATCH' ? 'background:#c2410c; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'CREDIT_NOTE_MISMATCH')">
-            📜 Credit Note Mismatch
+            Credit Note Mismatch
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'DEBIT_NOTE_MISMATCH' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'DEBIT_NOTE_MISMATCH' ? 'background:#c2410c; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'DEBIT_NOTE_MISMATCH')">
-            📜 Debit Note Mismatch
+            Debit Note Mismatch
           </button>
           <button class="demo-chip ${reconSPFilterState.exceptionType === 'MATCHED' ? 'active' : ''}" style="${reconSPFilterState.exceptionType === 'MATCHED' ? 'background:#059669; color:white;' : ''}" onclick="setSPFilter(${reconId}, 'MATCHED')">
-            ✓ Clean Matches
+            Clean Matches
           </button>
         </div>
       </div>
@@ -8000,13 +8180,13 @@ async function viewSalesPurchaseReconDetails(reconId) {
               </thead>
               <tbody>
                 ${items.map(itm => {
-                  const invNo = itm.ref_a || itm.ref_b || "N/A";
-                  const partyName = itm.party_a || itm.party_b || "N/A";
-                  const hasDiff = (itm.difference || 0) > 0;
-                  const hasTaxDiff = (itm.tax_difference || 0) > 0;
-                  const hasDateDiff = (itm.date_diff_days || 0) > 0;
+      const invNo = itm.ref_a || itm.ref_b || "N/A";
+      const partyName = itm.party_a || itm.party_b || "N/A";
+      const hasDiff = (itm.difference || 0) > 0;
+      const hasTaxDiff = (itm.tax_difference || 0) > 0;
+      const hasDateDiff = (itm.date_diff_days || 0) > 0;
 
-                  return `
+      return `
                     <tr style="${itm.item_type !== 'MATCHED' ? 'background-color: #fffbf5;' : ''}">
                       <td>
                         <span class="font-mono font-bold" style="color: var(--text-main); font-size: 12px;">${escapeHtml(invNo)}</span><br/>
@@ -8037,14 +8217,14 @@ async function viewSalesPurchaseReconDetails(reconId) {
                         ${formatINR(itm.tax_difference || 0)}
                       </td>
                       <td class="text-center font-mono" style="font-size: 11px; color: ${hasDateDiff ? '#d97706' : '#64748b'};">
-                        ${hasDateDiff ? `⏱️ ${itm.date_diff_days}d` : '0d'}
+                        ${hasDateDiff ? `${itm.date_diff_days}d` : '0d'}
                       </td>
                       <td>${getExceptionBadge(itm.item_type)}</td>
                       <td style="font-size: 11.5px; color: var(--text-secondary);">
                         <div>${escapeHtml(itm.match_reason || 'Reconciled invoice record')}</div>
                         ${itm.notes && itm.notes !== itm.match_reason ? `
                           <div style="font-size: 10.5px; color: #1e40af; margin-top: 2px; background: #eff6ff; padding: 2px 5px; border-radius: 3px;">
-                            💬 Auditor Note: ${escapeHtml(itm.notes)}
+                            ${ICONS.edit} Auditor Note: ${escapeHtml(itm.notes)}
                           </div>
                         ` : ''}
                       </td>
@@ -8052,22 +8232,22 @@ async function viewSalesPurchaseReconDetails(reconId) {
                       <td class="text-center">
                         <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
                           <button class="btn btn-sm btn-success" style="padding: 2px 6px; font-size: 10.5px;" onclick="handleSPItemAction(${reconId}, ${itm.id}, 'Accepted')" title="Accept finding">
-                            ✓ Accept
+                            ${ICONS.check} Accept
                           </button>
                           <button class="btn btn-sm btn-secondary" style="padding: 2px 6px; font-size: 10.5px; color: #dc2626;" onclick="handleSPItemAction(${reconId}, ${itm.id}, 'Rejected')" title="Reject finding">
-                            ✕ Reject
+                            ${ICONS.close} Reject
                           </button>
                           <button class="btn btn-sm btn-secondary" style="padding: 2px 6px; font-size: 10.5px; color: #d97706;" onclick="handleSPItemAction(${reconId}, ${itm.id}, 'Marked for review')" title="Mark for review">
-                            ⚠️ Review
+                            Review
                           </button>
                           <button class="btn btn-sm btn-secondary" style="padding: 2px 6px; font-size: 10.5px;" onclick="openSPCommentModal(${reconId}, ${itm.id}, '${escapeHtml(itm.status || 'Suggested')}', '${escapeHtml(itm.notes || '')}')" title="Add working-paper comment">
-                            💬
+                            ${ICONS.edit}
                           </button>
                         </div>
                       </td>
                     </tr>
                   `;
-                }).join('')}
+    }).join('')}
               </tbody>
             </table>
           </div>
@@ -8106,17 +8286,17 @@ function openSPCommentModal(reconId, itemId, currentStatus, currentNotes) {
     <div class="modal-overlay" id="sp-comment-modal">
       <div class="modal-card" style="max-width: 500px;">
         <div class="modal-header">
-          <div class="modal-title">💬 Add Auditor Comment & Review Status</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('sp-comment-modal')">✕</button>
+          <div class="modal-title">Add Auditor Comment & Review Status</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('sp-comment-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleSPCommentSubmit(event, ${reconId}, ${itemId})">
             <div class="form-group">
               <label class="form-label">Audit Review Status *</label>
               <select id="sp-modal-status" class="form-control" required>
-                <option value="Accepted" ${currentStatus === 'Accepted' ? 'selected' : ''}>✓ Accept (Valid Exception / Verified)</option>
-                <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>✕ Reject (False Positive / Explanation Accepted)</option>
-                <option value="Marked for review" ${currentStatus === 'Marked for review' ? 'selected' : ''}>⚠️ Marked for Review (Pending Client Clarification)</option>
+                <option value="Accepted" ${currentStatus === 'Accepted' ? 'selected' : ''}>Accept (Valid Exception / Verified)</option>
+                <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>Reject (False Positive / Explanation Accepted)</option>
+                <option value="Marked for review" ${currentStatus === 'Marked for review' ? 'selected' : ''}>Marked for Review (Pending Client Clarification)</option>
               </select>
             </div>
 
@@ -8167,8 +8347,8 @@ async function openRunBRSModal() {
       <div class="modal-overlay" id="run-brs-modal">
         <div class="modal-card" style="max-width: 580px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute Bank Reconciliation (BRS Engine)</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-brs-modal')">✕</button>
+            <div class="modal-title">Execute Bank Reconciliation (BRS Engine)</div>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-brs-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
@@ -8264,22 +8444,22 @@ async function viewReconciliationDetails(reconId) {
 
     const getMatchLevelBadge = (level, score) => {
       const l = (level || "UNMATCHED").toUpperCase();
-      if (l === "EXACT MATCH") return `<span class="badge badge-resolved" style="font-size: 11px;">✓ EXACT (100%)</span>`;
-      if (l === "HIGH CONFIDENCE") return `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 11px;">⚡ HIGH (${score || 90}%)</span>`;
-      if (l === "POSSIBLE MATCH") return `<span class="badge badge-medium" style="font-size: 11px;">⚠️ POSSIBLE (${score || 65}%)</span>`;
+      if (l === "EXACT MATCH") return `<span class="badge badge-resolved" style="font-size: 11px;">EXACT (100%)</span>`;
+      if (l === "HIGH CONFIDENCE") return `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 11px;">HIGH (${score || 90}%)</span>`;
+      if (l === "POSSIBLE MATCH") return `<span class="badge badge-medium" style="font-size: 11px;">POSSIBLE (${score || 65}%)</span>`;
       return `<span class="badge badge-disabled" style="font-size: 11px;">UNMATCHED</span>`;
     };
 
     const getItemTypeBadge = (type) => {
       const t = type || "MATCHED";
-      if (t === "UNPRESENTED_CHEQUE") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">📤 Unpresented Cheque</span>`;
-      if (t === "OUTSTANDING_DEPOSIT") return `<span class="badge" style="background:#eff6ff; color:#1d4ed8; border: 1px solid var(--border);">📥 Outstanding Deposit</span>`;
-      if (t === "BANK_CHARGES") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">💳 Direct Bank Charges</span>`;
-      if (t === "INTEREST_CREDIT") return `<span class="badge" style="background:#ecfdf5; color:#065f46; border: 1px solid var(--border);">💰 Interest Credited</span>`;
-      if (t === "AMOUNT_MISMATCH") return `<span class="badge badge-high">⚠️ Amount Mismatch</span>`;
-      if (t === "UNKNOWN_ENTRY") return `<span class="badge badge-critical">❓ Unknown Entry</span>`;
-      if (t === "DUPLICATE_BOOK_ENTRY" || t === "DUPLICATE_BANK_ENTRY") return `<span class="badge badge-critical">📑 Duplicate Entry</span>`;
-      return `<span class="badge badge-resolved">✓ Matched</span>`;
+      if (t === "UNPRESENTED_CHEQUE") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">Unpresented Cheque</span>`;
+      if (t === "OUTSTANDING_DEPOSIT") return `<span class="badge" style="background:#eff6ff; color:#1d4ed8; border: 1px solid var(--border);">Outstanding Deposit</span>`;
+      if (t === "BANK_CHARGES") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">Direct Bank Charges</span>`;
+      if (t === "INTEREST_CREDIT") return `<span class="badge" style="background:#ecfdf5; color:#065f46; border: 1px solid var(--border);">Interest Credited</span>`;
+      if (t === "AMOUNT_MISMATCH") return `<span class="badge badge-high">Amount Mismatch</span>`;
+      if (t === "UNKNOWN_ENTRY") return `<span class="badge badge-critical">Unknown Entry</span>`;
+      if (t === "DUPLICATE_BOOK_ENTRY" || t === "DUPLICATE_BANK_ENTRY") return `<span class="badge badge-critical">Duplicate Entry</span>`;
+      return `<span class="badge badge-resolved">Matched</span>`;
     };
 
     container.innerHTML = `
@@ -8296,10 +8476,10 @@ async function viewReconciliationDetails(reconId) {
         </div>
         <div style="display: flex; gap: 8px;">
           <a href="${FinAuditAPI.getBRSReportDownloadUrl(reconId)}" target="_blank" class="btn btn-secondary">
-            📥 Download BRS Report (CSV)
+            ${ICONS.download} Download BRS Report (CSV)
           </a>
           <button class="btn btn-secondary" onclick="openManualMatchModal(${reconId})">
-            ➕ Manual Match Pair
+            ${ICONS.plus} Manual Match Pair
           </button>
           <button class="btn btn-secondary" onclick="renderReconciliation()">
             ◀ All BRS Statements
@@ -8339,7 +8519,7 @@ async function viewReconciliationDetails(reconId) {
           <div class="kpi-value font-mono" style="font-size: 13px; color: ${(details.net_unreconciled_difference || 0) === 0 ? '#059669' : '#dc2626'};">
             ${formatINR(details.net_unreconciled_difference || 0)}
           </div>
-          <div class="kpi-subtext">${(details.net_unreconciled_difference || 0) === 0 ? '✓ Fully Reconciled' : 'Unreconciled difference'}</div>
+          <div class="kpi-subtext">${(details.net_unreconciled_difference || 0) === 0 ? 'Fully Reconciled' : 'Unreconciled difference'}</div>
         </div>
       </div>
 
@@ -8347,7 +8527,7 @@ async function viewReconciliationDetails(reconId) {
       <div class="card" style="margin-bottom: 20px; border: 1px solid var(--border); background: var(--bg-app);">
         <div class="card-header" style="background: #eff6ff; padding: 10px 16px;">
           <div style="font-weight: 700; font-size: 13.5px; color: #1e3a8a;">
-            📋 Formal Bank Reconciliation Statement Computation (ICAI Standard Schedule)
+            Formal Bank Reconciliation Statement Computation (ICAI Standard Schedule)
           </div>
         </div>
         <div style="padding: 14px 18px;">
@@ -8386,7 +8566,7 @@ async function viewReconciliationDetails(reconId) {
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
-            🔍 Filter Items by Matching Category
+            Filter Items by Matching Category
           </div>
           <div style="width: 260px;">
             <input type="text" id="recon-search-input" class="form-control" placeholder="Search ref, party, memo..." value="${escapeHtml(reconFilterState.search)}" oninput="applyReconFilters(${reconId})">
@@ -8395,31 +8575,31 @@ async function viewReconciliationDetails(reconId) {
 
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
           <button class="demo-chip ${reconFilterState.itemType === 'ALL' && reconFilterState.matchLevel === 'ALL' ? 'active' : ''}" style="${reconFilterState.itemType === 'ALL' && reconFilterState.matchLevel === 'ALL' ? 'background:#0f172a; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'ALL', 'ALL')">
-            📋 All Items (${items.length})
+            All Items (${items.length})
           </button>
           <button class="demo-chip ${reconFilterState.matchLevel === 'EXACT MATCH' ? 'active' : ''}" style="${reconFilterState.matchLevel === 'EXACT MATCH' ? 'background:#059669; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'EXACT MATCH', 'ALL')">
-            ✓ Exact Matches
+            Exact Matches
           </button>
           <button class="demo-chip ${reconFilterState.matchLevel === 'HIGH CONFIDENCE' ? 'active' : ''}" style="${reconFilterState.matchLevel === 'HIGH CONFIDENCE' ? 'background:#0284c7; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'HIGH CONFIDENCE', 'ALL')">
-            ⚡ High Confidence
+            High Confidence
           </button>
           <button class="demo-chip ${reconFilterState.matchLevel === 'POSSIBLE MATCH' ? 'active' : ''}" style="${reconFilterState.matchLevel === 'POSSIBLE MATCH' ? 'background:#ea580c; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'POSSIBLE MATCH', 'ALL')">
-            ⚠️ Possible Matches
+            Possible Matches
           </button>
           <button class="demo-chip ${reconFilterState.itemType === 'UNPRESENTED_CHEQUE' ? 'active' : ''}" style="${reconFilterState.itemType === 'UNPRESENTED_CHEQUE' ? 'background:#b45309; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'ALL', 'UNPRESENTED_CHEQUE')">
-            📤 Unpresented Cheques
+            Unpresented Cheques
           </button>
           <button class="demo-chip ${reconFilterState.itemType === 'OUTSTANDING_DEPOSIT' ? 'active' : ''}" style="${reconFilterState.itemType === 'OUTSTANDING_DEPOSIT' ? 'background:#4338ca; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'ALL', 'OUTSTANDING_DEPOSIT')">
-            📥 Outstanding Deposits
+            Outstanding Deposits
           </button>
           <button class="demo-chip ${reconFilterState.itemType === 'BANK_CHARGES' ? 'active' : ''}" style="${reconFilterState.itemType === 'BANK_CHARGES' ? 'background:#991b1b; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'ALL', 'BANK_CHARGES')">
-            💳 Direct Bank Charges
+            Direct Bank Charges
           </button>
           <button class="demo-chip ${reconFilterState.itemType === 'INTEREST_CREDIT' ? 'active' : ''}" style="${reconFilterState.itemType === 'INTEREST_CREDIT' ? 'background:#065f46; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'ALL', 'INTEREST_CREDIT')">
-            💰 Interest Credited
+            Interest Credited
           </button>
           <button class="demo-chip ${reconFilterState.matchLevel === 'UNMATCHED' ? 'active' : ''}" style="${reconFilterState.matchLevel === 'UNMATCHED' ? 'background:#475569; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'UNMATCHED', 'ALL')">
-            ❌ All Unmatched
+            All Unmatched
           </button>
         </div>
       </div>
@@ -8452,10 +8632,10 @@ async function viewReconciliationDetails(reconId) {
               </thead>
               <tbody>
                 ${items.map(itm => {
-                  const amt = itm.amount_a || itm.amount_b || 0.0;
-                  const isSuggested = itm.status === "Suggested";
-                  const isConfirmed = itm.status === "Confirmed" || itm.status === "Manual Matched";
-                  return `
+      const amt = itm.amount_a || itm.amount_b || 0.0;
+      const isSuggested = itm.status === "Suggested";
+      const isConfirmed = itm.status === "Confirmed" || itm.status === "Manual Matched";
+      return `
                     <tr style="${itm.match_level === 'POSSIBLE MATCH' || itm.status === 'Unmatched' ? 'background-color: #fffbf5;' : ''}">
                       <td>${getMatchLevelBadge(itm.match_level, itm.match_score)}</td>
                       <td>${getItemTypeBadge(itm.item_type)}</td>
@@ -8478,11 +8658,11 @@ async function viewReconciliationDetails(reconId) {
                         ${itm.difference > 0 ? `<br/><span style="font-size:10px; color:#dc2626;">Diff: ${formatINR(itm.difference)}</span>` : ''}
                       </td>
                       <td class="text-center font-mono" style="font-size: 11.5px; color: var(--text-secondary);">
-                        ${itm.date_diff_days > 0 ? `⏱️ ${itm.date_diff_days}d` : 'Same Day'}
+                        ${itm.date_diff_days > 0 ? `${itm.date_diff_days}d` : 'Same Day'}
                       </td>
                       <td style="font-size: 11.5px; color: var(--text-secondary);">
                         <div>${escapeHtml(itm.match_reason || itm.notes || 'Reconciled item')}</div>
-                        ${itm.notes && itm.notes !== itm.match_reason ? `<div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">💬 ${escapeHtml(itm.notes)}</div>` : ''}
+                        ${itm.notes && itm.notes !== itm.match_reason ? `<div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">${ICONS.edit} ${escapeHtml(itm.notes)}</div>` : ''}
                       </td>
                       <td>
                         ${isConfirmed ? `
@@ -8497,10 +8677,10 @@ async function viewReconciliationDetails(reconId) {
                         <div style="display: flex; gap: 4px; justify-content: center;">
                           ${isSuggested ? `
                             <button class="btn btn-sm btn-success" style="padding: 3px 7px; font-size: 11px;" onclick="confirmBRSMatch(${reconId}, ${itm.id})" title="Confirm suggested match">
-                              ✓ Accept
+                              ${ICONS.check} Accept
                             </button>
                             <button class="btn btn-sm btn-secondary" style="padding: 3px 7px; font-size: 11px; color: #dc2626;" onclick="rejectBRSMatch(${reconId}, ${itm.id})" title="Reject match">
-                              ✕ Reject
+                              ${ICONS.close} Reject
                             </button>
                           ` : (isConfirmed ? `
                             <button class="btn btn-sm btn-secondary" style="padding: 3px 7px; font-size: 11px;" onclick="rejectBRSMatch(${reconId}, ${itm.id})" title="Unlink / Reject">
@@ -8515,7 +8695,7 @@ async function viewReconciliationDetails(reconId) {
                       </td>
                     </tr>
                   `;
-                }).join('')}
+    }).join('')}
               </tbody>
             </table>
           </div>
@@ -8581,8 +8761,8 @@ async function openManualMatchModal(reconId) {
       <div class="modal-overlay" id="manual-match-modal">
         <div class="modal-card" style="max-width: 650px;">
           <div class="modal-header">
-            <div class="modal-title">🔗 Auditor Manual Match Pairing</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('manual-match-modal')">✕</button>
+            <div class="modal-title">Auditor Manual Match Pairing</div>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('manual-match-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
@@ -8775,7 +8955,7 @@ async function renderFinancialStatements() {
 // Local AI Audit Assistant View
 async function renderAIAssistant() {
   const container = document.getElementById("content-container");
-  
+
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
@@ -8789,16 +8969,16 @@ async function renderAIAssistant() {
     <div class="chat-container">
       <div class="chat-messages" id="chat-messages">
         <div class="chat-bubble bot">
-          <b>FinAuditPro AI Assistant initialized (100% Local & Offline).</b><br/>
+          <b>Audit Assistant ready.</b><br/>
           I have indexed all transactions, trial balance groupings, and audit findings for this engagement. How can I assist with your audit verification?
         </div>
       </div>
 
       <div style="padding: 8px 16px; background: var(--bg-sidebar); display: flex; gap: 8px; overflow-x: auto;">
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Show large cash transactions above Section 40A(3) limit')">💡 Section 40A(3) Cash Violations</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the critical risks in this engagement?')">💡 Critical Audit Risks</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the top 5 highest value vouchers?')">💡 Top 5 Highest Vouchers</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Are there any GSTIN format or ITC matching issues?')">💡 GSTIN & ITC Compliance</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Show large cash transactions above Section 40A(3) limit')">Section 40A(3) Cash Violations</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the critical risks in this engagement?')">Critical Audit Risks</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the top 5 highest value vouchers?')">Top 5 Highest Vouchers</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Are there any GSTIN format or ITC matching issues?')">GSTIN & ITC Compliance</button>
       </div>
 
       <div class="chat-input-bar">
@@ -8932,8 +9112,8 @@ async function handleFileSelected(event) {
 
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px;">
           ${standardFields.map(f => {
-            const matchedCol = Object.keys(preview.suggested_mapping).find(src => preview.suggested_mapping[src] === f.id) || "";
-            return `
+      const matchedCol = Object.keys(preview.suggested_mapping).find(src => preview.suggested_mapping[src] === f.id) || "";
+      return `
               <div class="form-group" style="padding: 10px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
                 <label class="form-label">${f.name}</label>
                 <select class="form-control mapping-select" data-field="${f.id}">
@@ -8944,7 +9124,7 @@ async function handleFileSelected(event) {
                 </select>
               </div>
             `;
-          }).join("")}
+    }).join("")}
         </div>
 
         <div class="card-title" style="font-size: 13px; margin-bottom: 8px;">Source Data Preview (First 5 Rows):</div>
@@ -9026,11 +9206,11 @@ const CHECKLIST_CATEGORIES_LIST = [
 
 function getChecklistStatusBadge(status) {
   const s = status || "Not Started";
-  if (s === "Completed") return `<span class="badge badge-chk-completed">✓ Completed</span>`;
-  if (s === "In Progress") return `<span class="badge badge-chk-in-progress">⟳ In Progress</span>`;
-  if (s === "Requires Review") return `<span class="badge badge-chk-requires-review">⚠ Requires Review</span>`;
-  if (s === "Not Applicable") return `<span class="badge badge-chk-not-applicable">Ø Not Applicable</span>`;
-  return `<span class="badge badge-chk-not-started">○ Not Started</span>`;
+  if (s === "Completed") return `<span class="badge badge-chk-completed">Completed</span>`;
+  if (s === "In Progress") return `<span class="badge badge-chk-in-progress">In Progress</span>`;
+  if (s === "Requires Review") return `<span class="badge badge-chk-requires-review">Requires Review</span>`;
+  if (s === "Not Applicable") return `<span class="badge badge-chk-not-applicable">Not Applicable</span>`;
+  return `<span class="badge badge-chk-not-started">Not Started</span>`;
 }
 
 async function renderChecklist() {
@@ -9039,7 +9219,7 @@ async function renderChecklist() {
 
   container.innerHTML = `
     <div style="padding: 24px; text-align: center; color: var(--text-muted);">
-      <div style="font-size: 24px; margin-bottom: 8px;">📋</div>
+      <div style="margin-bottom: 8px; color: var(--text-muted);"><svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
       Loading Audit Checklist & Substantive Procedures...
     </div>
   `;
@@ -9088,13 +9268,13 @@ async function renderChecklist() {
 
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           <button class="btn btn-secondary" onclick="openGenerateChecklistModal()" title="Tailor procedures for this engagement">
-            ⚡ Regenerate / Tailor
+            ${ICONS.refresh} Tailor Checklist
           </button>
           <button class="btn btn-primary" onclick="openCreateCustomChecklistItemModal()">
-            ➕ Add Custom Procedure
+            ${ICONS.plus} Add Procedure
           </button>
           <a class="btn btn-secondary" href="${FinAuditAPI.getExportChecklistCsvUrl(state.currentEngagementId)}" download="audit_checklist_${state.currentEngagementId}.csv">
-            📥 Export CSV
+            ${ICONS.download} Export CSV
           </a>
         </div>
       </div>
@@ -9102,8 +9282,8 @@ async function renderChecklist() {
       <!-- Professional Standard Skepticism Banner -->
       <div style="background: var(--bg-app); border: 1px solid var(--border); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--text-secondary);">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 16px;">🛡️</span>
-          <span><b>Auditor Professional Skepticism Policy (SA 200/230):</b> AI audit engines automatically flag exceptions and initiate procedures as <i>'Requires Review'</i> or <i>'Not Started'</i>. Items are <b>never automatically marked Completed</b> by AI without verified auditor working paper sign-off.</span>
+          <span class="status-indicator-dot online" style="width: 8px; height: 8px;"></span>
+          <span><b>Auditor Professional Standards Policy (SA 200/230):</b> AI audit engines automatically flag exceptions and initiate procedures as <i>'Requires Review'</i> or <i>'Not Started'</i>. Items are <b>never automatically marked Completed</b> by AI without verified auditor working paper sign-off.</span>
         </div>
         <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">Offline Deterministic Check</span>
       </div>
@@ -9196,7 +9376,7 @@ async function renderChecklist() {
               type="text"
               id="checklist-search-input"
               class="form-control"
-              placeholder="🔍 Search procedures, checklist ID, or assigned staff..."
+              placeholder="Search procedures, checklist ID, or assigned staff..."
               value="${checklistState.searchQuery || ''}"
               onkeydown="if(event.key==='Enter') executeChecklistSearch(this.value)"
             >
@@ -9206,11 +9386,11 @@ async function renderChecklist() {
           <div style="width: 190px;">
             <select class="form-control" onchange="filterChecklistStatus(this.value)">
               <option value="All" ${checklistState.statusFilter === 'All' ? 'selected' : ''}>All Statuses (${totalItems})</option>
-              <option value="Requires Review" ${checklistState.statusFilter === 'Requires Review' ? 'selected' : ''}>⚠ Requires Review (${reqReviewItems})</option>
-              <option value="In Progress" ${checklistState.statusFilter === 'In Progress' ? 'selected' : ''}>⟳ In Progress (${inProgressItems})</option>
-              <option value="Not Started" ${checklistState.statusFilter === 'Not Started' ? 'selected' : ''}>○ Not Started (${notStartedItems})</option>
-              <option value="Completed" ${checklistState.statusFilter === 'Completed' ? 'selected' : ''}>✓ Completed (${completedItems})</option>
-              <option value="Not Applicable" ${checklistState.statusFilter === 'Not Applicable' ? 'selected' : ''}>Ø Not Applicable (${naItems})</option>
+              <option value="Requires Review" ${checklistState.statusFilter === 'Requires Review' ? 'selected' : ''}>Requires Review (${reqReviewItems})</option>
+              <option value="In Progress" ${checklistState.statusFilter === 'In Progress' ? 'selected' : ''}>In Progress (${inProgressItems})</option>
+              <option value="Not Started" ${checklistState.statusFilter === 'Not Started' ? 'selected' : ''}>Not Started (${notStartedItems})</option>
+              <option value="Completed" ${checklistState.statusFilter === 'Completed' ? 'selected' : ''}>Completed (${completedItems})</option>
+              <option value="Not Applicable" ${checklistState.statusFilter === 'Not Applicable' ? 'selected' : ''}>Not Applicable (${naItems})</option>
             </select>
           </div>
 
@@ -9220,7 +9400,7 @@ async function renderChecklist() {
 
           ${(checklistState.activeCategory !== 'All' || checklistState.statusFilter !== 'All' || checklistState.searchQuery) ? `
             <button class="btn btn-sm btn-secondary" onclick="resetChecklistFilters()">
-              ✕ Clear Filters
+              ${ICONS.close} Clear Filters
             </button>
           ` : ''}
         </div>
@@ -9248,7 +9428,7 @@ async function renderChecklist() {
               ${items.length === 0 ? `
                 <tr>
                   <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                    <div style="font-size: 28px; margin-bottom: 8px;">📂</div>
+                    <div style="margin-bottom: 8px; color: var(--text-muted);"><svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg></div>
                     <div style="font-weight: 600; font-size: 14px; color: #1e293b;">No checklist items found</div>
                     <div style="font-size: 12px; margin-top: 4px;">Try clearing filters or click <b>"Regenerate / Tailor"</b> to generate standard procedures.</div>
                   </td>
@@ -9261,7 +9441,7 @@ async function renderChecklist() {
                     ${item.is_custom ? '<span class="badge badge-low" style="font-size: 9px; padding: 1px 4px;">CUSTOM</span>' : ''}
                     ${item.risk_finding_id ? `
                       <span class="badge badge-critical" style="font-size: 9px; padding: 1px 4px; cursor: pointer;" onclick="openLinkedRiskFinding(${item.risk_finding_id})" title="Click to view linked risk finding">
-                        ⚡ RISK #${item.risk_finding_id}
+                        RISK #${item.risk_finding_id}
                       </span>
                     ` : ''}
                   </td>
@@ -9303,14 +9483,14 @@ async function renderChecklist() {
 
                   <!-- Assigned Staff -->
                   <td style="font-size: 12px; color: var(--text-secondary);">
-                    ${item.assigned_staff ? `<span>👤 ${item.assigned_staff}</span>` : '<span style="color: var(--text-muted); font-style: italic;">Unassigned</span>'}
+                    ${item.assigned_staff ? `<span>${item.assigned_staff}</span>` : '<span style="color: var(--text-muted); font-style: italic;">Unassigned</span>'}
                   </td>
 
                   <!-- Evidence -->
                   <td>
                     ${item.evidence ? `
                       <div style="font-size: 11.5px; color: #0369a1; background: #f0f9ff; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--border); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.evidence}">
-                        📎 ${item.evidence}
+                        ${item.evidence}
                       </div>
                     ` : '<span style="color: var(--text-muted); font-size: 11.5px;">None</span>'}
                   </td>
@@ -9319,7 +9499,7 @@ async function renderChecklist() {
                   <td>
                     ${item.comment ? `
                       <div style="font-size: 11.5px; color: var(--text-secondary); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.comment}">
-                        💬 ${item.comment}
+                        ${item.comment}
                       </div>
                     ` : '<span style="color: var(--text-muted); font-size: 11.5px;">—</span>'}
                   </td>
@@ -9343,7 +9523,7 @@ async function renderChecklist() {
                         onclick="openChecklistSignOffModal(${item.id})"
                         title="Inspect, sign off, and edit procedure details"
                       >
-                        ✏️ Review
+                        Review
                       </button>
                       ${item.is_custom ? `
                         <button
@@ -9352,7 +9532,7 @@ async function renderChecklist() {
                           onclick="handleDeleteChecklistItem(${item.id}, '${item.item_code}')"
                           title="Delete custom item"
                         >
-                          🗑️
+                          ${ICONS.trash}
                         </button>
                       ` : ''}
                     </div>
@@ -9428,8 +9608,8 @@ function openCreateCustomChecklistItemModal() {
     <div class="modal-overlay" id="custom-checklist-modal">
       <div class="modal-card" style="max-width: 620px;">
         <div class="modal-header">
-          <div class="modal-title">➕ Add Custom Audit Checklist Procedure</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('custom-checklist-modal')">✕</button>
+          <div class="modal-title">Add Custom Audit Checklist Procedure</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('custom-checklist-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleCreateCustomChecklistSubmit(event)">
@@ -9535,8 +9715,8 @@ function openChecklistSignOffModal(itemId) {
     <div class="modal-overlay" id="checklist-signoff-modal">
       <div class="modal-card" style="max-width: 660px;">
         <div class="modal-header">
-          <div class="modal-title">📋 Review & Sign-Off: ${item.item_code}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('checklist-signoff-modal')">✕</button>
+          <div class="modal-title">Review & Sign-Off: ${item.item_code}</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('checklist-signoff-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 16px;">
@@ -9560,11 +9740,11 @@ function openChecklistSignOffModal(itemId) {
               <div class="form-group">
                 <label class="form-label">Audit Status *</label>
                 <select id="signoff-status" class="form-control" onchange="handleSignOffStatusChange(this.value)" required>
-                  <option value="Not Started" ${item.status === 'Not Started' ? 'selected' : ''}>○ Not Started</option>
-                  <option value="In Progress" ${item.status === 'In Progress' ? 'selected' : ''}>⟳ In Progress</option>
-                  <option value="Requires Review" ${item.status === 'Requires Review' ? 'selected' : ''}>⚠ Requires Review</option>
-                  <option value="Completed" ${item.status === 'Completed' ? 'selected' : ''}>✓ Completed (Signed Off)</option>
-                  <option value="Not Applicable" ${item.status === 'Not Applicable' ? 'selected' : ''}>Ø Not Applicable</option>
+                  <option value="Not Started" ${item.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                  <option value="In Progress" ${item.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                  <option value="Requires Review" ${item.status === 'Requires Review' ? 'selected' : ''}>Requires Review</option>
+                  <option value="Completed" ${item.status === 'Completed' ? 'selected' : ''}>Completed (Signed Off)</option>
+                  <option value="Not Applicable" ${item.status === 'Not Applicable' ? 'selected' : ''}>Not Applicable</option>
                 </select>
               </div>
 
@@ -9598,7 +9778,7 @@ function openChecklistSignOffModal(itemId) {
 
             <!-- Professional Skepticism Reminder -->
             <div style="background: #fffbeb; border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; font-size: 11.5px; color: #92400e; margin-top: 10px;">
-              🔒 <b>SA 230 Working Paper Rule:</b> Only mark 'Completed' after independent substantive testing or verification of management representations.
+              <b>SA 230 Working Paper Rule:</b> Only mark 'Completed' after independent substantive testing or verification of management representations.
             </div>
 
             <div class="modal-footer" style="padding: 10px 0 0 0; margin-top: 14px;">
@@ -9662,8 +9842,8 @@ function openGenerateChecklistModal() {
     <div class="modal-overlay" id="generate-checklist-modal">
       <div class="modal-card" style="max-width: 620px;">
         <div class="modal-header">
-          <div class="modal-title">⚡ Tailor & Generate Audit Checklist</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('generate-checklist-modal')">✕</button>
+          <div class="modal-title">Tailor & Generate Audit Checklist</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('generate-checklist-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
@@ -10014,13 +10194,13 @@ async function renderWorkingPapers() {
                   </td>
                 </tr>
               ` : wps.map(w => {
-                const attachedCount = (w.attached_files || []).length;
-                const fCount = (w.linked_findings || []).length;
-                const tCount = (w.linked_transactions || []).length;
-                const cCount = (w.linked_checklists || []).length;
-                const commentsCount = (w.reviewer_comments || []).length;
+      const attachedCount = (w.attached_files || []).length;
+      const fCount = (w.linked_findings || []).length;
+      const tCount = (w.linked_transactions || []).length;
+      const cCount = (w.linked_checklists || []).length;
+      const commentsCount = (w.reviewer_comments || []).length;
 
-                return `
+      return `
                   <tr style="cursor: pointer;" onclick="openWorkingPaperDrawer(${w.id})">
                     <td>
                       <span class="font-mono font-bold" style="color: #2563eb; background: #eff6ff; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); font-size: 12px;">
@@ -10044,7 +10224,7 @@ async function renderWorkingPapers() {
                             ${attachedCount} Doc${attachedCount > 1 ? 's' : ''}
                           </span>
                         ` : '<span style="color: var(--text-muted); font-size: 11px;">No files</span>'}
-                        ${w.evidence ? `<span title="${escapeHtml(w.evidence)}" style="color: #059669; font-size: 11px; font-weight: 500;">✓ Summary</span>` : ''}
+                        ${w.evidence ? `<span title="${escapeHtml(w.evidence)}" style="color: #059669; font-size: 11px; font-weight: 500;">Summary</span>` : ''}
                       </div>
                     </td>
                     <td>
@@ -10065,7 +10245,7 @@ async function renderWorkingPapers() {
                     </td>
                     <td>
                       ${getWpStatusBadge(w.status)}
-                      ${commentsCount > 0 ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">💬 ${commentsCount} note${commentsCount > 1 ? 's' : ''}</div>` : ''}
+                      ${commentsCount > 0 ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${commentsCount} note${commentsCount > 1 ? 's' : ''}</div>` : ''}
                     </td>
                     <td style="text-align: right;" onclick="event.stopPropagation();">
                       <div style="display: flex; gap: 4px; justify-content: flex-end;">
@@ -10074,17 +10254,17 @@ async function renderWorkingPapers() {
                         </button>
                         ${w.status !== 'Reviewed' ? `
                           <button class="btn btn-success btn-sm" onclick="openReviewWorkingPaperModal(${w.id}, '${escapeHtml(w.wp_reference)}')" title="Mark as Reviewed & Sign Off">
-                            ✓ Review
+                            ${ICONS.check} Review
                           </button>
                         ` : ''}
                         <button class="btn btn-secondary btn-sm" style="color: #ef4444; border-color: #fecaca;" onclick="promptDeleteWorkingPaper(${w.id}, ${w.status === 'Reviewed'}, '${escapeHtml(w.wp_reference)}')" title="Delete Working Paper">
-                          🗑️
+                          ${ICONS.trash}
                         </button>
                       </div>
                     </td>
                   </tr>
                 `;
-              }).join("")}
+    }).join("")}
             </tbody>
           </table>
         </div>
@@ -10146,7 +10326,7 @@ function openCreateWorkingPaperModal() {
       <div class="modal-card" style="max-width: 680px; width: 95vw;">
         <div class="modal-header">
           <div class="modal-title">Create New Audit Working Paper (SA 230)</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('wp-create-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('wp-create-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body" style="max-height: 80vh; overflow-y: auto;">
           <form id="wp-create-form" onsubmit="handleCreateWorkingPaperSubmit(event)">
@@ -10276,7 +10456,7 @@ async function openWorkingPaperDrawer(wpId, defaultTab = "overview") {
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div id="drawer-wp-status-badge"></div>
-            <button class="btn btn-sm btn-secondary" style="border: none; font-size: 16px;" onclick="closeWorkingPaperDrawer()">✕</button>
+            <button class="btn btn-sm btn-secondary" style="border: none; font-size: 16px;" onclick="closeWorkingPaperDrawer()">${ICONS.close}</button>
           </div>
         </div>
 
@@ -10284,22 +10464,22 @@ async function openWorkingPaperDrawer(wpId, defaultTab = "overview") {
         <div style="padding: 12px 24px 0 24px; background: var(--bg-card);">
           <div class="wp-nav-tabs">
             <div class="wp-nav-tab ${currentDrawerTab === 'overview' ? 'active' : ''}" onclick="switchWpDrawerTab('overview')">
-              📋 Overview
+              Overview
             </div>
             <div class="wp-nav-tab ${currentDrawerTab === 'evidence' ? 'active' : ''}" onclick="switchWpDrawerTab('evidence')">
-              📎 Supporting Evidence (<span id="drawer-tab-docs-count">0</span>)
+              Supporting Evidence (<span id="drawer-tab-docs-count">0</span>)
             </div>
             <div class="wp-nav-tab ${currentDrawerTab === 'notes' ? 'active' : ''}" onclick="switchWpDrawerTab('notes')">
-              📝 Working Notes
+              Working Notes
             </div>
             <div class="wp-nav-tab ${currentDrawerTab === 'links' ? 'active' : ''}" onclick="switchWpDrawerTab('links')">
-              🔗 Cross References (<span id="drawer-tab-links-count">0</span>)
+              Cross References (<span id="drawer-tab-links-count">0</span>)
             </div>
             <div class="wp-nav-tab ${currentDrawerTab === 'comments' ? 'active' : ''}" onclick="switchWpDrawerTab('comments')">
-              💬 Review Comments (<span id="drawer-tab-comments-count">0</span>)
+              Review Comments (<span id="drawer-tab-comments-count">0</span>)
             </div>
             <div class="wp-nav-tab ${currentDrawerTab === 'audit_trail' ? 'active' : ''}" onclick="switchWpDrawerTab('audit_trail')">
-              📜 Audit Trail
+              Audit Trail
             </div>
           </div>
         </div>
@@ -10392,7 +10572,7 @@ function populateWorkingPaperDrawer() {
     if (footerActions) {
       footerActions.innerHTML = `
         <button class="btn btn-secondary" style="color: #ef4444;" onclick="promptDeleteWorkingPaper(${wp.id}, ${wp.status === 'Reviewed'}, '${escapeHtml(wp.wp_reference)}')">
-          🗑️ Delete WP
+          ${ICONS.trash} Delete WP
         </button>
         <button class="btn btn-primary" onclick="saveWorkingPaperOverview(${wp.id})">
           Save Changes
@@ -10449,7 +10629,7 @@ function renderWpOverviewTab(wp) {
         <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Transition to:</span>
         <button class="btn btn-secondary btn-sm ${wp.status === 'Prepared' ? 'font-bold' : ''}" onclick="quickChangeWpStatus(${wp.id}, 'Prepared')">Prepared</button>
         <button class="btn btn-secondary btn-sm ${wp.status === 'Under Review' ? 'font-bold' : ''}" onclick="quickChangeWpStatus(${wp.id}, 'Under Review')">Under Review</button>
-        <button class="btn btn-success btn-sm ${wp.status === 'Reviewed' ? 'font-bold' : ''}" onclick="openReviewWorkingPaperModal(${wp.id}, '${escapeHtml(wp.wp_reference)}')">✓ Mark Reviewed</button>
+        <button class="btn btn-success btn-sm ${wp.status === 'Reviewed' ? 'font-bold' : ''}" onclick="openReviewWorkingPaperModal(${wp.id}, '${escapeHtml(wp.wp_reference)}')">${ICONS.check} Mark Reviewed</button>
         <button class="btn btn-danger btn-sm ${wp.status === 'Needs Correction' ? 'font-bold' : ''}" onclick="quickChangeWpStatus(${wp.id}, 'Needs Correction')">Needs Correction</button>
       </div>
     </div>
@@ -10589,7 +10769,7 @@ function renderWpEvidenceTab(wp) {
               Download
             </a>
             <button class="btn btn-secondary btn-sm" style="color: #ef4444; border-color: #fecaca;" onclick="handleDeleteWpDoc(${wp.id}, '${escapeHtml(file.id || file.file_name)}')" title="Delete attached file">
-              ✕
+              ${ICONS.close}
             </button>
           </div>
         </div>
@@ -10599,13 +10779,13 @@ function renderWpEvidenceTab(wp) {
 }
 
 function getFileTypeIcon(filename) {
-  if (!filename) return "📄";
+  if (!filename) return ICONS.fileText;
   const ext = filename.split(".").pop().toLowerCase();
-  if (["pdf"].includes(ext)) return "📕";
-  if (["xlsx", "xls", "csv"].includes(ext)) return "📊";
-  if (["doc", "docx", "txt"].includes(ext)) return "📝";
-  if (["png", "jpg", "jpeg", "webp"].includes(ext)) return "🖼️";
-  return "📁";
+  if (["pdf"].includes(ext)) return ICONS.fileText;
+  if (["xlsx", "xls", "csv"].includes(ext)) return ICONS.chartBar;
+  if (["doc", "docx", "txt"].includes(ext)) return ICONS.clipboard;
+  if (["png", "jpg", "jpeg", "webp"].includes(ext)) return ICONS.fileText;
+  return ICONS.folder;
 }
 
 function triggerWpDocUpload() {
@@ -10738,7 +10918,7 @@ function renderWpLinksTab(wp) {
             </div>
           </div>
           <button class="btn btn-secondary btn-sm" style="color: #ef4444; border: none; padding: 2px 6px;" onclick="unlinkWpEntity(${wp.id}, 'finding', ${f.id})" title="Unlink Finding">
-            ✕
+            ${ICONS.close}
           </button>
         </div>
       `).join("")}
@@ -10752,7 +10932,7 @@ function renderWpLinksTab(wp) {
           <span class="badge badge-open" style="font-size: 10.5px;">${txns.length}</span>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openLinkEntityModal(${wp.id}, 'transaction')">
-          + Link Transaction
+          ${ICONS.plus} Link Transaction
         </button>
       </div>
 
@@ -10774,7 +10954,7 @@ function renderWpLinksTab(wp) {
             ${t.description ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">${escapeHtml(t.description)} ${t.party_name ? '• ' + escapeHtml(t.party_name) : ''}</div>` : ''}
           </div>
           <button class="btn btn-secondary btn-sm" style="color: #ef4444; border: none; padding: 2px 6px;" onclick="unlinkWpEntity(${wp.id}, 'transaction', ${t.id})" title="Unlink Transaction">
-            ✕
+            ${ICONS.close}
           </button>
         </div>
       `).join("")}
@@ -10788,7 +10968,7 @@ function renderWpLinksTab(wp) {
           <span class="badge badge-low" style="font-size: 10.5px;">${chks.length}</span>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="openLinkEntityModal(${wp.id}, 'checklist')">
-          + Link Checklist Item
+          ${ICONS.plus} Link Checklist Item
         </button>
       </div>
 
@@ -10807,7 +10987,7 @@ function renderWpLinksTab(wp) {
             <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-top: 4px;">${escapeHtml(c.question)}</div>
           </div>
           <button class="btn btn-secondary btn-sm" style="color: #ef4444; border: none; padding: 2px 6px;" onclick="unlinkWpEntity(${wp.id}, 'checklist', ${c.id})" title="Unlink Checklist Item">
-            ✕
+            ${ICONS.close}
           </button>
         </div>
       `).join("")}
@@ -10843,7 +11023,7 @@ async function openLinkEntityModal(wpId, entityType) {
       <div class="modal-card" style="max-width: 650px; width: 95vw;">
         <div class="modal-header">
           <div class="modal-title">Link ${entityType.toUpperCase()} to WP</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('${modalId}')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('${modalId}')">${ICONS.close}</button>
         </div>
         <div class="modal-body" style="padding: 30px; text-align: center; color: var(--text-muted);">
           <div class="spinner" style="display:inline-block; margin-bottom: 8px;"></div>
@@ -10877,7 +11057,7 @@ async function openLinkEntityModal(wpId, entityType) {
       <div class="modal-card" style="max-width: 680px; width: 95vw;">
         <div class="modal-header">
           <div class="modal-title">${title}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('${modalId}')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('${modalId}')">${ICONS.close}</button>
         </div>
         <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
           <div style="margin-bottom: 12px;">
@@ -10888,8 +11068,8 @@ async function openLinkEntityModal(wpId, entityType) {
             ${items.length === 0 ? `
               <div style="padding: 24px; text-align: center; color: var(--text-muted);">No available records to link.</div>
             ` : items.map(item => {
-              if (entityType === "finding") {
-                return `
+      if (entityType === "finding") {
+        return `
                   <div class="wp-attachment-card link-item-row" data-search="${escapeHtml((item.finding_code + ' ' + item.title + ' ' + item.category).toLowerCase())}">
                     <div>
                       <div style="display: flex; align-items: center; gap: 6px;">
@@ -10902,9 +11082,9 @@ async function openLinkEntityModal(wpId, entityType) {
                     <button class="btn btn-primary btn-sm" onclick="executeLinkItem(${wpId}, 'finding', ${item.id})">+ Link</button>
                   </div>
                 `;
-              } else if (entityType === "transaction") {
-                return `
-                  <div class="wp-attachment-card link-item-row" data-search="${escapeHtml((item.voucher_no + ' ' + item.ledger + ' ' + (item.description||'')).toLowerCase())}">
+      } else if (entityType === "transaction") {
+        return `
+                  <div class="wp-attachment-card link-item-row" data-search="${escapeHtml((item.voucher_no + ' ' + item.ledger + ' ' + (item.description || '')).toLowerCase())}">
                     <div>
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <span class="font-mono" style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(item.date || '')}</span>
@@ -10917,8 +11097,8 @@ async function openLinkEntityModal(wpId, entityType) {
                     <button class="btn btn-primary btn-sm" onclick="executeLinkItem(${wpId}, 'transaction', ${item.id})">+ Link</button>
                   </div>
                 `;
-              } else if (entityType === "checklist") {
-                return `
+      } else if (entityType === "checklist") {
+        return `
                   <div class="wp-attachment-card link-item-row" data-search="${escapeHtml((item.item_code + ' ' + item.category + ' ' + item.question).toLowerCase())}">
                     <div>
                       <div style="display: flex; align-items: center; gap: 6px;">
@@ -10931,8 +11111,8 @@ async function openLinkEntityModal(wpId, entityType) {
                     <button class="btn btn-primary btn-sm" onclick="executeLinkItem(${wpId}, 'checklist', ${item.id})">+ Link</button>
                   </div>
                 `;
-              }
-            }).join("")}
+      }
+    }).join("")}
           </div>
         </div>
       </div>
@@ -11096,12 +11276,12 @@ function openReviewWorkingPaperModal(wpId, wpRef) {
       <div class="modal-card" style="max-width: 520px; width: 95vw;">
         <div class="modal-header">
           <div class="modal-title">Sign Off & Mark Reviewed: ${escapeHtml(wpRef)}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('wp-review-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('wp-review-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form id="wp-review-form" onsubmit="handleConfirmWpReview(event, ${wpId})">
             <div style="background: #ecfdf5; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; color: #047857;">
-              ✓ You are approving this working paper as compliant with ICAI SA 230 standard on audit documentation.
+              You are approving this working paper as compliant with ICAI SA 230 standard on audit documentation.
             </div>
 
             <div class="form-group">
@@ -11169,13 +11349,13 @@ function promptDeleteWorkingPaper(wpId, isReviewed, wpRef) {
       <div class="modal-card" style="max-width: 520px; width: 95vw;">
         <div class="modal-header">
           <div class="modal-title" style="color: #dc2626;">Delete Working Paper: ${escapeHtml(wpRef)}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('wp-delete-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('wp-delete-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form id="wp-delete-form" onsubmit="handleExecuteWpDelete(event, ${wpId}, ${isReviewed})">
             ${isReviewed ? `
               <div style="background: #fef2f2; border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 14px; font-size: 12px; color: #991b1b;">
-                <strong>⚠️ Mandatory Audit Compliance Rule (SA 230):</strong><br/>
+                <strong>Mandatory Audit Compliance Rule (SA 230):</strong><br/>
                 This is a <strong>REVIEWED</strong> working paper. In accordance with audit standards, reviewed working papers cannot be deleted without a recorded justification. This deletion will be permanently logged in the audit trail.
               </div>
               <div class="form-group">
@@ -11246,7 +11426,7 @@ const ALL_REPORT_TYPES = [
     category: "Master Report",
     badge: "17 Sections",
     badgeClass: "badge-role-admin",
-    icon: "📑",
+    icon: ICONS.fileText,
     primary: true
   },
   {
@@ -11256,7 +11436,7 @@ const ALL_REPORT_TYPES = [
     category: "Executive",
     badge: "Overview",
     badgeClass: "badge-role-auditor",
-    icon: "📊"
+    icon: ICONS.chartBar
   },
   {
     id: "data_import",
@@ -11265,7 +11445,7 @@ const ALL_REPORT_TYPES = [
     category: "Data & Ingestion",
     badge: "Data Scope",
     badgeClass: "badge-role-staff",
-    icon: "📥"
+    icon: ICONS.download
   },
   {
     id: "trial_balance",
@@ -11274,7 +11454,7 @@ const ALL_REPORT_TYPES = [
     category: "Accounting",
     badge: "Ledger Health",
     badgeClass: "badge-low",
-    icon: "⚖️"
+    icon: ICONS.scale
   },
   {
     id: "bank_reconciliation",
@@ -11283,7 +11463,7 @@ const ALL_REPORT_TYPES = [
     category: "Reconciliation",
     badge: "Bank BRS",
     badgeClass: "badge-open",
-    icon: "🏦"
+    icon: ICONS.scale
   },
   {
     id: "gst_reconciliation",
@@ -11292,16 +11472,16 @@ const ALL_REPORT_TYPES = [
     category: "Taxation",
     badge: "GST ITC",
     badgeClass: "badge-high",
-    icon: "🧾"
+    icon: ICONS.fileText
   },
   {
     id: "anomaly_report",
     title: "6. Anomaly Report",
     description: "Deterministic rules, Benford's Law first-digit distribution, statistical 3.0σ outliers, and machine learning Isolation Forest anomaly scores.",
-    category: "AI & Analytics",
+    category: "Audit Analytics",
     badge: "ML / Outliers",
     badgeClass: "badge-role-admin",
-    icon: "🧠"
+    icon: ICONS.alertTriangle
   },
   {
     id: "yoy_comparison",
@@ -11310,7 +11490,7 @@ const ALL_REPORT_TYPES = [
     category: "Financial Analysis",
     badge: "Comparative",
     badgeClass: "badge-medium",
-    icon: "📈"
+    icon: ICONS.chartBar
   },
   {
     id: "risk_findings",
@@ -11319,7 +11499,7 @@ const ALL_REPORT_TYPES = [
     category: "Audit Exceptions",
     badge: "Risk Register",
     badgeClass: "badge-critical",
-    icon: "⚠️"
+    icon: ICONS.alertTriangle
   },
   {
     id: "audit_checklist",
@@ -11328,7 +11508,7 @@ const ALL_REPORT_TYPES = [
     category: "Compliance",
     badge: "Checklist",
     badgeClass: "badge-resolved",
-    icon: "✅"
+    icon: ICONS.check
   }
 ];
 
@@ -11366,13 +11546,13 @@ async function renderReports() {
         </div>
         <button class="btn btn-primary" onclick="triggerGeneratePDFReport('complete_audit_analysis')" style="padding: 8px 16px;">
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          ⚡ Generate Complete Master Analysis (PDF)
+          ${ICONS.download} Generate Master Report (PDF)
         </button>
       </div>
 
       <!-- Statutory Quality Control Notice Banner -->
       <div style="background: var(--bg-app); border: 1px solid var(--border); border-left: 4px solid #2563eb; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 24px; font-size: 12px; color: var(--text-secondary); line-height: 1.45;">
-        <strong style="color: var(--text-main);">⚖️ ICAI Quality Control & SA 230 Compliance Note:</strong><br/>
+        <strong style="color: var(--text-main);">ICAI Quality Control & SA 230 Compliance Note:</strong><br/>
         All generated PDF reports provide an <em>AI-assisted audit analysis report</em> with fully traceable <strong>Finding IDs</strong>. In accordance with professional standards (SA 200/SA 700), reports include formal review sign-off blocks and do not replace the final independent professional audit opinion rendered by the Practicing Chartered Accountant.
       </div>
 
@@ -11389,7 +11569,7 @@ async function renderReports() {
               <div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 20px;">${rt.icon}</span>
+                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: #f1f5f9; border-radius: 6px; color: var(--text-main);">${rt.icon}</span>
                     <span class="badge ${rt.badgeClass}">${escapeHtml(rt.badge)}</span>
                   </div>
                   <span style="font-size: 10.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(rt.category)}</span>
@@ -11540,7 +11720,7 @@ async function renderAuditTrail() {
             ${logs.length === 0 ? `
               <tr>
                 <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                  <div style="font-size: 36px; margin-bottom: 8px;">🛡️</div>
+                  <div style="margin-bottom: 8px; color: var(--text-muted);"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg></div>
                   <div style="font-weight: 600; color: var(--text-secondary);">No audit activity yet</div>
                   <div style="font-size: 12px; margin-top: 4px;">System and user actions will be cryptographically chained and recorded here in compliance with MCA Rule 11(g).</div>
                 </td>
@@ -11591,7 +11771,7 @@ async function renderClients() {
       <!-- Filter / Search Bar -->
       <div class="card" style="padding: 14px 18px; margin-bottom: 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 240px;">
-          <input type="text" id="client-search-input" class="form-control" placeholder="🔍 Search by Client Name, PAN, GSTIN, Contact Person, Industry..." onkeyup="filterClientsLive()">
+          <input type="text" id="client-search-input" class="form-control" placeholder="Search by Client Name, PAN, GSTIN, Contact Person, Industry..." onkeyup="filterClientsLive()">
         </div>
         <div style="width: 200px;">
           <select id="client-entity-filter" class="form-control" onchange="filterClientsLive()">
@@ -11652,7 +11832,7 @@ async function renderClients() {
                   <td class="text-center">
                     <div style="display: flex; gap: 6px; justify-content: center;">
                       <button class="btn btn-sm btn-secondary" onclick="openClientHistoryDrawer(${c.id})">
-                        📅 Multi-Year Timeline
+                        ${ICONS.calendar} Multi-Year Timeline
                       </button>
                       ${canCreate ? `
                         <button class="btn btn-sm btn-secondary" onclick="openEditClientModal(${c.id})">
@@ -11691,7 +11871,7 @@ function openCreateClientModal() {
       <div class="modal-card" style="width: 560px;">
         <div class="modal-header">
           <div class="modal-title">Create New Client Master Profile</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('client-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('client-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleCreateClientSubmit(event)">
@@ -11805,7 +11985,7 @@ async function openEditClientModal(clientId) {
       <div class="modal-card" style="width: 560px;">
         <div class="modal-header">
           <div class="modal-title">Edit Client Master: ${client.name}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('edit-client-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('edit-client-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleEditClientSubmit(event, ${clientId})">
@@ -11925,7 +12105,7 @@ async function openClientHistoryDrawer(clientId) {
     </div>
 
     <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 10px;">
-      📅 Multi-Year Audit Engagement History (${history.length}):
+      Multi-Year Audit Engagement History (${history.length}):
     </div>
 
     ${history.length === 0 ? `
@@ -11951,10 +12131,10 @@ async function openClientHistoryDrawer(clientId) {
             </div>
             <div style="margin-top: 10px; display: flex; gap: 8px;">
               <button class="btn btn-sm btn-primary" onclick="selectEngagementAndGo(${h.id})">
-                🚀 Open Engagement Context
+                ${ICONS.externalLink} Open Engagement
               </button>
               <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${h.id})">
-                📑 Clone to New FY
+                ${ICONS.clipboard} Clone to New FY
               </button>
             </div>
           </div>
@@ -11997,7 +12177,7 @@ async function renderEngagements() {
       <!-- Filter Controls -->
       <div class="card" style="padding: 14px 18px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 200px;">
-          <input type="text" id="eng-search-input" class="form-control" placeholder="🔍 Search Engagement Title, Client, FY..." onkeyup="filterEngagementsLive()">
+          <input type="text" id="eng-search-input" class="form-control" placeholder="Search Engagement Title, Client, FY..." onkeyup="filterEngagementsLive()">
         </div>
         <div style="width: 160px;">
           <select id="eng-type-filter" class="form-control" onchange="filterEngagementsLive()">
@@ -12027,7 +12207,7 @@ async function renderEngagements() {
         </div>
         ${engagements.length === 0 ? `
           <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 44px; margin-bottom: 10px;">📁</div>
+            <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg></div>
             <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No engagements yet</div>
             <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
               Create an audit engagement for your registered client to establish the audit mandate, financial year, and materiality benchmark.
@@ -12086,7 +12266,7 @@ async function renderEngagements() {
                         ${e.id === state.currentEngagementId ? 'Viewing' : 'Switch Context'}
                       </button>
                       <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${e.id})">
-                        📑 Clone FY
+                        ${ICONS.clipboard} Clone FY
                       </button>
                       ${canCreate ? `
                         <button class="btn btn-sm btn-secondary" onclick="openEditEngagementModal(${e.id})">
@@ -12152,7 +12332,7 @@ async function openCreateEngagementModal() {
       <div class="modal-card" style="width: 560px;">
         <div class="modal-header">
           <div class="modal-title">Create New Audit Engagement</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('eng-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('eng-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleCreateEngagementSubmit(event)">
@@ -12266,7 +12446,7 @@ async function openEditEngagementModal(engagementId) {
       <div class="modal-card" style="width: 560px;">
         <div class="modal-header">
           <div class="modal-title">Edit Engagement: ${eng.title}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('edit-eng-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('edit-eng-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleEditEngagementSubmit(event, ${engagementId})">
@@ -12377,7 +12557,7 @@ async function openDuplicateEngagementModal(sourceEngagementId) {
       <div class="modal-card" style="width: 500px;">
         <div class="modal-header">
           <div class="modal-title">Duplicate Audit Structure for New FY</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('duplicate-eng-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('duplicate-eng-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <div style="padding: 10px; background: #eff6ff; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; margin-bottom: 14px; color: #1e3a8a;">
@@ -12472,7 +12652,7 @@ async function renderSettings() {
         ${isAdmin ? `
           <div style="margin-top: 16px; display: flex; gap: 10px;">
             <button class="btn btn-primary" onclick="triggerBackup()">
-              💾 Create Full SQLite Backup
+              ${ICONS.download} Create Full Backup
             </button>
           </div>
         ` : ''}
@@ -12500,7 +12680,7 @@ async function renderSettings() {
             <tr><td><b>Last Login Recorded:</b></td><td class="font-mono">${state.currentUser?.last_login ? state.currentUser.last_login.replace('T', ' ').split('.')[0] : '—'}</td></tr>
           </table>
           <button class="btn btn-secondary" style="width: 100%;" onclick="openChangePasswordModal()">
-            🔒 Change My Account Password
+            ${ICONS.lock} Change Password
           </button>
         </div>
       </div>
@@ -12553,14 +12733,14 @@ async function openEvidenceDrawer(findingId) {
     </div>
 
     <div style="margin-bottom: 16px;">
-      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">💡 Local AI Audit Commentary & Analysis:</div>
+      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">Audit Commentary & Analysis:</div>
       <div style="font-size: 12px; color: var(--text-secondary); padding: 10px; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid var(--border); line-height: 1.5;">
         ${finding.ai_explanation || 'Detailed review required.'}
       </div>
     </div>
 
     <div style="margin-bottom: 16px;">
-      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">📋 Recommended Auditor Action:</div>
+      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">Recommended Auditor Action:</div>
       <div style="font-size: 12px; color: #065f46; padding: 10px; background: #ecfdf5; border-radius: var(--radius-md); border: 1px solid var(--border); line-height: 1.5;">
         ${finding.recommended_action || 'Inspect supporting invoice.'}
       </div>
@@ -12648,7 +12828,7 @@ async function renderFinancialStatements() {
   container.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: center; height: 300px; color: var(--text-muted);">
       <div style="text-align: center;">
-        <div style="font-size: 28px; margin-bottom: 8px;">⏳</div>
+        <div style="display: flex; justify-content: center; margin-bottom: 12px; color: var(--primary);"><span class="svg-icon" style="animation: spin 1s linear infinite;">${ICONS.refresh}</span></div>
         <div>Generating Schedule III Financial Statements & Computing Analytical Ratios...</div>
       </div>
     </div>
@@ -12661,7 +12841,7 @@ async function renderFinancialStatements() {
   } catch (err) {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
-        <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
+        <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg></div>
         <h3>Financial Statement Analysis Error</h3>
         <p style="margin-top: 6px; color: var(--text-muted);">${err.message || "Failed to load financial statement data."}</p>
         <button class="btn btn-secondary" style="margin-top: 14px;" onclick="renderFinancialStatements()">Retry Analysis</button>
@@ -12708,7 +12888,7 @@ function renderFSContent(data) {
     <!-- Executive Management & Audit Commentary Banner -->
     <div class="card" style="margin-bottom: 20px; border-left: 4px solid var(--primary); background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);">
       <div style="display: flex; align-items: flex-start; gap: 14px;">
-        <div style="font-size: 24px; line-height: 1;">📋</div>
+        <div style="color: var(--text-muted);"><svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
         <div style="flex: 1;">
           <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 4px;">
             Executive Audit & Management Analysis Summary (FY ${cyYear} vs FY ${pyYear})
@@ -12730,19 +12910,19 @@ function renderFSContent(data) {
     <!-- Sub Navigation Tabs -->
     <div class="tab-pills" style="margin-bottom: 18px;">
       <div class="tab-pill ${currentFSTab === 'ratios' ? 'active' : ''}" onclick="switchFSTab('ratios')">
-        📊 Statutory & Financial Ratios
+        Statutory & Financial Ratios
       </div>
       <div class="tab-pill ${currentFSTab === 'balance_sheet' ? 'active' : ''}" onclick="switchFSTab('balance_sheet')">
-        📑 Balance Sheet (Schedule III)
+        Balance Sheet (Schedule III)
       </div>
       <div class="tab-pill ${currentFSTab === 'pnl' ? 'active' : ''}" onclick="switchFSTab('pnl')">
-        📈 Profit & Loss Statement
+        Profit & Loss Statement
       </div>
       <div class="tab-pill ${currentFSTab === 'cash_flow' ? 'active' : ''}" onclick="switchFSTab('cash_flow')">
-        💸 Cash Flow Statement
+        Cash Flow Statement
       </div>
       <div class="tab-pill ${currentFSTab === 'significant_movements' ? 'active' : ''}" onclick="switchFSTab('significant_movements')">
-        🔍 Significant Movements (${sigCount})
+        Significant Movements (${sigCount})
       </div>
     </div>
 
@@ -12831,7 +13011,7 @@ function renderRatiosDashboardHtml(data, cyYear, pyYear) {
   return `
     <div style="margin-bottom: 24px;">
       <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <span>💧</span> Liquidity & Solvency Ratios
+        Liquidity & Solvency Ratios
       </h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
         ${ratioCard("Current Ratio", "Liquidity", cy.current_ratio, py.current_ratio, "x", "≥ 1.33x")}
@@ -12843,7 +13023,7 @@ function renderRatiosDashboardHtml(data, cyYear, pyYear) {
 
     <div style="margin-bottom: 24px;">
       <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <span>📈</span> Profitability & Operating Margins
+        Profitability & Operating Margins
       </h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
         ${ratioCard("Gross Profit Margin", "Profitability", cy.gross_profit_margin_pct, py.gross_profit_margin_pct, "%")}
@@ -12855,7 +13035,7 @@ function renderRatiosDashboardHtml(data, cyYear, pyYear) {
 
     <div style="margin-bottom: 24px;">
       <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <span>⚙️</span> Turnover Ratios & Working Capital Days
+        Turnover Ratios & Working Capital Days
       </h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
         ${ratioCard("Debtors / Receivable Turnover", "Activity", cy.receivable_turnover, py.receivable_turnover, "x")}
@@ -12895,7 +13075,7 @@ function renderBalanceSheetHtml(data, cyYear, pyYear) {
         <td class="font-mono text-right" style="font-weight: 600;">${formatINR(cyVal || 0)}</td>
         <td class="font-mono text-right" style="color: ${diff >= 0 ? '#0f172a' : '#dc2626'};">${diff >= 0 ? '+' : ''}${formatINR(diff)}</td>
         <td class="font-mono text-right" style="color: ${pctColor};">
-          ${isSig ? '⚠️ ' : ''}${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%
+          ${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%
         </td>
       </tr>
     `;
@@ -12983,7 +13163,7 @@ function renderPnLHtml(data, cyYear, pyYear) {
         <td class="font-mono text-right" style="font-weight: 600;">${formatINR(cyVal || 0)}</td>
         <td class="font-mono text-right" style="color: ${diff >= 0 ? '#0f172a' : '#dc2626'};">${diff >= 0 ? '+' : ''}${formatINR(diff)}</td>
         <td class="font-mono text-right" style="color: ${pctColor};">
-          ${isSig ? '⚠️ ' : ''}${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%
+          ${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%
         </td>
       </tr>
     `;
@@ -13139,17 +13319,17 @@ function renderSignificantMovementsHtml(data, cyYear, pyYear) {
           </thead>
           <tbody>
             ${comparisons.map((c, idx) => {
-              const isSig = c.is_significant;
-              const hasExpl = !!c.auditor_explanation;
-              const badgeClass = c.audit_verdict === "Significant movement" ? "badge-critical" :
-                                 (c.audit_verdict === "Unusual change" ? "badge-high" :
-                                 (c.audit_verdict === "Normal variance" ? "badge-low" : "badge-medium"));
+    const isSig = c.is_significant;
+    const hasExpl = !!c.auditor_explanation;
+    const badgeClass = c.audit_verdict === "Significant movement" ? "badge-critical" :
+      (c.audit_verdict === "Unusual change" ? "badge-high" :
+        (c.audit_verdict === "Normal variance" ? "badge-low" : "badge-medium"));
 
-              const isMoney = c.unit === "INR";
-              const isPct = c.unit === "%";
-              const fmt = (v) => isMoney ? formatINR(v) : (isPct ? `${(v || 0).toFixed(2)}%` : `${(v || 0).toFixed(2)}x`);
+    const isMoney = c.unit === "INR";
+    const isPct = c.unit === "%";
+    const fmt = (v) => isMoney ? formatINR(v) : (isPct ? `${(v || 0).toFixed(2)}%` : `${(v || 0).toFixed(2)}x`);
 
-              return `
+    return `
                 <tr style="${isSig ? 'background: #fffdfa;' : ''}">
                   <td>
                     <div style="font-weight: 700; color: var(--text-main);">${c.metric_name}</div>
@@ -13171,13 +13351,13 @@ function renderSignificantMovementsHtml(data, cyYear, pyYear) {
                     <button class="btn btn-sm ${hasExpl ? 'btn-secondary' : (isSig ? 'btn-primary' : 'btn-secondary')}" 
                             style="font-size: 11px; padding: 4px 8px;"
                             onclick="openFSExplanationModal('${c.item_key}', '${c.metric_name.replace(/'/g, "\\'")}', ${c.current_year_value}, ${c.previous_year_value}, ${c.absolute_difference}, ${c.percentage_difference}, '${c.unit}')">
-                      ${hasExpl ? '✏️ Edit Note' : (isSig ? '📝 Enter Explanation' : '➕ Add Note')}
+                      ${hasExpl ? 'Edit Note' : (isSig ? 'Enter Explanation' : 'Add Note')}
                     </button>
-                    ${hasExpl ? `<div style="font-size: 10px; color: #059669; font-weight: 600; margin-top: 2px;">✓ Documented</div>` : ''}
+                    ${hasExpl ? `<div style="font-size: 10px; color: #059669; font-weight: 600; margin-top: 2px;">Documented</div>` : ''}
                   </td>
                 </tr>
               `;
-            }).join("")}
+  }).join("")}
           </tbody>
         </table>
       </div>
@@ -13212,7 +13392,7 @@ function openFSExplanationModal(itemKey, metricName, cyVal, pyVal, absDiff, pctD
               SA 520 Analytical Review Documentation
             </div>
           </div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('fs-explanation-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('fs-explanation-modal')">${ICONS.close}</button>
         </div>
 
         <div class="modal-body">
@@ -13322,7 +13502,7 @@ async function renderDuplicateAndMissing() {
   container.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: center; height: 300px; color: var(--text-muted);">
       <div style="text-align: center;">
-        <div style="font-size: 28px; margin-bottom: 8px;">🔍</div>
+        <div style="margin-bottom: 8px; color: var(--text-muted);"><svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div>
         <div>Scanning ledgers for exact & fuzzy duplicates and missing sequence gaps...</div>
       </div>
     </div>
@@ -13335,7 +13515,7 @@ async function renderDuplicateAndMissing() {
   } catch (err) {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
-        <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
+        <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg></div>
         <h3>Duplicate & Sequence Gap Detection Error</h3>
         <p style="margin-top: 6px; color: var(--text-muted);">${err.message || "Failed to scan transactions."}</p>
         <button class="btn btn-secondary" style="margin-top: 14px;" onclick="renderDuplicateAndMissing()">Retry Analysis</button>
@@ -13416,10 +13596,10 @@ function renderDupContent(data) {
     <!-- Sub Navigation Tabs -->
     <div class="tab-pills" style="margin-bottom: 18px;">
       <div class="tab-pill ${currentDupTab === 'duplicates' ? 'active' : ''}" onclick="switchDupTab('duplicates')">
-        👥 Duplicate Groups Workbench (${summary.total_duplicate_groups || 0})
+        Duplicate Groups Workbench (${summary.total_duplicate_groups || 0})
       </div>
       <div class="tab-pill ${currentDupTab === 'sequence_gaps' ? 'active' : ''}" onclick="switchDupTab('sequence_gaps')">
-        🔢 Missing Sequence Gaps (${summary.total_sequence_gaps || 0})
+        Missing Sequence Gaps (${summary.total_sequence_gaps || 0})
       </div>
     </div>
 
@@ -13478,16 +13658,16 @@ function renderDuplicateGroupsHtml(data) {
           All Groups (${groups.length})
         </button>
         <button class="btn btn-sm ${dupStatusFilter === 'Unreviewed' ? 'btn-primary' : 'btn-secondary'}" onclick="setDupStatusFilter('Unreviewed')">
-          ⏳ Unreviewed (${groups.filter(g => g.status === 'Unreviewed').length})
+          Unreviewed (${groups.filter(g => g.status === 'Unreviewed').length})
         </button>
         <button class="btn btn-sm ${dupStatusFilter === 'Confirmed Duplicate' ? 'btn-primary' : 'btn-secondary'}" onclick="setDupStatusFilter('Confirmed Duplicate')">
-          🚩 Confirmed Duplicate (${groups.filter(g => g.status === 'Confirmed Duplicate').length})
+          Confirmed Duplicate (${groups.filter(g => g.status === 'Confirmed Duplicate').length})
         </button>
         <button class="btn btn-sm ${dupStatusFilter === 'Marked Valid' ? 'btn-primary' : 'btn-secondary'}" onclick="setDupStatusFilter('Marked Valid')">
-          ✅ Marked Valid (${groups.filter(g => g.status === 'Marked Valid').length})
+          Marked Valid (${groups.filter(g => g.status === 'Marked Valid').length})
         </button>
         <button class="btn btn-sm ${dupStatusFilter === 'Ignored' ? 'btn-primary' : 'btn-secondary'}" onclick="setDupStatusFilter('Ignored')">
-          👁️ Ignored (${groups.filter(g => g.status === 'Ignored').length})
+          Ignored (${groups.filter(g => g.status === 'Ignored').length})
         </button>
       </div>
 
@@ -13498,7 +13678,7 @@ function renderDuplicateGroupsHtml(data) {
 
     ${filteredGroups.length === 0 ? `
       <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
-        <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+        <div style="margin-bottom: 8px; color: #10b981;"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path></svg></div>
         <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No Duplicate Groups Found</div>
         <p style="margin-top: 4px; font-size: 12px;">No transaction pairs matched the selected filter criteria.</p>
       </div>
@@ -13514,10 +13694,10 @@ function renderSingleDuplicateGroupCard(g) {
   const txA = g.transactions[0] || {};
   const txB = g.transactions[1] || {};
 
-  const statusBadge = g.status === "Confirmed Duplicate" ? '<span class="badge badge-critical">🚩 Confirmed Duplicate</span>' :
-                      (g.status === "Marked Valid" ? '<span class="badge badge-low">✅ Marked Valid</span>' :
-                      (g.status === "Ignored" ? '<span class="badge badge-medium">👁️ Ignored</span>' :
-                      '<span class="badge badge-high">⏳ Unreviewed</span>'));
+  const statusBadge = g.status === "Confirmed Duplicate" ? '<span class="badge badge-critical">Confirmed Duplicate</span>' :
+    (g.status === "Marked Valid" ? '<span class="badge badge-low">Marked Valid</span>' :
+      (g.status === "Ignored" ? '<span class="badge badge-medium">Ignored</span>' :
+        '<span class="badge badge-high">Unreviewed</span>'));
 
   const simColor = g.similarity_pct >= 95 ? '#dc2626' : (g.similarity_pct >= 85 ? '#ea580c' : '#d97706');
 
@@ -13531,7 +13711,7 @@ function renderSingleDuplicateGroupCard(g) {
           </span>
           <span class="badge badge-role-auditor" style="font-size: 11px;">${g.group_type}</span>
           <span style="font-weight: 700; font-size: 12px; color: ${simColor}; background: #fff7ed; padding: 2px 8px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-            ⚡ ${g.similarity_pct}% Similarity
+            ${g.similarity_pct}% Similarity
           </span>
           ${statusBadge}
         </div>
@@ -13622,16 +13802,16 @@ function renderSingleDuplicateGroupCard(g) {
 
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-sm btn-secondary" onclick="openDuplicateCommentModal('${g.group_code}', '${g.status}', '${(g.auditor_comment || '').replace(/'/g, "\\'")}')">
-            💬 ${g.auditor_comment ? 'Edit Note' : 'Add Note'}
+            ${g.auditor_comment ? 'Edit Note' : 'Add Note'}
           </button>
           <button class="btn btn-sm btn-secondary" onclick="actionDuplicateGroup('${g.group_code}', 'Ignored')">
-            👁️ Ignore
+            Ignore
           </button>
           <button class="btn btn-sm btn-secondary" onclick="actionDuplicateGroup('${g.group_code}', 'Marked Valid')">
-            ✅ Mark Valid
+            Mark Valid
           </button>
           <button class="btn btn-sm btn-primary" onclick="actionDuplicateGroup('${g.group_code}', 'Confirmed Duplicate')">
-            🚩 Confirm Duplicate
+            Confirm Duplicate
           </button>
         </div>
       </div>
@@ -13665,17 +13845,17 @@ function openDuplicateCommentModal(groupCode, currentStatus, currentComment) {
       <div class="modal-card" style="max-width: 540px;">
         <div class="modal-header">
           <div class="modal-title">Auditor Review Note: Group #${groupCode}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('dup-comment-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('dup-comment-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleDuplicateCommentSubmit(event, '${groupCode}')">
             <div class="form-group">
               <label class="form-label">Review Status</label>
               <select class="form-control" id="dup-modal-status">
-                <option value="Confirmed Duplicate" ${currentStatus === 'Confirmed Duplicate' ? 'selected' : ''}>🚩 Confirmed Duplicate (Double Booking)</option>
-                <option value="Marked Valid" ${currentStatus === 'Marked Valid' ? 'selected' : ''}>✅ Marked Valid (Legitimate Recurring / Split Transaction)</option>
-                <option value="Ignored" ${currentStatus === 'Ignored' ? 'selected' : ''}>👁️ Ignored (Immaterial)</option>
-                <option value="Unreviewed" ${currentStatus === 'Unreviewed' ? 'selected' : ''}>⏳ Unreviewed</option>
+                <option value="Confirmed Duplicate" ${currentStatus === 'Confirmed Duplicate' ? 'selected' : ''}>Confirmed Duplicate (Double Booking)</option>
+                <option value="Marked Valid" ${currentStatus === 'Marked Valid' ? 'selected' : ''}>Marked Valid (Legitimate Recurring / Split Transaction)</option>
+                <option value="Ignored" ${currentStatus === 'Ignored' ? 'selected' : ''}>Ignored (Immaterial)</option>
+                <option value="Unreviewed" ${currentStatus === 'Unreviewed' ? 'selected' : ''}>Unreviewed</option>
               </select>
             </div>
 
@@ -13721,7 +13901,7 @@ function renderSequenceGapsHtml(data) {
     <!-- Disclaimer / Guidance Banner -->
     <div class="card" style="margin-bottom: 18px; border-left: 4px solid var(--primary); background: var(--bg-app);">
       <div style="display: flex; gap: 12px; align-items: flex-start;">
-        <div style="font-size: 20px;">💡</div>
+        <div style="color: var(--text-muted);"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
         <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
           <b>ICAI Standard Audit Guidance on Sequence Gaps:</b>
           Sequence gaps in invoice, voucher, or cheque numbering are treated as <i>exceptions requiring professional inquiry</i> 
@@ -13732,7 +13912,7 @@ function renderSequenceGapsHtml(data) {
 
     ${gaps.length === 0 ? `
       <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
-        <div style="font-size: 32px; margin-bottom: 8px;">✅</div>
+        <div style="margin-bottom: 8px; color: #10b981;"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
         <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No Sequence Gaps Detected</div>
         <p style="margin-top: 4px; font-size: 12px;">All invoice, voucher, and cheque number series exhibit strict continuity.</p>
       </div>
@@ -13746,13 +13926,13 @@ function renderSequenceGapsHtml(data) {
 
 function renderSingleSequenceGapCard(gap, idx) {
   const sevBadge = gap.severity === "HIGH" ? '<span class="badge badge-critical">HIGH SEVERITY</span>' :
-                   (gap.severity === "MEDIUM" ? '<span class="badge badge-high">MEDIUM SEVERITY</span>' :
-                   '<span class="badge badge-low">LOW SEVERITY</span>');
+    (gap.severity === "MEDIUM" ? '<span class="badge badge-high">MEDIUM SEVERITY</span>' :
+      '<span class="badge badge-low">LOW SEVERITY</span>');
 
-  const statusBadge = gap.status === "Documented / Valid Gap" ? '<span class="badge badge-low">✓ Documented Valid Gap</span>' :
-                      (gap.status === "In Review" ? '<span class="badge badge-medium">In Review</span>' :
-                      (gap.status === "Resolved" ? '<span class="badge badge-resolved">Resolved</span>' :
-                      '<span class="badge badge-high">Open</span>'));
+  const statusBadge = gap.status === "Documented / Valid Gap" ? '<span class="badge badge-low">Documented Valid Gap</span>' :
+    (gap.status === "In Review" ? '<span class="badge badge-medium">In Review</span>' :
+      (gap.status === "Resolved" ? '<span class="badge badge-resolved">Resolved</span>' :
+        '<span class="badge badge-high">Open</span>'));
 
   return `
     <div class="card" style="padding: 16px; border: 1px solid var(--border);">
@@ -13811,7 +13991,7 @@ function renderSingleSequenceGapCard(gap, idx) {
       <!-- Action / Documentation Bar -->
       <div style="display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px;">
         <button class="btn btn-sm btn-secondary" onclick="openSequenceGapModal('${gap.sequence_type}', '${gap.series_prefix || ''}', '${gap.expected_from}', '${gap.expected_to}', '${gap.status}', '${(gap.auditor_comment || '').replace(/'/g, "\\'")}')">
-          📝 ${gap.auditor_comment ? 'Edit Remark' : 'Document Sequence Finding'}
+          ${gap.auditor_comment ? 'Edit Remark' : 'Document Sequence Finding'}
         </button>
       </div>
     </div>
@@ -13824,14 +14004,14 @@ function openSequenceGapModal(seqType, prefix, expFrom, expTo, currentStatus, cu
       <div class="modal-card" style="max-width: 550px;">
         <div class="modal-header">
           <div class="modal-title">Sequence Gap Documentation: ${expFrom} to ${expTo}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('gap-review-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('gap-review-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleSequenceGapSubmit(event, '${seqType}', '${prefix}', '${expFrom}', '${expTo}')">
             <div class="form-group">
               <label class="form-label">Audit Review Status</label>
               <select class="form-control" id="gap-modal-status">
-                <option value="Documented / Valid Gap" ${currentStatus === 'Documented / Valid Gap' ? 'selected' : ''}>✓ Documented Valid Gap (Verified Cancelled / Spoiled / Multi-branch)</option>
+                <option value="Documented / Valid Gap" ${currentStatus === 'Documented / Valid Gap' ? 'selected' : ''}>Documented Valid Gap (Verified Cancelled / Spoiled / Multi-branch)</option>
                 <option value="In Review" ${currentStatus === 'In Review' ? 'selected' : ''}>In Review (Awaiting Client Explanation)</option>
                 <option value="Resolved" ${currentStatus === 'Resolved' ? 'selected' : ''}>Resolved</option>
                 <option value="Open" ${currentStatus === 'Open' ? 'selected' : ''}>Open</option>
@@ -13933,7 +14113,7 @@ function renderAnomalyDetectionUI(data) {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
       <div>
         <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
-          <span>🤖 AI-Assisted Anomaly Detection Engine</span>
+          <span>Anomaly Detection Engine</span>
           <span class="badge" style="background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 700;">HYBRID 3-TIER</span>
         </h2>
         <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
@@ -13943,19 +14123,19 @@ function renderAnomalyDetectionUI(data) {
 
       <div style="display: flex; gap: 10px;">
         <button class="btn btn-secondary" onclick="triggerFreshAnomalyRun()">
-          ⚡ Re-Run Anomaly Engine
+          ${ICONS.refresh} Re-Run Engine
         </button>
         <a class="btn btn-primary" href="${FinAuditAPI.getAnomalyReportDownloadUrl(state.currentEngagementId)}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-          📥 Export Anomaly Report (CSV)
+          ${ICONS.download} Export Report (CSV)
         </a>
       </div>
     </div>
 
     <!-- Professional Standard Disclaimer Banner -->
     <div style="background: #eff6ff; border: 1px solid var(--border); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-      <span style="font-size: 20px;">🛡️</span>
+      <span class="status-indicator-dot online" style="width: 10px; height: 10px;"></span>
       <div style="font-size: 12.5px; color: #1e40af;">
-        <b>Professional Auditing Safeguard:</b> <i>Potential anomaly detected. Auditor review recommended.</i> An anomaly does not constitute proof of fraud; it indicates empirical deviation requiring substantive audit inquiry (SA 240, SA 315, SA 520).
+        <b>Audit Safeguard:</b> <i>Potential anomaly detected. Auditor review recommended.</i> An anomaly does not constitute proof of fraud; it indicates empirical deviation requiring substantive audit inquiry (SA 240, SA 315, SA 520).
       </div>
     </div>
 
@@ -13997,7 +14177,7 @@ function renderAnomalyDetectionUI(data) {
       <div class="card" style="padding: 16px 20px; margin-bottom: 20px; background: #fafafa; border: 1px solid var(--border);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">📊 Benford's Law Leading Digit Diagnostic (Nigrini Standard)</span>
+            <span style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">Benford's Law Leading Digit Diagnostic (Nigrini Standard)</span>
             <span class="badge ${benford.mad > 0.015 ? 'badge-critical' : 'badge-low'}" style="font-size: 11px;">
               ${benford.conformity} (MAD = ${benford.mad})
             </span>
@@ -14070,7 +14250,7 @@ function renderAnomalyDetectionUI(data) {
 
     ${anomalies.length === 0 ? `
       <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
-        <div style="font-size: 32px; margin-bottom: 8px;">✓</div>
+        <div style="margin-bottom: 8px; color: #10b981;"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path></svg></div>
         <p style="font-size: 15px; font-weight: 600;">No anomalies matched the selected filters.</p>
         <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Adjust the filter criteria or re-run the anomaly engine to inspect all findings.</p>
       </div>
@@ -14085,20 +14265,20 @@ function renderAnomalyDetectionUI(data) {
 function renderSingleAnomalyCard(anom, idx) {
   const tx = anom.transaction || {};
   const ev = anom.evidence || {};
-  
-  const sevBadge = anom.severity === "CRITICAL" ? '<span class="badge badge-critical">CRITICAL SEVERITY</span>' :
-                   (anom.severity === "HIGH" ? '<span class="badge badge-high">HIGH SEVERITY</span>' :
-                   (anom.severity === "MEDIUM" ? '<span class="badge badge-medium">MEDIUM SEVERITY</span>' :
-                   '<span class="badge badge-low">LOW SEVERITY</span>'));
 
-  const statusBadge = anom.status === "Confirmed Anomaly" ? '<span class="badge badge-critical">✓ Confirmed Anomaly</span>' :
-                      (anom.status === "Marked Normal" ? '<span class="badge badge-low">✓ Marked Normal / Valid</span>' :
-                      (anom.status === "Ignored" ? '<span class="badge badge-secondary">Ignored</span>' :
-                      '<span class="badge badge-high">Open</span>'));
+  const sevBadge = anom.severity === "CRITICAL" ? '<span class="badge badge-critical">CRITICAL SEVERITY</span>' :
+    (anom.severity === "HIGH" ? '<span class="badge badge-high">HIGH SEVERITY</span>' :
+      (anom.severity === "MEDIUM" ? '<span class="badge badge-medium">MEDIUM SEVERITY</span>' :
+        '<span class="badge badge-low">LOW SEVERITY</span>'));
+
+  const statusBadge = anom.status === "Confirmed Anomaly" ? '<span class="badge badge-critical">Confirmed Anomaly</span>' :
+    (anom.status === "Marked Normal" ? '<span class="badge badge-low">Marked Normal / Valid</span>' :
+      (anom.status === "Ignored" ? '<span class="badge badge-secondary">Ignored</span>' :
+        '<span class="badge badge-high">Open</span>'));
 
   const levelPill = anom.level.includes("LEVEL 3") ? '<span class="badge" style="background: #f5f3ff; color: #6d28d9; border: 1px solid var(--border);">LEVEL 3: ML</span>' :
-                    (anom.level.includes("LEVEL 2") ? '<span class="badge" style="background: #f0f9ff; color: #0369a1; border: 1px solid var(--border);">LEVEL 2: STATISTICAL</span>' :
-                    '<span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid var(--border);">LEVEL 1: DETERMINISTIC</span>');
+    (anom.level.includes("LEVEL 2") ? '<span class="badge" style="background: #f0f9ff; color: #0369a1; border: 1px solid var(--border);">LEVEL 2: STATISTICAL</span>' :
+      '<span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid var(--border);">LEVEL 1: DETERMINISTIC</span>');
 
   return `
     <div class="card" style="padding: 18px; border: 1px solid var(--border); ">
@@ -14118,7 +14298,7 @@ function renderSingleAnomalyCard(anom, idx) {
 
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-sm btn-secondary" onclick="openAIExplanationModal('${anom.anomaly_id}')" style="font-size: 11.5px;">
-            🤖 AI Working Paper Memo
+            ${ICONS.fileText} Working Paper Memo
           </button>
         </div>
       </div>
@@ -14134,7 +14314,7 @@ function renderSingleAnomalyCard(anom, idx) {
           <div><b>Voucher #:</b> <span class="font-mono">${tx.voucher_no || '—'}</span></div>
           <div><b>Ledger Head:</b> <span>${tx.ledger || '—'}</span></div>
           <div><b>Party / Payee:</b> <span>${tx.party_name || '—'}</span></div>
-          <div><b>Amount:</b> <b class="font-mono" style="color: var(--text-main);">₹${Number(tx.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</b></div>
+          <div><b>Amount:</b> <b class="font-mono" style="color: var(--text-main);">₹${Number(tx.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b></div>
           <div><b>Narration:</b> <span style="color: var(--text-muted);">${tx.description || '—'}</span></div>
         </div>
       </div>
@@ -14142,12 +14322,12 @@ function renderSingleAnomalyCard(anom, idx) {
       <!-- Evidence & Metric Highlights -->
       <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
         <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">
-          🔍 Quantifiable Evidence Trail:
+          Quantifiable Evidence Trail:
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px;">
           ${Object.entries(ev).map(([k, v]) => `
             <span style="font-size: 11.5px; background: var(--bg-sidebar); padding: 3px 8px; border-radius: 4px; color: #1e293b;">
-              <b>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</b> ${typeof v === 'number' ? Number(v).toLocaleString('en-IN', {maximumFractionDigits: 2}) : v}
+              <b>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</b> ${typeof v === 'number' ? Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : v}
             </span>
           `).join("")}
         </div>
@@ -14176,16 +14356,16 @@ function renderSingleAnomalyCard(anom, idx) {
         <span style="font-size: 11.5px; color: var(--text-muted);">Auditor Verification Actions:</span>
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-sm btn-danger" onclick="quickUpdateAnomalyStatus('${anom.anomaly_id}', 'Confirmed Anomaly')" ${anom.status === 'Confirmed Anomaly' ? 'disabled' : ''}>
-            ⚠️ Confirm Anomaly
+            Confirm Anomaly
           </button>
           <button class="btn btn-sm btn-success" onclick="quickUpdateAnomalyStatus('${anom.anomaly_id}', 'Marked Normal')" ${anom.status === 'Marked Normal' ? 'disabled' : ''}>
-            ✓ Mark Normal / Valid
+            ${ICONS.check} Mark Valid
           </button>
           <button class="btn btn-sm btn-secondary" onclick="quickUpdateAnomalyStatus('${anom.anomaly_id}', 'Ignored')" ${anom.status === 'Ignored' ? 'disabled' : ''}>
             Ignore
           </button>
           <button class="btn btn-sm btn-secondary" onclick="openAnomalyReviewModal('${anom.anomaly_id}', '${anom.status}', '${(anom.auditor_comment || '').replace(/'/g, "\\'")}')">
-            📝 ${anom.auditor_comment ? 'Edit Remark' : 'Add Comment'}
+            ${ICONS.edit} ${anom.auditor_comment ? 'Edit Remark' : 'Add Comment'}
           </button>
         </div>
       </div>
@@ -14237,16 +14417,16 @@ function openAnomalyReviewModal(anomalyId, currentStatus, currentComment) {
       <div class="modal-card" style="max-width: 550px;">
         <div class="modal-header">
           <div class="modal-title">Review Anomaly #${anomalyId}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('anomaly-review-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('anomaly-review-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleAnomalyReviewSubmit(event, '${anomalyId}')">
             <div class="form-group">
               <label class="form-label">Auditor Conclusion Status</label>
               <select class="form-control" id="anom-modal-status">
-                <option value="Confirmed Anomaly" ${currentStatus === 'Confirmed Anomaly' ? 'selected' : ''}>⚠️ Confirmed Anomaly (Flagged for Management Letter / Form 3CD)</option>
-                <option value="Marked Normal" ${currentStatus === 'Marked Normal' ? 'selected' : ''}>✓ Marked Normal / Valid (Business Justification Verified)</option>
-                <option value="Ignored" ${currentStatus === 'Ignored' ? 'selected' : ''}>⚪ Ignored (Immaterial / Non-Risk Item)</option>
+                <option value="Confirmed Anomaly" ${currentStatus === 'Confirmed Anomaly' ? 'selected' : ''}>Confirmed Anomaly (Flagged for Management Letter / Form 3CD)</option>
+                <option value="Marked Normal" ${currentStatus === 'Marked Normal' ? 'selected' : ''}>Marked Normal / Valid (Business Justification Verified)</option>
+                <option value="Ignored" ${currentStatus === 'Ignored' ? 'selected' : ''}>Ignored (Immaterial / Non-Risk Item)</option>
                 <option value="Open" ${currentStatus === 'Open' ? 'selected' : ''}>Open (Pending Review)</option>
               </select>
             </div>
@@ -14292,15 +14472,15 @@ async function openAIExplanationModal(anomalyId) {
       <div class="modal-overlay" id="ai-explanation-modal">
         <div class="modal-card" style="max-width: 750px;">
           <div class="modal-header">
-            <div class="modal-title">🤖 AI Audit Working Paper Memorandum — #${anomalyId}</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('ai-explanation-modal')">✕</button>
+            <div class="modal-title">Audit Working Paper Memorandum — #${anomalyId}</div>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('ai-explanation-modal')">${ICONS.close}</button>
           </div>
           <div class="modal-body">
             <pre style="background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 6px; font-family: monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; max-height: 480px; overflow-y: auto;">${res.ai_memo}</pre>
             
             <div class="modal-footer" style="padding: 12px 0 0 0; margin-top: 14px; display: flex; justify-content: space-between;">
               <button class="btn btn-secondary" onclick="navigator.clipboard.writeText(\`${res.ai_memo.replace(/`/g, '\\`')}\`); notifyInfo('Copied Working Paper Memorandum to clipboard!');">
-                📋 Copy Memo
+                ${ICONS.clipboard} Copy Memo
               </button>
               <button class="btn btn-primary" onclick="closeModal('ai-explanation-modal')">Close</button>
             </div>
@@ -14385,9 +14565,9 @@ function renderYoYComparisonUI(data) {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
       <div>
         <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
-          <span>📈 Year-on-Year Financial Comparison</span>
+          <span>Year-on-Year Financial Comparison</span>
           <span class="badge" style="background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 700;">
-            ${prevFy} ➔ ${currentFy}
+            ${prevFy} &rarr; ${currentFy}
           </span>
         </h2>
         <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
@@ -14397,7 +14577,7 @@ function renderYoYComparisonUI(data) {
 
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
         <a class="btn btn-primary" href="${FinAuditAPI.getYoYReportDownloadUrl(state.currentEngagementId, { threshold_pct: state.yoyConfig.threshold_pct, py_engagement_id: state.yoyConfig.py_engagement_id })}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-          📥 Download YoY Report (CSV)
+          ${ICONS.download} Download YoY Report (CSV)
         </a>
       </div>
     </div>
@@ -14487,16 +14667,16 @@ function renderYoYComparisonUI(data) {
     <!-- Section Navigation Tabs -->
     <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto;">
       <button class="btn btn-sm ${state.yoyConfig.activeSection === 'executive' ? 'btn-primary' : 'btn-secondary'}" style="border-bottom-left-radius: 0; border-bottom-right-radius: 0; font-weight: 700;" onclick="switchYoYSection('executive')">
-        🏛️ Executive Financial Heads (${data.executive_comparison?.length || 0})
+        Executive Financial Heads (${data.executive_comparison?.length || 0})
       </button>
       <button class="btn btn-sm ${state.yoyConfig.activeSection === 'ledgers' ? 'btn-primary' : 'btn-secondary'}" style="border-bottom-left-radius: 0; border-bottom-right-radius: 0; font-weight: 700;" onclick="switchYoYSection('ledgers')">
-        📚 Major Ledger Accounts (${data.major_ledgers_comparison?.length || 0})
+        Major Ledger Accounts (${data.major_ledgers_comparison?.length || 0})
       </button>
       <button class="btn btn-sm ${state.yoyConfig.activeSection === 'parties' ? 'btn-primary' : 'btn-secondary'}" style="border-bottom-left-radius: 0; border-bottom-right-radius: 0; font-weight: 700;" onclick="switchYoYSection('parties')">
-        👥 Party Balances (${data.party_comparison?.length || 0})
+        Party Balances (${data.party_comparison?.length || 0})
       </button>
       <button class="btn btn-sm ${state.yoyConfig.activeSection === 'volumes' ? 'btn-primary' : 'btn-secondary'}" style="border-bottom-left-radius: 0; border-bottom-right-radius: 0; font-weight: 700;" onclick="switchYoYSection('volumes')">
-        📊 Transaction Volumes (${data.volume_comparison?.length || 0})
+        Transaction Volumes (${data.volume_comparison?.length || 0})
       </button>
     </div>
 
@@ -14535,7 +14715,7 @@ function renderActiveYoYSectionTable(data) {
   if (items.length === 0) {
     return `
       <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
-        <div style="font-size: 30px; margin-bottom: 8px;">✓</div>
+        <div style="margin-bottom: 8px; color: #10b981;"><svg width="30" height="30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path></svg></div>
         <p style="font-size: 15px; font-weight: 600;">No items found in this section for the selected filters.</p>
         <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Try lowering the variance threshold or clearing the search filter.</p>
       </div>
@@ -14581,18 +14761,18 @@ function renderYoYTableRow(row, idx) {
   const dir = row.movement_direction;
 
   const dirBadge = dir === "Increase" ? `<span style="color: #059669; font-weight: 700;">▲ Increase</span>` :
-                   (dir === "Decrease" ? `<span style="color: #dc2626; font-weight: 700;">▼ Decrease</span>` :
-                   `<span style="color: var(--text-muted);">— No Change</span>`);
+    (dir === "Decrease" ? `<span style="color: #dc2626; font-weight: 700;">▼ Decrease</span>` :
+      `<span style="color: var(--text-muted);">— No Change</span>`);
 
   const riskBadge = row.risk === "CRITICAL" ? '<span class="badge badge-critical">CRITICAL</span>' :
-                    (row.risk === "HIGH" ? '<span class="badge badge-high">HIGH</span>' :
-                    (row.risk === "MEDIUM" ? '<span class="badge badge-medium">MEDIUM</span>' :
-                    '<span class="badge badge-low">NORMAL</span>'));
+    (row.risk === "HIGH" ? '<span class="badge badge-high">HIGH</span>' :
+      (row.risk === "MEDIUM" ? '<span class="badge badge-medium">MEDIUM</span>' :
+        '<span class="badge badge-low">NORMAL</span>'));
 
-  const statusBadge = row.status === "Reviewed" ? '<span class="badge badge-low">✓ Reviewed</span>' :
-                      (row.status === "Flagged for Inquiry" ? '<span class="badge badge-critical">Flagged</span>' :
-                      (row.status === "Verified" ? '<span class="badge badge-resolved">Verified</span>' :
-                      '<span class="badge badge-high" style="opacity: 0.6;">Unreviewed</span>'));
+  const statusBadge = row.status === "Reviewed" ? '<span class="badge badge-low">Reviewed</span>' :
+    (row.status === "Flagged for Inquiry" ? '<span class="badge badge-critical">Flagged</span>' :
+      (row.status === "Verified" ? '<span class="badge badge-resolved">Verified</span>' :
+        '<span class="badge badge-high" style="opacity: 0.6;">Unreviewed</span>'));
 
   return `
     <tr style="background: ${isSig ? '#fffbeb' : (idx % 2 === 0 ? '#ffffff' : '#fafafa')}; border-bottom: 1px solid var(--border);">
@@ -14605,13 +14785,13 @@ function renderYoYTableRow(row, idx) {
         <span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary);">${row.group || row.category}</span>
       </td>
       <td style="padding: 10px 14px; text-align: right; font-family: monospace; color: var(--text-secondary);">
-        ₹${Number(row.previous_year || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+        ₹${Number(row.previous_year || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
       </td>
       <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700; color: var(--text-main);">
-        ₹${Number(row.current_year || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+        ₹${Number(row.current_year || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
       </td>
       <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 700; color: ${absD > 0 ? '#059669' : (absD < 0 ? '#dc2626' : '#334155')};">
-        ${absD > 0 ? '+' : ''}₹${Number(absD || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+        ${absD > 0 ? '+' : ''}₹${Number(absD || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
       </td>
       <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 800; color: ${pct > 0 ? '#059669' : (pct < 0 ? '#dc2626' : '#64748b')};">
         ${pct > 0 ? '+' : ''}${pct.toFixed(1)}%
@@ -14627,12 +14807,8 @@ function renderYoYTableRow(row, idx) {
       </td>
       <td style="padding: 10px 14px; text-align: center;">
         <div style="display: flex; gap: 4px; justify-content: center;">
-          <button class="btn btn-sm btn-secondary" style="padding: 3px 6px; font-size: 11px;" title="Document Working Paper Comment" onclick="openYoYCommentModal('${row.item_key}', '${row.category}', '${row.account_name.replace(/'/g, "\\'")}', '${row.status}', '${(row.auditor_comment || '').replace(/'/g, "\\'")}')">
-            📝
-          </button>
-          <button class="btn btn-sm btn-secondary" style="padding: 3px 6px; font-size: 11px;" title="Generate Factual AI Movement Driver" onclick="triggerYoYFactualAI('${row.item_key}')">
-            🤖
-          </button>
+          <button class="btn btn-sm btn-secondary" style="padding: 3px 6px; font-size: 11px;" title="Document Working Paper Comment" onclick="openYoYCommentModal('${row.item_key}', '${row.category}', '${row.account_name.replace(/'/g, "\\'")}', '${row.status}', '${(row.auditor_comment || '').replace(/'/g, "\\'")}')">${ICONS.edit}</button>
+          <button class="btn btn-sm btn-secondary" style="padding: 3px 6px; font-size: 11px;" title="Analyze Movement Driver" onclick="triggerYoYFactualAI('${row.item_key}')">${ICONS.fileText}</button>
         </div>
       </td>
     </tr>
@@ -14671,38 +14847,38 @@ function handleYoYSearchDebounced(e) {
 
 function openYoYCommentModal(itemKey, category, accountName, currentStatus, currentComment) {
   const modalHtml = `
-    <div class="modal-overlay" id="yoy-comment-modal">
+    < div class="modal-overlay" id = "yoy-comment-modal" >
       <div class="modal-card" style="max-width: 520px;">
         <div class="modal-header">
           <div class="modal-title">YoY Working Paper: ${accountName}</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('yoy-comment-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('yoy-comment-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleYoYCommentSubmit(event, '${itemKey}', '${category}', '${accountName.replace(/'/g, "\\'")}')">
-            <div class="form-group">
-              <label class="form-label">Review Conclusion Status</label>
-              <select class="form-control" id="yoy-modal-status">
-                <option value="Reviewed" ${currentStatus === 'Reviewed' ? 'selected' : ''}>✓ Reviewed (Standard Variance)</option>
-                <option value="Verified" ${currentStatus === 'Verified' ? 'selected' : ''}>✓ Verified (Supported by Management Inquiry / Vouchers)</option>
-                <option value="Flagged for Inquiry" ${currentStatus === 'Flagged for Inquiry' ? 'selected' : ''}>⚠️ Flagged for Inquiry (Awaiting Client Evidence)</option>
-                <option value="Unreviewed" ${currentStatus === 'Unreviewed' ? 'selected' : ''}>Unreviewed</option>
-              </select>
-            </div>
+          <div class="form-group">
+            <label class="form-label">Review Conclusion Status</label>
+            <select class="form-control" id="yoy-modal-status">
+              <option value="Reviewed" ${currentStatus === 'Reviewed' ? 'selected' : ''}>Reviewed (Standard Variance)</option>
+              <option value="Verified" ${currentStatus === 'Verified' ? 'selected' : ''}>Verified (Supported by Management Inquiry / Vouchers)</option>
+              <option value="Flagged for Inquiry" ${currentStatus === 'Flagged for Inquiry' ? 'selected' : ''}>Flagged for Inquiry (Awaiting Client Evidence)</option>
+              <option value="Unreviewed" ${currentStatus === 'Unreviewed' ? 'selected' : ''}>Unreviewed</option>
+            </select>
+          </div>
 
-            <div class="form-group">
-              <label class="form-label">Auditor Comment / Working Paper Remark *</label>
-              <textarea class="form-control" id="yoy-modal-comment" rows="4" placeholder="Enter auditor analysis, SA 520 analytical review findings, supporting ledger vouchers, or management explanation..." required>${currentComment || ''}</textarea>
-            </div>
+          <div class="form-group">
+            <label class="form-label">Auditor Comment / Working Paper Remark *</label>
+            <textarea class="form-control" id="yoy-modal-comment" rows="4" placeholder="Enter auditor analysis, SA 520 analytical review findings, supporting ledger vouchers, or management explanation..." required>${currentComment || ''}</textarea>
+          </div>
 
-            <div class="modal-footer" style="padding: 10px 0 0 0; margin-top: 14px;">
-              <button type="button" class="btn btn-secondary" onclick="closeModal('yoy-comment-modal')">Cancel</button>
-              <button type="submit" class="btn btn-primary">Save Working Paper Remark</button>
-            </div>
-          </form>
-        </div>
+          <div class="modal-footer" style="padding: 10px 0 0 0; margin-top: 14px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('yoy-comment-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Working Paper Remark</button>
+          </div>
+        </form>
       </div>
-    </div>
-  `;
+      </div >
+    </div >
+    `;
   document.body.insertAdjacentHTML("beforeend", modalHtml);
 }
 
@@ -14733,22 +14909,22 @@ async function triggerYoYFactualAI(itemKey) {
       threshold_pct: state.yoyConfig.threshold_pct
     });
     const modalHtml = `
-      <div class="modal-overlay" id="yoy-ai-modal">
-        <div class="modal-card" style="max-width: 600px;">
-          <div class="modal-header">
-            <div class="modal-title">🤖 Factual Movement Analysis: ${res.account_name}</div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('yoy-ai-modal')">✕</button>
-          </div>
-          <div class="modal-body">
-            <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-size: 13px; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">${res.ai_reason}</div>
-            
-            <div class="modal-footer" style="padding: 12px 0 0 0; margin-top: 14px; display: flex; justify-content: space-between;">
-              <span style="font-size: 11.5px; color: var(--text-muted);">Zero-Hallucination Policy: Generated strictly from recorded ledger entries.</span>
-              <button class="btn btn-primary" onclick="closeModal('yoy-ai-modal'); renderYoYComparison();">Close</button>
-            </div>
+    < div class="modal-overlay" id = "yoy-ai-modal" >
+      <div class="modal-card" style="max-width: 600px;">
+        <div class="modal-header">
+          <div class="modal-title">Movement Analysis: ${res.account_name}</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('yoy-ai-modal')">${ICONS.close}</button>
+        </div>
+        <div class="modal-body">
+          <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-size: 13px; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">${res.ai_reason}</div>
+
+          <div class="modal-footer" style="padding: 12px 0 0 0; margin-top: 14px; display: flex; justify-content: space-between;">
+            <span style="font-size: 11.5px; color: var(--text-muted);">Zero-Hallucination Policy: Generated strictly from recorded ledger entries.</span>
+            <button class="btn btn-primary" onclick="closeModal('yoy-ai-modal'); renderYoYComparison();">Close</button>
           </div>
         </div>
       </div>
+      </div >
     `;
     document.body.insertAdjacentHTML("beforeend", modalHtml);
   } catch (err) {
@@ -14771,10 +14947,10 @@ async function renderAIAssistant() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
     container.innerHTML = `
-      <div class="card" style="padding: 40px; text-align: center; color: var(--text-secondary);">
+    < div class="card" style = "padding: 40px; text-align: center; color: var(--text-secondary);" >
         <h3>No Engagement Selected</h3>
         <p style="margin-top: 8px;">Please select an audit engagement to converse with the Local AI Assistant.</p>
-      </div>
+      </div >
     `;
     return;
   }
@@ -14794,12 +14970,12 @@ async function renderAIAssistant() {
     state.assistantState.messages.push({
       role: "assistant",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      content: `Hello! I am your **100% offline Local AI Audit Assistant** for **${state.activeEngagement?.client_name || 'this client'}** (${state.activeEngagement?.financial_year || 'FY'}).
+      content: `Hello! I am your ** 100 % offline Local AI Audit Assistant ** for ** ${state.activeEngagement?.client_name || 'this client'} ** (${state.activeEngagement?.financial_year || 'FY'}).
 
-I evaluate your imported ledger records deterministically and synthesize explainable CA-grade findings without sending any data outside your device.
+I evaluate your imported ledger records deterministically and synthesize explainable CA - grade findings without sending any data outside your device.
 
-#### 💡 How can I assist your audit today?
-Choose one of the quick prompt chips below or type your specific question:`,
+#### How can I assist your audit today ?
+    Choose one of the quick prompt chips below or type your specific question: `,
       disclaimer: "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: [],
       source_transactions: [],
@@ -14811,24 +14987,30 @@ Choose one of the quick prompt chips below or type your specific question:`,
     });
   }
 
-  const promptChipsHtml = state.assistantState.suggestedPrompts.map(p => `
-    <button class="assistant-prompt-chip" onclick="fillAssistantPrompt('${p.query.replace(/'/g, "\\'")}')">
-      <span>${p.icon === 'alert' ? '🚨' : p.icon === 'trending' ? '📈' : p.icon === 'bank' ? '🏦' : p.icon === 'document' ? '📑' : p.icon === 'scale' ? '⚖️' : p.icon === 'pencil' ? '📝' : p.icon === 'chart' ? '📊' : '🔍'}</span>
-      <span>${p.title}</span>
-    </button>
-  `).join("");
+  const promptChipsHtml = state.assistantState.suggestedPrompts.map(p => {
+    const iconSvg = (p.icon === 'alert') ? ICONS.alertTriangle :
+      (p.icon === 'trending' || p.icon === 'chart') ? ICONS.chartBar :
+        (p.icon === 'bank' || p.icon === 'scale') ? ICONS.scale :
+          (p.icon === 'document' || p.icon === 'pencil') ? ICONS.fileText :
+            ICONS.search;
+    return `
+      < button class="assistant-prompt-chip" onclick = "fillAssistantPrompt('${p.query.replace(/'/g, "\\'")}') ">
+        < span > ${iconSvg}</span >
+          <span>${p.title}</span>
+      </button >
+    `;
+  }).join("");
 
   const messagesHtml = state.assistantState.messages.map((m, idx) => renderAssistantMessageItem(m, idx)).join("");
 
   container.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 120px); max-height: calc(100vh - 120px);">
-      <!-- Header -->
+    < div style = "display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 120px); max-height: calc(100vh - 120px);" >
+      < !--Header -->
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">🤖 Local AI Audit Assistant</h2>
-            <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 600; font-size: 11px;">🔒 100% Offline & Private</span>
-            <span class="badge" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5; font-weight: 600; font-size: 11px;">Zero Cloud API</span>
+            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">Audit Assistant</h2>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 500; font-size: 11px;"><span class="status-indicator-dot online"></span>Local Model</span>
           </div>
           <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 3px;">
             Interactive deterministic audit intelligence for <strong>${state.activeEngagement?.client_name || 'Client'}</strong> (${state.activeEngagement?.financial_year || 'FY'})
@@ -14837,28 +15019,28 @@ Choose one of the quick prompt chips below or type your specific question:`,
 
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary btn-sm" onclick="loadExecutiveSummaryNarrative()">
-            📑 Executive Audit Memo
+            ${ICONS.fileText} Executive Audit Memo
           </button>
           <button class="btn btn-secondary btn-sm" onclick="clearAssistantChat()">
-            🗑️ Clear Chat
+            ${ICONS.trash} Clear Chat
           </button>
         </div>
       </div>
 
-      <!-- Mandatory Disclaimer Alert -->
+      <!--Mandatory Disclaimer Alert-- >
       <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #b45309;">
-        <span style="font-size: 16px;">🛡️</span>
+        <span class="status-indicator-dot" style="background: #d97706;"></span>
         <div>
-          <strong>Statutory Compliance Disclaimer:</strong> <em>AI-generated assistance. Verify findings against source records before making audit decisions.</em>
+          <strong>Compliance Notice:</strong> <em>Generated assistant analysis. Verify findings against source records before making audit decisions.</em>
         </div>
       </div>
 
-      <!-- Prompt Chips Carousel -->
+      <!--Prompt Chips Carousel-- >
       <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin;">
         ${promptChipsHtml}
       </div>
 
-      <!-- Chat Messages Container -->
+      <!--Chat Messages Container-- >
       <div id="assistant-chat-stream" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 12px 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md);">
         ${messagesHtml}
         ${state.assistantState.isLoading ? `
@@ -14872,21 +15054,21 @@ Choose one of the quick prompt chips below or type your specific question:`,
         ` : ''}
       </div>
 
-      <!-- Input Bar -->
-      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; display: flex; gap: 8px; align-items: center;">
-        <input 
-          type="text" 
-          id="assistant-query-input" 
-          class="form-control" 
-          placeholder="Ask a question about this engagement (e.g. 'Show me unusual transactions.', 'Which ledgers have the largest YoY changes?')..." 
-          style="border: none; background: transparent; font-size: 13.5px;"
-          onkeydown="if(event.key === 'Enter') handleAssistantSend();"
-          ${state.assistantState.isLoading ? 'disabled' : ''}
-          autofocus
-        >
-        <button 
-          class="btn btn-primary" 
-          id="assistant-send-btn" 
+      <!--Input Bar-- >
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; display: flex; gap: 8px; align-items: center;">
+      <input
+        type="text"
+        id="assistant-query-input"
+        class="form-control"
+        placeholder="Ask a question about this engagement (e.g. 'Show me unusual transactions.', 'Which ledgers have the largest YoY changes?')..."
+        style="border: none; background: transparent; font-size: 13.5px;"
+        onkeydown="if(event.key === 'Enter') handleAssistantSend();"
+        ${state.assistantState.isLoading ? 'disabled' : ''}
+        autofocus
+      >
+        <button
+          class="btn btn-primary"
+          id="assistant-send-btn"
           onclick="handleAssistantSend()"
           ${state.assistantState.isLoading ? 'disabled' : ''}
           style="display: flex; align-items: center; gap: 6px; padding: 8px 18px;"
@@ -14894,9 +15076,9 @@ Choose one of the quick prompt chips below or type your specific question:`,
           <span>Ask Local AI</span>
           <span>↵</span>
         </button>
-      </div>
     </div>
-  `;
+    </div >
+    `;
 
   // Scroll chat to bottom
   const chatStream = document.getElementById("assistant-chat-stream");
@@ -14907,16 +15089,16 @@ Choose one of the quick prompt chips below or type your specific question:`,
 
 function renderAssistantMessageItem(msg, idx) {
   const isUser = msg.role === "user";
-  
+
   if (isUser) {
     return `
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-left: 60px;">
+    < div style = "display: flex; justify-content: flex-end; gap: 10px; margin-left: 60px;" >
         <div style="background: #4f46e5; color: #ffffff; padding: 12px 16px; border-radius: 12px 12px 2px 12px; font-size: 13.5px; ">
           ${escapeHtml(msg.content)}
           <div style="font-size: 10.5px; color: rgba(255,255,255,0.7); text-align: right; margin-top: 4px;">${msg.timestamp}</div>
         </div>
         <div style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0;">CA</div>
-      </div>
+      </div >
     `;
   }
 
@@ -14927,7 +15109,7 @@ function renderAssistantMessageItem(msg, idx) {
   let evidenceHtml = "";
   if (msg.evidence && msg.evidence.length > 0) {
     const rows = msg.evidence.map(e => `
-      <tr style="font-size: 12px; border-bottom: 1px solid var(--border);">
+    < tr style = "font-size: 12px; border-bottom: 1px solid var(--border);" >
         <td style="padding: 6px 10px; font-family: monospace;">${e.date || e.doc_date || '—'}</td>
         <td style="padding: 6px 10px; font-weight: 600; color: #4f46e5;">${e.voucher_no || e.invoice_no || e.item_key || '—'}</td>
         <td style="padding: 6px 10px;">${e.ledger || e.account_name || '—'}</td>
@@ -14938,16 +15120,16 @@ function renderAssistantMessageItem(msg, idx) {
         </td>
         <td style="padding: 6px 10px;">
           <button class="btn btn-sm btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="inspectAssistantTransaction(${JSON.stringify(e).replace(/"/g, '&quot;')})">
-            🔍 Inspect
+            ${ICONS.search} Inspect
           </button>
-        </td>
-      </tr>
+        </td >
+      </tr >
     `).join("");
 
     evidenceHtml = `
-      <div style="margin-top: 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
+    < div style = "margin-top: 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;" >
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">📊 Supporting Evidence & Source Records (${msg.evidence.length} items)</span>
+          <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Supporting Evidence & Source Records (${msg.evidence.length} items)</span>
           <span style="font-size: 11px; color: var(--text-secondary);">Click 'Inspect' to review full audit attributes</span>
         </div>
         <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px;">
@@ -14968,7 +15150,7 @@ function renderAssistantMessageItem(msg, idx) {
             </tbody>
           </table>
         </div>
-      </div>
+      </div >
     `;
   }
 
@@ -14976,18 +15158,19 @@ function renderAssistantMessageItem(msg, idx) {
   let actionsHtml = "";
   if (msg.suggested_actions && msg.suggested_actions.length > 0) {
     actionsHtml = `
-      <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;">
-        ${msg.suggested_actions.map(act => `
+    < div style = "margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;" >
+      ${msg.suggested_actions.map(act => `
           <span style="font-size: 11.5px; background: rgba(99, 102, 241, 0.08); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 14px; padding: 3px 10px;">
-            ⚡ ${escapeHtml(act)}
+            ${escapeHtml(act)}
           </span>
-        `).join("")}
-      </div>
+        `).join("")
+      }
+      </div >
     `;
   }
 
   return `
-    <div style="display: flex; gap: 12px; align-items: flex-start; margin-right: 40px;">
+    < div style = "display: flex; gap: 12px; align-items: flex-start; margin-right: 40px;" >
       <div style="width: 34px; height: 34px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; ">AI</div>
       <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: 2px 12px 12px 12px; flex: 1; ">
         <div style="font-size: 13.5px; color: var(--text-primary); line-height: 1.6;">
@@ -14996,12 +15179,12 @@ function renderAssistantMessageItem(msg, idx) {
         ${evidenceHtml}
         ${actionsHtml}
         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-secondary);">
-          <span>🛡️ ${msg.disclaimer || MANDATORY_DISCLAIMER}</span>
+          <span>${msg.disclaimer || MANDATORY_DISCLAIMER}</span>
           <span>${msg.timestamp || ''}</span>
         </div>
       </div>
-    </div>
-  `;
+    </div >
+    `;
 }
 
 function formatAssistantMarkdown(text) {
@@ -15057,7 +15240,7 @@ async function handleAssistantSend() {
   } catch (err) {
     state.assistantState.messages.push({
       role: "assistant",
-      content: `⚠️ **AI Engine Notice:** An error occurred while evaluating the query: ${escapeHTML(err.message)}`,
+      content: `**Engine Notice:** An error occurred while evaluating the query: ${escapeHTML(err.message)}`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       disclaimer: "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: [],
@@ -15114,8 +15297,8 @@ function inspectAssistantTransaction(item) {
     <div class="modal-overlay" id="assistant-inspect-modal">
       <div class="modal-card" style="max-width: 650px;">
         <div class="modal-header">
-          <div class="modal-title">🔍 Source Transaction Inspection & Audit Evidence</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('assistant-inspect-modal')">✕</button>
+          <div class="modal-title">Source Transaction Inspection & Audit Evidence</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('assistant-inspect-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; background: var(--bg-app); border: 1px solid var(--border); padding: 14px; border-radius: 6px; font-size: 12.5px;">
@@ -15150,7 +15333,7 @@ function inspectAssistantTransaction(item) {
           ` : ''}
 
           <div class="modal-footer" style="padding: 10px 0 0 0; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 11px; color: var(--text-muted);">🛡️ Sourced deterministically from local audit database.</span>
+            <span style="font-size: 11px; color: var(--text-muted);">Sourced deterministically from local audit database.</span>
             <button class="btn btn-primary" onclick="closeModal('assistant-inspect-modal')">Done Reviewing</button>
           </div>
         </div>
@@ -15184,7 +15367,7 @@ function getRiskScoreBadge(score, severity = "MEDIUM", factors = null) {
   }
 
   const tooltip = factors && factors.equation ? `title="${factors.equation}"` : `title="Deterministic Risk Score: ${numScore.toFixed(1)}/10.0"`;
-  return `<span class="risk-score-pill ${pillClass}" ${tooltip}>⚡ ${numScore.toFixed(1)} / 10</span>`;
+  return `<span class="risk-score-pill ${pillClass}" ${tooltip}>${numScore.toFixed(1)} / 10</span>`;
 }
 
 function getFindingStatusBadge(status) {
@@ -15232,13 +15415,13 @@ async function renderFindings() {
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button class="btn btn-secondary" onclick="openCreateCustomFindingModal()">
-            <span>➕</span> Record Manual Observation
+            ${ICONS.plus} Record Manual Observation
           </button>
           <a href="${FinAuditAPI.getExportFindingsCsvUrl(state.currentEngagementId)}" download="audit_findings_${state.currentEngagementId}.csv" class="btn btn-secondary" style="text-decoration: none;">
-            <span>📥</span> Export CSV Register
+            ${ICONS.download} Export CSV Register
           </a>
           <button class="btn btn-primary" id="btn-sync-findings" onclick="syncCentralizedFindings()">
-            <span>⚡</span> Sync All Modules
+            ${ICONS.refresh} Sync All Modules
           </button>
         </div>
       </div>
@@ -15283,7 +15466,7 @@ async function renderFindings() {
           <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; flex: 1;">
             <!-- Search Box -->
             <div style="min-width: 220px; flex: 1; max-width: 320px;">
-              <input type="text" id="findings-search-input" class="form-control" placeholder="🔍 Search ID, title, rule, or desc..."
+              <input type="text" id="findings-search-input" class="form-control" placeholder="Search ID, title, rule, or desc..."
                      value="${state.findingsFilter.search || ''}" onkeydown="if(event.key==='Enter') handleFindingsFilterChange()">
             </div>
 
@@ -15339,13 +15522,13 @@ async function renderFindings() {
             Centralized Findings Register <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(${findings.length} records match filter)</span>
           </div>
           <div style="font-size: 11.5px; color: var(--text-muted);">
-            💡 Click on any risk score to inspect deterministic formula breakdown
+            Click on any risk score to inspect deterministic formula breakdown
           </div>
         </div>
 
         ${findings.length === 0 ? `
           <div style="padding: 48px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+            <div style="margin-bottom: 8px; color: #10b981;"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path></svg></div>
             <div style="font-size: 15px; font-weight: 600; color: #1e293b;">No findings matching current criteria</div>
             <p style="font-size: 12.5px; margin-top: 4px;">Click <strong>"Sync All Modules"</strong> above to aggregate exceptions across all audit subsystems.</p>
           </div>
@@ -15379,7 +15562,7 @@ async function renderFindings() {
                       <div style="font-size: 12px; color: var(--text-secondary); max-width: 480px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${f.description || f.reason || '—'}
                       </div>
-                      ${f.rule_used ? `<div style="font-size: 11px; color: #6366f1; margin-top: 2px;">📜 ${f.rule_used}</div>` : ''}
+                      ${f.rule_used ? `<div style="font-size: 11px; color: #6366f1; margin-top: 2px;">${f.rule_used}</div>` : ''}
                     </td>
                     <td>
                       ${getSeverityBadge(f.severity)}
@@ -15403,8 +15586,8 @@ async function renderFindings() {
                         <button class="btn btn-sm btn-primary" onclick="openFindingDetailModal(${f.id})">
                           Inspect
                         </button>
-                        <button class="btn btn-sm btn-secondary" onclick="generateFindingAIExplanation(${f.id})" title="View AI Explanation & ICAI Audit Procedures">
-                          🤖 AI
+                        <button class="btn btn-sm btn-secondary" onclick="generateFindingAIExplanation(${f.id})" title="View Audit Explanation & ICAI Procedures">
+                          ${ICONS.fileText} Explain
                         </button>
                       </div>
                     </td>
@@ -15444,19 +15627,19 @@ async function syncCentralizedFindings() {
   const btn = document.getElementById("btn-sync-findings");
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = `<span>⏳</span> Syncing Modules...`;
+    btn.innerHTML = `<span class="svg-icon" style="animation: spin 1s linear infinite;">${ICONS.refresh}</span> Syncing Modules...`;
   }
 
   try {
     const res = await FinAuditAPI.syncAllFindings(state.currentEngagementId);
-    notifyError(`✅ Centralized Findings Sync Complete!\n\nSynchronized ${res.data.total_collected} audit exceptions across all modules (${res.data.new_findings_created} new, ${res.data.existing_findings_updated} updated).`);
+    notifySuccess(`Centralized Findings Sync Complete!\n\nSynchronized ${res.data.total_collected} audit exceptions across all modules (${res.data.new_findings_created} new, ${res.data.existing_findings_updated} updated).`);
     await renderFindings();
   } catch (err) {
-    notifyError("❌ Error syncing centralized findings: " + err.message);
+    notifyError("Error syncing centralized findings: " + err.message);
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = `<span>⚡</span> Sync All Modules`;
+      btn.innerHTML = `${ICONS.refresh} Sync All Modules`;
     }
   }
 }
@@ -15483,7 +15666,7 @@ async function openFindingDetailModal(findingId) {
               </div>
               <div class="modal-title" style="font-size: 16px;">${finding.title}</div>
             </div>
-            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('finding-detail-modal')">✕</button>
+            <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('finding-detail-modal')">${ICONS.close}</button>
           </div>
 
           <div class="modal-body">
@@ -15491,7 +15674,7 @@ async function openFindingDetailModal(findingId) {
             <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; ">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                 <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e293b;">
-                  ⚡ Deterministic Risk Calculation Breakdown
+                  Deterministic Risk Calculation Breakdown
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted);">
                   Equation: <code style="background: var(--bg-sidebar); padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #4338ca;">${factors.equation || `${finding.risk_score}/10.0`}</code>
@@ -15526,12 +15709,12 @@ async function openFindingDetailModal(findingId) {
                 </div>
                 <div class="risk-factor-box">
                   <div class="factor-title">6. Data Quality</div>
-                  <div class="factor-value">${factors.data_quality_issue ? '⚠️ Compromised' : '✅ Verified'}</div>
+                  <div class="factor-value">${factors.data_quality_issue ? 'Compromised' : 'Verified'}</div>
                   <div class="factor-impact">+${factors.data_quality_impact || 0.0} penalty</div>
                 </div>
                 <div class="risk-factor-box">
                   <div class="factor-title">7. Historical Pattern</div>
-                  <div class="factor-value">${factors.historical_repeat ? '🔄 Recurring' : '🆕 First time'}</div>
+                  <div class="factor-value">${factors.historical_repeat ? 'Recurring' : 'First time'}</div>
                   <div class="factor-impact">+${factors.historical_impact || 0.0} pattern</div>
                 </div>
                 <div class="risk-factor-box" style="background: #f0fdf4; border-color: #bbf7d0;">
@@ -15611,7 +15794,7 @@ async function openFindingDetailModal(findingId) {
             <!-- Auditor Action & Status Update Section -->
             <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-top: 14px;">
               <div style="font-size: 12.5px; font-weight: 700; color: var(--text-main); margin-bottom: 10px;">
-                ✍️ Auditor Review & Working Paper Sign-off
+                Auditor Review & Working Paper Sign-off
               </div>
               
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
@@ -15677,7 +15860,7 @@ async function updateFindingReview(findingId) {
 async function generateFindingAIExplanation(findingId) {
   try {
     const res = await FinAuditAPI.getFindingAIExplanation(findingId);
-    notifyInfo(`🤖 AI Explainability Analysis for ${res.finding_code}:\n\n${res.ai_explanation}`);
+    notifyInfo(`Audit Explainability Analysis for ${res.finding_code}:\n\n${res.ai_explanation}`);
     await renderFindings();
   } catch (err) {
     notifyError("Error generating AI explanation: " + err.message);
@@ -15690,8 +15873,8 @@ function openCreateCustomFindingModal() {
     <div class="modal-overlay" id="create-custom-finding-modal">
       <div class="modal-card" style="max-width: 650px;">
         <div class="modal-header">
-          <div class="modal-title">➕ Record Manual Audit Observation</div>
-          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('create-custom-finding-modal')">✕</button>
+          <div class="modal-title">Record Manual Audit Observation</div>
+          <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('create-custom-finding-modal')">${ICONS.close}</button>
         </div>
         <div class="modal-body">
           <form onsubmit="handleCreateCustomFindingSubmit(event)">
@@ -15828,7 +16011,7 @@ async function renderAuditTrail() {
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
             <h1 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0;">Immutable Audit Trail & System Log</h1>
             <span class="badge" style="background: #ecfdf5; color: #059669; border: 1px solid var(--border); font-weight: 600; padding: 4px 10px; border-radius: 9999px;">
-              🔒 Append-Only Protected
+              Append-Only Protected
             </span>
           </div>
           <p style="color: var(--text-muted); font-size: 14px; margin: 0;">
@@ -16014,7 +16197,7 @@ async function refreshAuditTrailTable() {
     if (!res.items || res.items.length === 0) {
       tableWrap.innerHTML = `
         <div style="padding: 50px 20px; text-align: center;">
-          <div style="font-size: 32px; margin-bottom: 10px;">📋</div>
+          <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>
           <div style="font-size: 16px; font-weight: 600; color: #1e293b;">No audit records found</div>
           <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Try broadening your filter criteria or search keyword.</div>
         </div>
@@ -16034,7 +16217,7 @@ async function refreshAuditTrailTable() {
 
       const hasDiff = Boolean(log.old_value || log.new_value);
       const diffButton = hasDiff
-        ? `<button class="btn btn-sm btn-secondary" onclick="openAuditDiffModal(${log.id})" style="padding: 3px 8px; font-size: 11px;">🔍 Inspect Diff</button>`
+        ? `<button class="btn btn-sm btn-secondary" onclick="openAuditDiffModal(${log.id})" style="padding: 3px 8px; font-size: 11px;">${ICONS.search} Inspect Diff</button>`
         : `<span style="color: var(--text-muted); font-size: 11px;">N/A</span>`;
 
       return `
@@ -16237,7 +16420,7 @@ function openAuditDiffModal(logId) {
               Log #${log.id} • Action: <strong>${log.action}</strong> • Module: <strong>${log.module}</strong> • User: <strong>${log.username}</strong>
             </div>
           </div>
-          <button class="btn btn-sm btn-secondary" onclick="closeModal('audit-diff-modal')">✕</button>
+          <button class="btn btn-sm btn-secondary" onclick="closeModal('audit-diff-modal')">${ICONS.close}</button>
         </div>
 
         <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
@@ -16653,14 +16836,14 @@ async function refreshTopBarAIStatus() {
   try {
     const status = await FinAuditAPI.getAIStatus();
     if (!status.is_enabled) {
-      el.innerHTML = `<span style="color: var(--text-muted);">🤖 AI: Disabled</span>`;
+      el.innerHTML = `<span class="status-indicator-dot disabled"></span><span>Assistant: Disabled</span>`;
     } else if (status.is_available) {
-      el.innerHTML = `<span style="color: #10b981; font-weight: 700;">🤖 LM Studio: Connected</span>`;
+      el.innerHTML = `<span class="status-indicator-dot online"></span><span>Local Model: Ready</span>`;
     } else {
-      el.innerHTML = `<span style="color: #f59e0b;">🤖 LM Studio: Offline</span>`;
+      el.innerHTML = `<span class="status-indicator-dot offline"></span><span>Local Model: Offline</span>`;
     }
   } catch (e) {
-    el.innerHTML = `<span style="color: var(--text-muted);">🤖 LM Studio: Offline</span>`;
+    el.innerHTML = `<span class="status-indicator-dot offline"></span><span>Local Model: Offline</span>`;
   }
 }
 
@@ -16686,12 +16869,11 @@ async function renderAIManager() {
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
           <div>
             <div style="display: flex; align-items: center; gap: 10px;">
-              <h1 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0;">LM Studio Local AI Settings</h1>
-              <span class="badge" style="background: #065f46; color: #ffffff; font-weight: 700;">🔒 100% OFFLINE</span>
-              <span class="badge" style="background: #1e3a8a; color: #ffffff; font-weight: 700;">ZERO CLOUD TRANSMISSION</span>
+              <h1 style="font-size: 22px; font-weight: 700; color: var(--text-main); margin: 0;">Assistant & Local Model Settings</h1>
+              <span class="badge badge-low"><span class="status-indicator-dot online"></span>Local Engine</span>
             </div>
-            <p style="color: var(--text-muted); font-size: 13.5px; margin-top: 4px;">
-              Configure LM Studio local server endpoint, loaded models, sampling parameters, and local data privacy guard.
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">
+              Configure local inference server endpoint, loaded models, sampling parameters, and privacy controls.
             </p>
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -16709,20 +16891,19 @@ async function renderAIManager() {
           </div>
         </div>
 
-        <!-- Zero Cloud Transmission & Privacy Shield Banner -->
+        <!-- Local Privacy Controls Card -->
         <div class="ai-privacy-shield-box">
-          <div style="display: flex; align-items: center; gap: 14px;">
-            <div style="font-size: 32px;">🛡️</div>
+          <div style="display: flex; align-items: center; gap: 12px;">
             <div>
-              <div style="font-size: 15px; font-weight: 800; letter-spacing: 0.02em;">STRICT LOCAL PRIVACY SHIELD ACTIVE</div>
-              <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">
-                Client names, PAN, GSTIN, bank account numbers, raw financial records, and evidence documents are <b>never sent to any external cloud service</b>. All inference executes locally on this device via LM Studio.
+              <div style="font-size: 14px; font-weight: 600; color: var(--text-main);">Local Inference & Data Privacy Guard</div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                Client identifiers, PAN, GSTIN, accounts, and financial records are processed strictly on localhost via your configured local engine. External network transmission is prohibited.
               </div>
             </div>
           </div>
-          <div style="text-align: right; min-width: 140px;">
-            <div style="font-size: 11px; text-transform: uppercase; opacity: 0.8; font-weight: 700;">AI Provider</div>
-            <div style="font-size: 14px; font-weight: 800;">LM Studio (Localhost)</div>
+          <div style="text-align: right; min-width: 130px;">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Engine Endpoint</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">Localhost:1234</div>
           </div>
         </div>
 
@@ -16740,7 +16921,7 @@ async function renderAIManager() {
         ` : !isAvail ? `
           <div style="background: #fffbeb; border: 1px solid var(--border); border-left: 5px solid #d97706; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <div>
-              <div style="font-weight: 700; color: #92400e; font-size: 13.5px;">⚠️ LM Studio Disconnected (${st.model_location})</div>
+              <div style="font-weight: 700; color: #92400e; font-size: 13.5px;">Local Model Offline (${st.model_location})</div>
               <div style="font-size: 12px; color: #b45309; margin-top: 2px;">
                 <strong>${st.fallback_notice}</strong>
               </div>
@@ -16755,7 +16936,7 @@ async function renderAIManager() {
         ` : `
           <div style="background: #ecfdf5; border: 1px solid var(--border); border-left: 5px solid #059669; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
             <div>
-              <div style="font-weight: 700; color: #065f46; font-size: 13.5px;">🟢 LM Studio Connected & Ready for Local Inference</div>
+              <div style="font-weight: 700; color: #065f46; font-size: 13.5px;"><span class="status-indicator-dot online"></span> Local Model Connected & Ready</div>
               <div style="font-size: 12px; color: #047857; margin-top: 2px;">
                 Connected to LM Studio at <code>${st.model_location}</code> with model <b>${st.model_name}</b> (Latency: <b>${st.latency_ms} ms</b>).
               </div>
@@ -16793,7 +16974,7 @@ async function renderAIManager() {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                   <label class="form-label" style="margin: 0; font-weight: 700;">Loaded Model Name</label>
                   <button type="button" class="btn btn-sm btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="handleRefreshLMStudioModels()">
-                    🔄 Refresh Models
+                    ${ICONS.refresh} Refresh Models
                   </button>
                 </div>
                 <input type="text" id="ai-model-name" class="form-control" value="${escapeHtml(st.model_name || 'local-model')}" placeholder="e.g. meta-llama-3-8b-instruct or local-model">
@@ -16824,7 +17005,7 @@ async function renderAIManager() {
             <!-- Live Test Generation Output Box -->
             <div id="ai-test-output-box" style="display: none; margin-bottom: 20px; padding: 14px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
               <div style="font-weight: 700; color: var(--text-main); font-size: 13px; margin-bottom: 6px;">
-                🧪 Live AI Test Response:
+                Model Test Response:
               </div>
               <div id="ai-test-response-text" style="font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap;"></div>
             </div>
@@ -16832,7 +17013,7 @@ async function renderAIManager() {
             <!-- Redaction & Privacy Guard Demo Box -->
             <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px;">
               <div style="font-weight: 700; color: var(--text-main); font-size: 13px; margin-bottom: 6px;">
-                🔍 Live Data Sanitization & PII Redaction Preview
+                Data Sanitization & PII Redaction Preview
               </div>
               <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
                 Test how confidential client data (PAN, GSTIN, Bank Accounts) is automatically redacted before local LM Studio ingestion:
@@ -16850,7 +17031,7 @@ async function renderAIManager() {
           <!-- Right Column: Architecture & Instructions -->
           <div style="display: flex; flex-direction: column; gap: 20px;">
             <div class="ai-manager-card">
-              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">🏛️ LM Studio Architecture</h3>
+              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">Local Architecture</h3>
               <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; font-size: 12px; line-height: 1.6;">
                 <div style="font-weight: 700; color: #2563eb;">1. FinAuditPro Application</div>
                 <div style="color: var(--text-muted); margin-left: 14px;">↓ Local PII Redactor (Zero Cloud)</div>
@@ -16861,7 +17042,7 @@ async function renderAIManager() {
             </div>
 
             <div class="ai-manager-card">
-              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">📖 How to Run LM Studio</h3>
+              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">Running Local Inference</h3>
               <ol style="padding-left: 18px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0;">
                 <li>Download & launch <b>LM Studio</b> from <code>lmstudio.ai</code>.</li>
                 <li>Download any compatible instruction model (e.g. <i>Llama-3-8B-Instruct</i> or <i>Mistral-7B-Instruct</i>).</li>
@@ -16872,9 +17053,9 @@ async function renderAIManager() {
             </div>
 
             <div class="ai-manager-card">
-              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">⚙️ Deterministic Guarantee</h3>
+              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0;">Deterministic Guarantee</h3>
               <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.6;">
-                <div style="margin-bottom: 8px;">✅ <b>100% Core Audit Reliability:</b></div>
+                <div style="margin-bottom: 8px;"><b>Core Audit Reliability:</b></div>
                 <ul style="padding-left: 20px; color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
                   <li>General Ledger & Trial Balance math</li>
                   <li>Section 40A(3) & 269ST statutory rules</li>
@@ -17001,9 +17182,9 @@ async function testAIManagerConnection() {
   try {
     const res = await FinAuditAPI.testAIConnection();
     if (res.is_available) {
-      notifySuccess(`✅ LM Studio Connection Successful!\n\nEngine: ${res.engine}\nStatus: ${res.status_message}\nLatency: ${res.latency_ms} ms`);
+      notifySuccess(`Local Model Connection Successful!\n\nEngine: ${res.engine}\nStatus: ${res.status_message}\nLatency: ${res.latency_ms} ms`);
     } else {
-      notifyInfo(`⚠️ ${res.status_message}\n\nNotice: ${res.fallback_notice}`);
+      notifyInfo(`${res.status_message}\n\nNotice: ${res.fallback_notice}`);
     }
     await refreshTopBarAIStatus();
     await renderAIManager();
@@ -17061,7 +17242,7 @@ async function handleSanitizePreviewTest() {
   try {
     const res = await FinAuditAPI.previewSanitization(text, state.activeEngagement?.client_name);
     resultBox.innerHTML = `
-      <div style="color: #059669; font-weight: 700; margin-bottom: 4px;">✅ Sanitized Prompt (Safe for LM Studio):</div>
+      <div style="color: #059669; font-weight: 700; margin-bottom: 4px;">Sanitized Prompt (Local Engine):</div>
       <div style="background: var(--bg-app); padding: 6px; border-radius: 4px; border: 1px solid var(--border);">${escapeHtml(res.sanitized_text)}</div>
       <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
         Redacted: <b>${res.redaction_counts.pan || 0} PAN</b>, <b>${res.redaction_counts.gstin || 0} GSTIN</b>, <b>${res.redaction_counts.bank_account || 0} Bank A/C</b>, <b>${res.redaction_counts.client_name || 0} Client Name</b>

@@ -625,7 +625,9 @@ def activate_user(req: UserActivationSubmit):
         conn.commit()
 
         role = normalize_role(u["role"])
-        access_token = create_access_token({"sub": u["username"], "role": role, "uid": u["id"], "token_version": 2})
+        updated_row = conn.execute("SELECT token_version FROM users WHERE id = ?", (u["id"],)).fetchone()
+        new_token_ver = updated_row["token_version"] if updated_row and updated_row["token_version"] else 2
+        access_token = create_access_token({"sub": u["username"], "role": role, "uid": u["id"], "token_version": new_token_ver})
 
         return {
             "status": "success",

@@ -1,0 +1,7 @@
+# Add these entries to the root repository .gitignore if not already present:
+**/docker/.env
+**/.env
+__pycache__/
+.pytest_cache/
+venv/
+.venv/
