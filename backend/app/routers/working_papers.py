@@ -484,69 +484,70 @@ async def upload_supporting_document(
     description: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Uploads a supporting evidence document (PDF, Excel, Word, Image, CSV, etc.)
-    and attaches it to the working paper.
-    """
-    conn = get_db_connection()
-    row = conn.execute("SELECT * FROM working_papers WHERE id = ?", (wp_id,)).fetchone()
-    if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Working paper not found.")
-
-    wp = _parse_wp_row(row)
-    require_engagement_access(wp["engagement_id"], current_user)
-    now_str = datetime.now().isoformat()
-
-    # Read and validate file size (bounded to 50 MB)
+    """Upload a working-paper document and index it atomically as audit evidence."""
     content = await file.read(MAX_WP_FILE_SIZE + 1)
-    file_size = len(content)
-    if file_size > MAX_WP_FILE_SIZE:
-        conn.close()
+    if len(content) > MAX_WP_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File size exceeds maximum limit of 50 MB.")
 
     import hashlib
     sha256_hash = hashlib.sha256(content).hexdigest()
-
     original_name = os.path.basename(file.filename or "evidence.bin")
     file_ext = Path(original_name).suffix.lower()
     stored_filename = f"{uuid.uuid4().hex}{file_ext}"
-
     dest_path = resolve_safe_evidence_path(wp_id, stored_filename)
-    dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(dest_path, "wb") as f:
-        f.write(content)
-
     rel_path = f"uploaded_files/working_papers/wp_{wp_id}/{stored_filename}"
-    doc_id = str(uuid.uuid4())[:8]
+    conn = get_db_connection()
+    file_created = False
 
-    # Check for existing version with same original name
-    attached_files = wp.get("attached_files") or []
-    matching_existing = [d for d in attached_files if d.get("name") == original_name]
-    doc_version = len(matching_existing) + 1
-    parent_id = matching_existing[-1].get("id") if matching_existing else None
-
-    new_doc = {
-        "id": doc_id,
-        "name": original_name,
-        "file_name": stored_filename,
-        "file_path": rel_path,
-        "size_bytes": file_size,
-        "size_display": f"{file_size / 1024:.1f} KB" if file_size < 1024 * 1024 else f"{file_size / (1024 * 1024):.2f} MB",
-        "content_type": file.content_type or "application/octet-stream",
-        "sha256_hash": sha256_hash,
-        "version": doc_version,
-        "parent_id": parent_id,
-        "description": description or "",
-        "uploaded_by": current_user.get("full_name", "Auditor"),
-        "uploaded_at": now_str
-    }
-
-    attached_files.append(new_doc)
-
-    # Register in immutable evidence_items table
     try:
+        # Serialize per-working-paper updates so uploads cannot overwrite one another's metadata.
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM working_papers WHERE id = ?", (wp_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Working paper not found.")
+
+        wp = _parse_wp_row(row)
+        require_engagement_access(wp["engagement_id"], current_user)
+        now_str = datetime.now().isoformat()
+        attached_files = wp.get("attached_files") or []
+        matching_existing = [doc for doc in attached_files if doc.get("name") == original_name]
+        json_parent_id = matching_existing[-1].get("id") if matching_existing else None
+
+        # evidence_items is canonical for cryptographic evidence versioning.
+        parent_evidence = conn.execute(
+            """
+            SELECT id, version FROM evidence_items
+            WHERE working_paper_id = ? AND original_filename = ?
+            ORDER BY version DESC, id DESC LIMIT 1
+            """,
+            (wp_id, original_name),
+        ).fetchone()
+        previous_db_version = int(parent_evidence["version"] or 0) if parent_evidence else 0
+        doc_version = max(len(matching_existing) + 1, previous_db_version + 1)
+        parent_evidence_id = parent_evidence["id"] if parent_evidence else None
+
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(dest_path, "xb") as evidence_file:
+            evidence_file.write(content)
+        file_created = True
+
+        doc_id = str(uuid.uuid4())[:8]
+        new_doc = {
+            "id": doc_id,
+            "name": original_name,
+            "file_name": stored_filename,
+            "file_path": rel_path,
+            "size_bytes": len(content),
+            "size_display": f"{len(content) / 1024:.1f} KB" if len(content) < 1024 * 1024 else f"{len(content) / (1024 * 1024):.2f} MB",
+            "content_type": file.content_type or "application/octet-stream",
+            "sha256_hash": sha256_hash,
+            "version": doc_version,
+            "parent_id": json_parent_id,
+            "description": description or "",
+            "uploaded_by": current_user.get("full_name", "Auditor"),
+            "uploaded_at": now_str,
+        }
+
         from backend.app.repositories.evidence_repo import EvidenceRepository
         ev_repo = EvidenceRepository(conn)
         ev_repo.register_evidence(
@@ -555,41 +556,58 @@ async def upload_supporting_document(
             filename=stored_filename,
             original_filename=original_name,
             storage_path=rel_path,
-            file_size=file_size,
+            file_size=len(content),
             mime_type=file.content_type or "application/octet-stream",
             sha256_hash=sha256_hash,
+            uploaded_by=current_user.get("full_name", "Auditor"),
+            parent_evidence_id=parent_evidence_id,
+            replacement_reason=(description or "New evidence version") if parent_evidence_id else None,
             version=doc_version,
-            uploaded_by=current_user.get("full_name", "Auditor")
         )
+
+        attached_files.append(new_doc)
+        cursor = conn.execute(
+            "UPDATE working_papers SET attached_files_json = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(attached_files), now_str, wp_id),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Working paper attachment metadata was not saved.")
+
+        from backend.app.utils.audit_logger import log_audit_event
+        log_audit_event(
+            conn=conn,
+            action="UPLOAD_WP_EVIDENCE",
+            module="WORKING_PAPERS",
+            record_id=wp_id,
+            user=current_user,
+            engagement_id=wp["engagement_id"],
+            details=(
+                f"Uploaded supporting document '{original_name}' (v{doc_version}, "
+                f"SHA-256: {sha256_hash[:12]}..., {new_doc['size_display']}) "
+                f"to WP [{wp['wp_reference']}]"
+            ),
+            timestamp=now_str,
+        )
+
+        conn.commit()
+        file_created = False
+        return {
+            "status": "success",
+            "document": new_doc,
+            "message": f"Document '{original_name}' (v{doc_version}) uploaded and cryptographically indexed successfully.",
+        }
     except Exception:
-        pass
-
-    conn.execute(
-        "UPDATE working_papers SET attached_files_json = ?, updated_at = ? WHERE id = ?",
-        (json.dumps(attached_files), now_str, wp_id)
-    )
-
-    # Audit log
-    from backend.app.utils.audit_logger import log_audit_event
-    log_audit_event(
-        conn=conn,
-        action="UPLOAD_WP_EVIDENCE",
-        module="WORKING_PAPERS",
-        record_id=wp_id,
-        user=current_user,
-        engagement_id=wp["engagement_id"],
-        details=f"Uploaded supporting document '{original_name}' (v{doc_version}, SHA-256: {sha256_hash[:12]}..., {new_doc['size_display']}) to WP [{wp['wp_reference']}]",
-        timestamp=now_str
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "status": "success",
-        "document": new_doc,
-        "message": f"Document '{original_name}' (v{doc_version}) uploaded and cryptographically indexed successfully."
-    }
+        if conn.in_transaction:
+            conn.rollback()
+        if file_created and dest_path.exists():
+            try:
+                dest_path.unlink()
+            except OSError:
+                # Keep the original exception; a stray file can be reconciled separately.
+                pass
+        raise
+    finally:
+        conn.close()
 
 
 @router.delete("/{wp_id}/document/{doc_id}")
