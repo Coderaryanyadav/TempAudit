@@ -12,47 +12,70 @@ import secrets
 ALGORITHM = "HS256"
 
 def get_session_timeout_minutes() -> int:
-    """Reads configured session timeout from app_settings or defaults to 60 minutes."""
+    """Read the configured session timeout, falling back safely if settings cannot be read."""
+    conn = None
     try:
         conn = get_db_connection()
-        row = conn.execute("SELECT value FROM app_settings WHERE key = 'session_timeout_minutes'").fetchone()
-        conn.close()
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key = 'session_timeout_minutes'"
+        ).fetchone()
         if row and row["value"]:
             return max(5, int(row["value"]))
     except Exception:
-        pass
+        return 60
+    finally:
+        if conn is not None:
+            conn.close()
     return 60
 
+
 def get_jwt_secret() -> str:
-    """Retrieves secret key from environment or persisted database settings (Refusing hardcoded fallbacks)."""
+    """Return an environment secret or atomically create/read the persisted local secret."""
     env_secret = os.environ.get("FINAUDIT_SECRET_KEY")
     if env_secret:
         return env_secret
-    
+
+    conn = None
     try:
         conn = get_db_connection()
-        conn.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)")
-        row = conn.execute("SELECT value FROM app_settings WHERE key = 'jwt_secret_key'").fetchone()
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS app_settings "
+            "(key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)"
+        )
+        # Serialize first-time creation so concurrent requests cannot overwrite one another's key.
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key = 'jwt_secret_key'"
+        ).fetchone()
         if row and row["value"]:
             secret = row["value"]
-            conn.close()
+            conn.commit()
             return secret
-        
+
         new_secret = secrets.token_hex(32)
         now_str = datetime.now(timezone.utc).isoformat()
-        conn.execute("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('jwt_secret_key', ?, ?)", (new_secret, now_str))
+        conn.execute(
+            "INSERT INTO app_settings (key, value, updated_at) VALUES ('jwt_secret_key', ?, ?)",
+            (new_secret, now_str),
+        )
         conn.commit()
-        conn.close()
         return new_secret
-    except Exception as e:
-        raise RuntimeError("JWT secret is unavailable; refusing to start authentication.") from e
+    except Exception as exc:
+        if conn is not None and conn.in_transaction:
+            conn.rollback()
+        raise RuntimeError(
+            "JWT secret is unavailable; refusing to start authentication."
+        ) from exc
+    finally:
+        if conn is not None:
+            conn.close()
 
-SECRET_KEY = get_jwt_secret()
 
 security = HTTPBearer(auto_error=False)
 
 JWT_ISSUER = "finauditpro"
 JWT_AUDIENCE = "finauditpro-app"
+
 
 def hash_password(password: str, salt: str = None) -> str:
     """Hashes password using PBKDF2-HMAC-SHA256 with 100,000 iterations and random salt."""
@@ -91,15 +114,23 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
         timeout_mins = get_session_timeout_minutes()
         expire = now_utc + timedelta(minutes=timeout_mins)
     
-    # Ensure token_version is included
+    # Ensure token_version is included; close the connection even if the query fails.
     if "token_version" not in to_encode:
+        conn = None
         try:
             conn = get_db_connection()
-            user = conn.execute("SELECT token_version FROM users WHERE username = ?", (data.get("sub"),)).fetchone()
-            conn.close()
-            to_encode["token_version"] = user["token_version"] if user and user["token_version"] else 1
+            user = conn.execute(
+                "SELECT token_version FROM users WHERE username = ?",
+                (data.get("sub"),),
+            ).fetchone()
+            to_encode["token_version"] = (
+                user["token_version"] if user and user["token_version"] else 1
+            )
         except Exception:
             to_encode["token_version"] = 1
+        finally:
+            if conn is not None:
+                conn.close()
 
     to_encode.update({
         "exp": expire,
@@ -142,7 +173,7 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
         raise HTTPException(
             status_code=401,
             detail="Authentication required. Please provide a valid Bearer token.",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     token = credentials.credentials
@@ -153,12 +184,14 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
             secret,
             algorithms=[ALGORITHM],
             issuer=JWT_ISSUER,
-            audience=JWT_AUDIENCE
+            audience=JWT_AUDIENCE,
         )
-        username: str = payload.get("sub")
-        jti: str = payload.get("jti")
-        token_version: int = payload.get("token_version", 1)
-        if not username:
+        username = payload.get("sub")
+        jti = payload.get("jti")
+        token_version = payload.get("token_version", 1)
+        if not isinstance(username, str) or not username.strip():
+            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        if isinstance(token_version, bool) or not isinstance(token_version, int) or token_version < 1:
             raise HTTPException(status_code=401, detail="Invalid authentication credentials")
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
@@ -167,29 +200,48 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
 
     conn = get_db_connection()
     try:
-        # Check if JTI was explicitly revoked (Flaw 27)
         if jti:
-            revoked = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti = ?", (jti,)).fetchone()
+            revoked = conn.execute(
+                "SELECT 1 FROM revoked_tokens WHERE jti = ?",
+                (jti,),
+            ).fetchone()
             if revoked:
                 raise HTTPException(status_code=401, detail="Token has been revoked. Please log in again.")
 
-        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        user = conn.execute(
+            "SELECT * FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
     finally:
         conn.close()
-    
+
     if user is None:
         raise HTTPException(status_code=401, detail="User account not found")
-    
-    user_dict = dict(user)
-    if not user_dict.get("is_active", 1) or user_dict.get("status") == "DISABLED":
-        raise HTTPException(status_code=403, detail="Account is disabled. Please contact your audit administrator.")
 
-    # Check token_version for password changes / admin resets (Flaws 28, 29)
+    user_dict = dict(user)
+    status = str(user_dict.get("status") or "ACTIVE").strip().upper()
+    if not user_dict.get("is_active", 1) or status == "DISABLED":
+        raise HTTPException(
+            status_code=403,
+            detail="Account is disabled. Please contact your audit administrator.",
+        )
+    if status == "LOCKED":
+        raise HTTPException(status_code=403, detail="Account is locked. Please contact your audit administrator.")
+    if status == "INVITED":
+        raise HTTPException(status_code=403, detail="Account activation is required before signing in.")
+    if status not in {"ACTIVE", ""}:
+        raise HTTPException(status_code=403, detail="Account status is invalid. Please contact your audit administrator.")
+
     current_version = user_dict.get("token_version", 1) or 1
-    if token_version < current_version:
-        raise HTTPException(status_code=401, detail="Session has been invalidated due to a password or role change. Please log in again.")
+    # Any mismatch is invalid: accepting a future version is fail-open behavior.
+    if token_version != current_version:
+        raise HTTPException(
+            status_code=401,
+            detail="Session has been invalidated due to a password or role change. Please log in again.",
+        )
 
     return user_dict
+
 
 def normalize_role(role: Optional[str]) -> Optional[str]:
     """Normalizes user roles. Fails closed (returns None) on unknown or unexpected role values."""
