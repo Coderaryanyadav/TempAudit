@@ -18,6 +18,7 @@ from backend.app.routers.audit_trail import _validate_restorable_sqlite
 from backend.app.routers.auth import _activation_token_is_expired
 from backend.app.services.backup_service import BACKUP_DIR, BackupService
 from backend.app.repositories.evidence_repo import EvidenceRepository
+from backend.app.utils.audit_logger import log_audit_event
 
 client = TestClient(app)
 
@@ -34,6 +35,37 @@ def _update_user(username: str, **values) -> None:
             (*values.values(), username),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def test_standalone_audit_append_commits_and_links_previous_hash():
+    conn = get_db_connection()
+    try:
+        previous = conn.execute(
+            "SELECT entry_hash FROM audit_logs ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        expected_previous = (
+            previous["entry_hash"]
+            if previous and previous["entry_hash"]
+            else "GENESIS_HASH_00000000000000000000000000000000"
+        )
+
+        log_audit_event(
+            conn=conn,
+            action="SECURITY_REGRESSION_TEST",
+            module="TEST",
+            details="Verify standalone audit append transaction",
+            user={"id": 1, "username": "admin"},
+        )
+
+        latest = conn.execute(
+            "SELECT previous_hash, entry_hash FROM audit_logs ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        assert latest is not None
+        assert latest["previous_hash"] == expected_previous
+        assert latest["entry_hash"]
+        assert conn.in_transaction is False
     finally:
         conn.close()
 
