@@ -53,43 +53,43 @@ def download_evidence(
     evidence_id: int,
     current_user: dict = Depends(get_current_user)
 ):
-    """Downloads evidence artifact verifying hash integrity prior to streaming."""
+    """Download evidence only from the upload root after verifying its registered hash."""
     conn = get_db_connection()
-    repo = EvidenceRepository(conn)
-    evidence = repo.get_by_id(evidence_id)
-    if not evidence:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Evidence record not found.")
+    try:
+        repo = EvidenceRepository(conn)
+        evidence = repo.get_by_id(evidence_id)
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Evidence record not found.")
 
-    require_engagement_access(evidence["engagement_id"], current_user)
-    
-    storage_path = evidence["storage_path"]
-    if os.path.isabs(storage_path):
-        abs_path = storage_path
-    else:
-        abs_path = os.path.join(os.path.dirname(BASE_EVIDENCE_DIR), storage_path)
-
-    if not os.path.exists(abs_path):
-        conn.close()
-        raise HTTPException(status_code=404, detail="Physical evidence file not found on disk.")
-
-    # Integrity verification
-    sha = hashlib.sha256()
-    with open(abs_path, "rb") as f:
-        while chunk := f.read(65536):
-            sha.update(chunk)
-    disk_hash = sha.hexdigest()
-
-    if disk_hash != evidence["sha256_hash"]:
-        conn.close()
-        raise HTTPException(
-            status_code=409,
-            detail=f"Evidence Integrity Failure: Expected SHA-256 {evidence['sha256_hash']} but disk file has {disk_hash}"
+        require_engagement_access(evidence["engagement_id"], current_user)
+        abs_path = repo.resolve_storage_path(
+            evidence.get("storage_path"),
+            base_dir=os.path.dirname(BASE_EVIDENCE_DIR),
         )
+        if abs_path is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Evidence storage path is invalid or escapes the evidence storage directory.",
+            )
+        if not os.path.isfile(abs_path):
+            raise HTTPException(status_code=404, detail="Physical evidence file not found on disk.")
 
-    conn.close()
-    return FileResponse(
-        path=abs_path,
-        filename=evidence["original_filename"],
-        media_type=evidence["mime_type"]
-    )
+        sha = hashlib.sha256()
+        with open(abs_path, "rb") as evidence_file:
+            while chunk := evidence_file.read(65536):
+                sha.update(chunk)
+        disk_hash = sha.hexdigest()
+
+        if disk_hash != evidence["sha256_hash"]:
+            raise HTTPException(
+                status_code=409,
+                detail="Evidence integrity verification failed; the file may have been modified.",
+            )
+
+        return FileResponse(
+            path=abs_path,
+            filename=os.path.basename(evidence["original_filename"]),
+            media_type=evidence["mime_type"],
+        )
+    finally:
+        conn.close()
