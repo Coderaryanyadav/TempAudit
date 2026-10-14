@@ -1,5 +1,6 @@
 import os
 import json
+import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -351,7 +352,7 @@ def generate_audit_report_pdf(
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_title_display = REPORT_TITLES.get(report_type, "Audit Analysis Report")
     clean_type = report_type.replace("_", "-")
-    pdf_filename = f"FinAuditPro_{clean_type}_Eng{engagement_id}_{timestamp_str}.pdf"
+    pdf_filename = f"FinAuditPro_{clean_type}_Eng{engagement_id}_{timestamp_str}_{uuid.uuid4().hex[:8]}.pdf"
     pdf_path = os.path.join(output_dir, pdf_filename)
 
     doc = SimpleDocTemplate(
