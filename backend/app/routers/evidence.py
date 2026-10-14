@@ -19,34 +19,38 @@ def list_engagement_evidence(
     engagement_id: int,
     current_user: dict = Depends(get_current_user)
 ):
-    """Lists all immutable evidence artifacts registered for an engagement."""
+    """List evidence records for an engagement after validating the caller's access."""
     require_engagement_access(engagement_id, current_user)
     conn = get_db_connection()
-    repo = EvidenceRepository(conn)
-    items = repo.list_by_engagement(engagement_id)
-    conn.close()
-    return {"engagement_id": engagement_id, "evidence_count": len(items), "evidence_items": items}
+    try:
+        repo = EvidenceRepository(conn)
+        items = repo.list_by_engagement(engagement_id)
+        return {"engagement_id": engagement_id, "evidence_count": len(items), "evidence_items": items}
+    finally:
+        conn.close()
+
 
 @router.get("/verify/{evidence_id}")
 def verify_evidence_hash(
     evidence_id: int,
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Verifies physical SHA-256 integrity against immutable database record.
-    Detects any file tampering or corruption.
-    """
+    """Verify file integrity for a registered evidence record."""
     conn = get_db_connection()
-    repo = EvidenceRepository(conn)
-    evidence = repo.get_by_id(evidence_id)
-    if not evidence:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Evidence record not found.")
+    try:
+        repo = EvidenceRepository(conn)
+        evidence = repo.get_by_id(evidence_id)
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Evidence record not found.")
 
-    require_engagement_access(evidence["engagement_id"], current_user)
-    result = repo.verify_physical_integrity(evidence_id, base_dir=os.path.dirname(BASE_EVIDENCE_DIR))
-    conn.close()
-    return result
+        require_engagement_access(evidence["engagement_id"], current_user)
+        return repo.verify_physical_integrity(
+            evidence_id,
+            base_dir=os.path.dirname(BASE_EVIDENCE_DIR),
+        )
+    finally:
+        conn.close()
+
 
 @router.get("/download/{evidence_id}")
 def download_evidence(
