@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FinAuditPro — Offline AI-Assisted Audit Assistant</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=2.0.0">
+  <title>FinAuditPro — Audit Workspace</title>
+  <link rel="stylesheet" href="/static/css/styles.css?v=2.1.0">
 </head>
 
 <body>
@@ -16,10 +16,10 @@
     <!-- Sidebar Navigation -->
     <nav id="sidebar" role="navigation" aria-label="Main Navigation">
       <div class="brand-header">
-        <div class="brand-icon" title="FinAuditPro">F</div>
+        <div class="brand-icon" title="FinAuditPro">FA</div>
         <div style="flex: 1; min-width: 0;">
           <div class="brand-title">FinAuditPro</div>
-          <div class="brand-subtitle" style="font-size: 10px; color: #94a3b8;">Standalone CA Suite</div>
+          <div class="brand-subtitle" style="font-size: 10px; color: #94a3b8;">Audit Workspace</div>
         </div>
         <button id="sidebar-collapse-toggle" class="sidebar-toggle-btn" title="Toggle Sidebar Width" aria-label="Toggle Sidebar">
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +118,7 @@
           <span class="nav-item-text">Duplicates & Sequence Gaps</span>
         </button>
 
-        <div class="nav-section-title">AI & Exception Engine</div>
+        <div class="nav-section-title">Analysis</div>
         <button class="nav-item" data-tab="anomaly_detection" role="tab" aria-selected="false" tabindex="0">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
@@ -204,8 +204,8 @@
       </div>
 
       <div class="sidebar-footer">
-        <span class="offline-pill"><span class="offline-dot"></span> <span class="sidebar-footer-text">100% OFFLINE</span></span>
-        <span class="sidebar-footer-text">Local SQLite</span>
+        <span class="offline-pill"><span class="offline-dot"></span> <span class="sidebar-footer-text">Local processing</span></span>
+        <span class="sidebar-footer-text">SQLite</span>
       </div>
     </nav>
 
@@ -238,13 +238,11 @@
         </button>
 
         <div class="top-bar-actions" style="display: flex; align-items: center; gap: 14px; margin-left: auto;">
-          <!-- Prominent Offline Mode & AI Indicator -->
+          <!-- Local processing and model status -->
           <div id="top-offline-badge" class="top-offline-pill" onclick="navigateTo('ai_manager')"
-            title="100% Offline Standalone Application — Click to configure Local AI Model & Privacy Guard">
-            <span class="offline-dot"></span>
-            <span style="font-weight: 700; letter-spacing: 0.03em;">OFFLINE MODE</span>
-            <span style="color: #475569;">|</span>
-            <span id="top-ai-status-text">🤖 Local AI: Checking...</span>
+            title="View local processing and model status">
+            <span class="offline-dot" id="top-ai-status-dot" aria-hidden="true"></span>
+            <span id="top-ai-status-text">Checking local model…</span>
           </div>
 
           <div class="user-profile-menu-wrap">
@@ -258,13 +256,13 @@
             <!-- Profile Dropdown -->
             <div class="user-dropdown-menu" id="user-dropdown-menu" role="menu">
               <div class="user-dropdown-item" role="menuitem" tabindex="0" onclick="openChangePasswordModal()">
-                <span>🔒</span> Change My Password
+                Change My Password
               </div>
               <div class="user-dropdown-item" role="menuitem" tabindex="0" onclick="navigateTo('ai_manager')">
-                <span>🤖</span> Local AI Manager
+                Local AI Manager
               </div>
               <div class="user-dropdown-item danger" role="menuitem" tabindex="0" onclick="handleLogout()">
-                <span>🚪</span> Sign Out
+                Sign Out
               </div>
             </div>
           </div>
@@ -295,8 +293,8 @@
   <div id="fin-confirm-container"></div>
   <div id="global-search-container"></div>
 
-  <script src="/static/js/api.js?v=2.0.0"></script>
-  <script src="/static/js/app.js?v=2.0.0"></script>
+  <script src="/static/js/api.js?v=2.1.0"></script>
+  <script src="/static/js/app.js?v=2.1.0"></script>
 </body>
 
 </html>

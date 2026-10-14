@@ -243,7 +243,7 @@ function renderErrorBanner(err, contextTitle = "Action Failed") {
   return `
     <div class="error-banner-card">
       <div class="error-banner-header">
-        <div class="error-banner-icon">⚠️</div>
+        <div class="error-banner-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
         <div>
           <h4 class="error-banner-title">${escapeHTML(translated.title)}</h4>
           <p class="error-banner-message">${escapeHTML(translated.friendlyMessage)}</p>
@@ -697,7 +697,7 @@ function showSetupWizard(step = 1, errorMsg = null) {
           </div>
 
           <div style="background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
-            <div style="font-weight: 700; font-size: 14px; color: #0284c7; margin-bottom: 6px;">🤖 Local AI Inference Privacy Shield</div>
+            <div style="font-weight: 700; font-size: 14px; color: #0284c7; margin-bottom: 6px;">Local model processing</div>
             <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
               FinAuditPro connects strictly to offline local LLMs (LM Studio / Ollama / Built-in Reasoner). All prompts automatically sanitize client PANs, GSTINs, bank accounts, and entity names.
             </div>
@@ -998,7 +998,7 @@ function showActivationModal(initialToken = "") {
 
         <div style="display: flex; justify-content: center; gap: 8px; margin-top: 14px;">
           <button class="btn btn-secondary btn-sm" onclick="checkAuthSession()">← Back to Setup / Login</button>
-          <button class="btn btn-outline btn-sm" onclick="showSetupWizard(1)" style="color: #0284c7; border-color: #0284c7;">🚀 First-Time Setup</button>
+          <button class="btn btn-outline btn-sm" onclick="showSetupWizard(1)" style="color: #0284c7; border-color: #0284c7;">First-Time Setup</button>
         </div>
       </div>
     </div>
@@ -1065,7 +1065,7 @@ function showSystemDatabaseError(errorMsg) {
   overlay.innerHTML = `
     <div class="login-card" style="max-width: 500px; border-top: 4px solid #ef4444;">
       <div class="login-header" style="background: #0f172a; padding: 24px; text-align: center;">
-        <div style="font-size: 36px; margin-bottom: 8px;">⚠️</div>
+        <div style="font-size: 36px; margin-bottom: 8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
         <div class="login-title" style="font-size: 20px; color: #f87171;">Installation Diagnostic Alert</div>
         <div class="login-subtitle">FinAuditPro could not safely open this installation</div>
       </div>
@@ -1437,7 +1437,7 @@ async function handleGlobalSearchQuery(e) {
     matchedEngagements.forEach(eng => {
       html += `
         <div class="search-result-row" onclick="selectEngagementFromSearch(${eng.id})">
-          <div class="search-result-icon">📁</div>
+          <div class="search-result-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10H3V7z"></path></svg></div>
           <div class="search-result-details">
             <div class="search-result-title">${escapeHTML(eng.client_name)} — ${escapeHTML(eng.title)}</div>
             <div class="search-result-sub">FY ${escapeHTML(eng.financial_year)} • ${escapeHTML(eng.audit_type || 'Statutory Audit')}</div>
@@ -1480,7 +1480,7 @@ async function handleGlobalSearchQuery(e) {
     matchedTabs.forEach(t => {
       html += `
         <div class="search-result-row" onclick="navigateToTabFromSearch('${t.id}')">
-          <div class="search-result-icon">⚡</div>
+          <div class="search-result-icon" aria-hidden="true">→</div>
           <div class="search-result-details">
             <div class="search-result-title">${escapeHTML(t.label)}</div>
             <div class="search-result-sub">${escapeHTML(t.desc)}</div>
@@ -1514,7 +1514,7 @@ window.selectEngagementFromSearch = async function(engId) {
 function renderEmptyEngagementGuide(container, tabName = "dashboard") {
   container.innerHTML = `
     <div class="onboarding-hero-card">
-      <div class="onboarding-hero-icon">🚀</div>
+      <div class="onboarding-hero-icon" aria-hidden="true">FA</div>
       <h2 class="onboarding-hero-title">Welcome to FinAuditPro!</h2>
       <p class="onboarding-hero-desc">
         You don't have any audit engagements configured yet. To begin auditing, create a client record and initialize your first audit engagement.
@@ -2164,7 +2164,7 @@ async function renderClients(searchQuery = null, entityFilter = null) {
         </div>
         ${clients.length === 0 ? `
           <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 44px; margin-bottom: 10px;">🏢</div>
+            <div style="font-size: 44px; margin-bottom: 10px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg></div>
             <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No clients yet</div>
             <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
               Register your audited entity to establish tenancy, define statutory identifiers (PAN, GSTIN), and begin creating audit engagements.
@@ -2221,14 +2221,14 @@ async function renderClients(searchQuery = null, entityFilter = null) {
                     <td class="text-center">
                       <div style="display: flex; gap: 6px; justify-content: center;">
                         <button class="btn btn-sm btn-secondary" onclick="openClientHistoryDrawer(${c.id})" title="View Historical Multi-Year Timeline">
-                          📅 Previous Years
+                          Previous Years
                         </button>
                         ${isAuditorOrAdmin ? `
                           <button class="btn btn-sm btn-secondary" onclick="openCreateEngagementModal(${c.id})" title="Create Audit Engagement">
                             + Engagement
                           </button>
                           <button class="btn btn-sm btn-secondary" onclick="openEditClientModal(${c.id})" title="Edit Client Profile">
-                            ✏️ Edit
+                            Edit
                           </button>
                         ` : ''}
                       </div>
@@ -2753,10 +2753,10 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
                         `}
                         ${isAuditorOrAdmin ? `
                           <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${e.id})" title="Duplicate structure to a new financial year">
-                            📑 Clone FY
+                            Clone FY
                           </button>
                           <button class="btn btn-sm btn-secondary" onclick="openEditEngagementModal(${e.id})" title="Edit Details">
-                            ✏️ Edit
+                            Edit
                           </button>
                         ` : ''}
                       </div>
@@ -3399,7 +3399,7 @@ function renderMappingWorkspace(preview) {
             🔍 Validate Data Integrity
           </button>
           <button class="btn btn-primary" onclick="handleConfirmImport(${preview.file_id}, '${preview.data_category}')">
-            ⚡ Confirm & Import Data
+            Confirm & Import Data
           </button>
         </div>
       </div>
@@ -3472,7 +3472,7 @@ function renderMappingWorkspace(preview) {
 
         <div style="margin-top: 16px; padding: 12px; background: var(--bg-app); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
           <div style="font-size: 12px; color: var(--text-muted);">
-            💡 <b>Auditor Tip:</b> FinAuditPro never alters raw values. Original strings are stored for audit defense.
+            <b>Auditor note:</b> FinAuditPro never alters raw values. Original strings are stored for audit defense.
           </div>
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-secondary" onclick="document.getElementById('mapping-workspace-container').innerHTML = ''">Cancel</button>
@@ -3661,7 +3661,7 @@ async function handleConfirmImport(fileId, dataCategory) {
                 📊 View Trial Balance
               </button>
               <button class="btn btn-primary" style="flex: 1;" onclick="closeModal('import-success-modal'); triggerRunHybridEngine()">
-                ⚡ Run Audit Engine
+                Run Audit Engine
               </button>
             </div>
           </div>
@@ -3754,7 +3754,7 @@ async function renderDataCleaningLogs() {
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary" onclick="openNormalizationSandboxModal()">
-            ⚡ Rule Sandbox & Tester
+            Rule Sandbox & Tester
           </button>
           <button class="btn btn-primary" onclick="navigateTo('import')">
             + Import More Data
@@ -4111,7 +4111,7 @@ function openNormalizationSandboxModal() {
     <div class="modal-overlay" id="sandbox-modal">
       <div class="modal-card" style="max-width: 650px;">
         <div class="modal-header">
-          <div class="modal-title">⚡ Interactive Data Normalization Sandbox</div>
+          <div class="modal-title">Data Normalization Sandbox</div>
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('sandbox-modal')">✕</button>
         </div>
         <div class="modal-body">
@@ -4152,7 +4152,7 @@ function openNormalizationSandboxModal() {
                 <input type="text" id="sandbox-raw-input" class="form-control font-mono" placeholder="e.g. 01-Apr-2026 or ₹ 1,50,000.00" value="01-Apr-2026" required>
               </div>
               <div>
-                <button type="submit" class="btn btn-primary" style="padding: 8px 14px;">⚡ Transform</button>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 14px;">Transform</button>
               </div>
             </div>
           </form>
@@ -4225,7 +4225,7 @@ async function handleSandboxPreviewSubmit(event) {
             <b>Applied Rule:</b> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${escapeHtml(res.transformation_rule)}</code>
           </div>
           <div style="font-size: 11px; color: var(--text-muted);">
-            ${res.is_transformed ? '✨ Transformed from raw' : 'Identical to raw'}
+            ${res.is_transformed ? 'Transformed from raw' : 'Identical to raw'}
           </div>
         </div>
       </div>
@@ -4296,10 +4296,10 @@ async function renderDashboard() {
               </button>
             ` : ''}
             <button class="btn btn-secondary" onclick="navigateTo('clients')">
-              🏢 Clients
+              Clients
             </button>
             <button class="btn btn-secondary" onclick="navigateTo('settings')">
-              ⚙️ Settings
+              Settings
             </button>
           </div>
         </div>
@@ -4309,7 +4309,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-blue" onclick="navigateTo('clients')" title="Click to view all active clients">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Active Clients</span>
-              <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">🏢</div>
+              <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg></div>
             </div>
             <div class="dash-stat-val">${cards.active_clients_count || 0}</div>
             <div class="dash-stat-sub"><span>Registered audit clients</span></div>
@@ -4318,7 +4318,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-indigo" onclick="navigateTo('engagements')" title="Click to view all active audit engagements">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Active Engagements</span>
-              <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">📁</div>
+              <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10H3V7z"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #4f46e5;">${cards.active_engagements_count || 0}</div>
             <div class="dash-stat-sub"><span>In Progress / Draft audits</span></div>
@@ -4327,7 +4327,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-amber">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Open Findings</span>
-              <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">⚠️</div>
+              <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #d97706;">0</div>
             <div class="dash-stat-sub"><span>Unresolved observations</span></div>
@@ -4336,7 +4336,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-red">
             <div class="dash-stat-header">
               <span class="dash-stat-title">High-Risk Findings</span>
-              <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">🚨</div>
+              <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #dc2626;">0</div>
             <div class="dash-stat-sub"><span>Critical & High severity</span></div>
@@ -4345,7 +4345,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-purple">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Unmatched Txns</span>
-              <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">⚖️</div>
+              <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m-4 6H4m0 0l4 4m-4-4l4-4"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #9333ea;">0</div>
             <div class="dash-stat-sub"><span>BRS & GST 2B unreconciled</span></div>
@@ -4354,7 +4354,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-orange">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Pending Reviews</span>
-              <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">⏳</div>
+              <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #ea580c;">0</div>
             <div class="dash-stat-sub"><span>Awaiting sign-off / WPs</span></div>
@@ -4365,7 +4365,7 @@ async function renderDashboard() {
         <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--primary);">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div class="card-title" style="font-size: 16px; font-weight: 700;">🚀 Practice Setup & Getting Started Guide</div>
+              <div class="card-title" style="font-size: 16px; font-weight: 700;">Practice Setup & Getting Started Guide</div>
               <div class="card-subtitle">Zero data has been preloaded. Follow the sequential workflow below to initialize your practice:</div>
             </div>
           </div>
@@ -4478,7 +4478,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-blue" onclick="navigateTo('clients')" title="Click to view all active clients">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Active Clients</span>
-            <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">🏢</div>
+            <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg></div>
           </div>
           <div class="dash-stat-val">${cards.active_clients_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4489,7 +4489,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-indigo" onclick="navigateTo('engagements')" title="Click to view all active audit engagements">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Active Engagements</span>
-            <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">📁</div>
+            <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10H3V7z"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #4f46e5;">${cards.active_engagements_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4500,7 +4500,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-amber" onclick="openDashboardFindingsModal('OPEN', null)" title="Click to inspect all Open findings">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Open Findings</span>
-            <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">⚠️</div>
+            <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #d97706;">${cards.open_findings_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4511,7 +4511,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-red" onclick="openDashboardFindingsModal('HIGH', null)" title="Click to inspect Critical & High risk findings">
           <div class="dash-stat-header">
             <span class="dash-stat-title">High-Risk Findings</span>
-            <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">🚨</div>
+            <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #dc2626;">${cards.high_risk_findings_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4522,7 +4522,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-purple" onclick="openDashboardReconciliationModal('UNMATCHED')" title="Click to inspect unmatched BRS / GST records">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Unmatched Txns</span>
-            <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">⚖️</div>
+            <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m-4 6H4m0 0l4 4m-4-4l4-4"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #9333ea;">${cards.unmatched_transactions_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4533,7 +4533,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-orange" onclick="openDashboardPendingReviewsModal()" title="Click to inspect pending Partner reviews">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Pending Reviews</span>
-            <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">⏳</div>
+            <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #ea580c;">${cards.pending_reviews_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4554,10 +4554,10 @@ async function renderDashboard() {
               📅 Multi-Year History
             </button>
             <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${state.currentEngagementId})">
-              📑 Clone for Next FY
+              Clone for Next FY
             </button>
             <button class="btn btn-sm btn-secondary" onclick="navigateTo('trial_balance')">
-              📊 Trial Balance
+              Trial Balance
             </button>
           </div>
         </div>
@@ -4594,7 +4594,7 @@ async function renderDashboard() {
           <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); cursor: pointer;" onclick="openDashboardTransactionsModal('', 'All Transactions')">
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL TRANSACTIONS</div>
             <div class="font-mono font-bold" style="font-size: 18px; color: #2563eb; margin-top: 2px;">${(overview.total_transactions || 0).toLocaleString()} Entries</div>
-            <div style="font-size: 11.5px; color: #2563eb;">🔍 Click to inspect all</div>
+            <div style="font-size: 11.5px; color: #2563eb;">Click to inspect all</div>
           </div>
           <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL DEBIT TURNOVER</div>
@@ -5758,10 +5758,10 @@ async function renderTrialBalance() {
         </div>
         <div style="display: flex; gap: 8px;">
           <a href="${FinAuditAPI.getTrialBalanceReportDownloadUrl(state.currentEngagementId)}" target="_blank" class="btn btn-secondary">
-            📥 Download Analysis Report (CSV)
+            Download Analysis Report (CSV)
           </a>
           <button class="btn btn-primary" onclick="renderTrialBalance()">
-            ⚡ Re-Analyze TB
+            Re-analyze trial balance
           </button>
         </div>
       </div>
@@ -5913,7 +5913,7 @@ async function renderTrialBalance() {
                           </button>
                         ` : ''}
                         <button class="btn btn-sm btn-secondary" style="font-size: 10.5px; padding: 2px 6px; color: var(--primary);" onclick='openTBExceptionAIExplanation(${JSON.stringify(JSON.stringify(ex))})'>
-                          💡 AI Explanation
+                          AI Explanation
                         </button>
                       </div>
                     </td>
@@ -6270,7 +6270,7 @@ async function renderGeneralLedger() {
             📥 Download GL Audit Report (CSV)
           </a>
           <button class="btn btn-primary" onclick="renderGeneralLedger()">
-            ⚡ Re-Scan Ledger
+            Re-scan ledger
           </button>
         </div>
       </div>
@@ -6317,7 +6317,7 @@ async function renderGeneralLedger() {
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
-            ⚡ Quick 13-Point Anomaly Filter Chips
+            13-Point Anomaly Filters
           </div>
           ${isFilterActive ? `
             <button class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 2px 8px; color: #dc2626;" onclick="resetGLFilters()">
@@ -6720,7 +6720,7 @@ async function openGLTransactionDrawer(txId) {
 
       <!-- Compliance Disclaimer -->
       <div style="padding: 10px 12px; background: var(--bg-sidebar); border-radius: var(--radius-md); font-size: 11px; color: var(--text-muted); margin-bottom: 16px;">
-        🛡️ <b>ICAI Audit Assistant Guideline:</b> FinAuditPro flags items as <i>"Potential anomaly"</i> or <i>"Requires review"</i>. Findings do not constitute a legal determination of fraud.
+        <b>Audit review note:</b> FinAuditPro flags items as <i>"Potential anomaly"</i> or <i>"Requires review"</i>. Findings do not constitute a legal determination of fraud.
       </div>
 
       <!-- Working Paper Notes -->
@@ -6820,17 +6820,17 @@ async function renderReconciliation() {
             </button>
             <button class="btn btn-primary" onclick="openRunGSTReconModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Run GST Reconciliation
+              Run GST Reconciliation
             </button>
           ` : (reconActiveSubTab === "sales_purchase" ? `
             <button class="btn btn-primary" onclick="openRunSalesPurchaseReconModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Run Sales & Purchase Reconciliation
+              Run Sales & Purchase Reconciliation
             </button>
           ` : `
             <button class="btn btn-primary" onclick="openRunBRSModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Execute Bank BRS Reconciliation
+              Execute Bank Reconciliation
             </button>
           `)}
         </div>
@@ -7081,7 +7081,7 @@ async function openRunGSTReconModal() {
       <div class="modal-overlay" id="run-gst-recon-modal">
         <div class="modal-card" style="max-width: 620px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute GST Audit Reconciliation</div>
+            <div class="modal-title">Execute GST Reconciliation</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-gst-recon-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -7216,7 +7216,7 @@ async function viewGSTReconciliationDetails(reconId) {
       if (c === "Partially matched") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">⚠️ Partially Matched</span>`;
       if (c === "Missing in source A") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">❌ Missing in Source A</span>`;
       if (c === "Missing in source B") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border: 1px solid var(--border);">📦 Missing in Source B</span>`;
-      return `<span class="badge badge-critical">⚡ Mismatched</span>`;
+      return `<span class="badge badge-critical">Mismatched</span>`;
     };
 
     const getStatusPill = (status) => {
@@ -7323,7 +7323,7 @@ async function viewGSTReconciliationDetails(reconId) {
             ⚠️ Partially Matched
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Mismatched' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Mismatched' ? 'background:#dc2626; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Mismatched')">
-            ⚡ Mismatched
+            Mismatched
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Missing in source A' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Missing in source A' ? 'background:#7c2d12; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Missing in source A')">
             ❌ Missing in Source A (Portal)
@@ -7716,7 +7716,7 @@ async function openRunSalesPurchaseReconModal() {
       <div class="modal-overlay" id="run-sp-recon-modal">
         <div class="modal-card" style="max-width: 600px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute Sales & Purchase Reconciliation</div>
+            <div class="modal-title">Execute Sales & Purchase Reconciliation</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-sp-recon-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -8167,7 +8167,7 @@ async function openRunBRSModal() {
       <div class="modal-overlay" id="run-brs-modal">
         <div class="modal-card" style="max-width: 580px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute Bank Reconciliation (BRS Engine)</div>
+            <div class="modal-title">Execute Bank Reconciliation</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-brs-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -8265,7 +8265,7 @@ async function viewReconciliationDetails(reconId) {
     const getMatchLevelBadge = (level, score) => {
       const l = (level || "UNMATCHED").toUpperCase();
       if (l === "EXACT MATCH") return `<span class="badge badge-resolved" style="font-size: 11px;">✓ EXACT (100%)</span>`;
-      if (l === "HIGH CONFIDENCE") return `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 11px;">⚡ HIGH (${score || 90}%)</span>`;
+      if (l === "HIGH CONFIDENCE") return `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 11px;">HIGH (${score || 90}%)</span>`;
       if (l === "POSSIBLE MATCH") return `<span class="badge badge-medium" style="font-size: 11px;">⚠️ POSSIBLE (${score || 65}%)</span>`;
       return `<span class="badge badge-disabled" style="font-size: 11px;">UNMATCHED</span>`;
     };
@@ -8401,7 +8401,7 @@ async function viewReconciliationDetails(reconId) {
             ✓ Exact Matches
           </button>
           <button class="demo-chip ${reconFilterState.matchLevel === 'HIGH CONFIDENCE' ? 'active' : ''}" style="${reconFilterState.matchLevel === 'HIGH CONFIDENCE' ? 'background:#0284c7; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'HIGH CONFIDENCE', 'ALL')">
-            ⚡ High Confidence
+            High Confidence
           </button>
           <button class="demo-chip ${reconFilterState.matchLevel === 'POSSIBLE MATCH' ? 'active' : ''}" style="${reconFilterState.matchLevel === 'POSSIBLE MATCH' ? 'background:#ea580c; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'POSSIBLE MATCH', 'ALL')">
             ⚠️ Possible Matches
@@ -8781,7 +8781,7 @@ async function renderAIAssistant() {
       <div>
         <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Local AI Audit Assistant & Query Engine</h2>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
-          100% Offline AI Natural Language Auditor • Evidence-backed reasoning
+          Audit Assistant • Evidence-backed responses
         </div>
       </div>
     </div>
@@ -8795,10 +8795,10 @@ async function renderAIAssistant() {
       </div>
 
       <div style="padding: 8px 16px; background: var(--bg-sidebar); display: flex; gap: 8px; overflow-x: auto;">
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Show large cash transactions above Section 40A(3) limit')">💡 Section 40A(3) Cash Violations</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the critical risks in this engagement?')">💡 Critical Audit Risks</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the top 5 highest value vouchers?')">💡 Top 5 Highest Vouchers</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Are there any GSTIN format or ITC matching issues?')">💡 GSTIN & ITC Compliance</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Show large cash transactions above Section 40A(3) limit')">Section 40A(3) Cash Violations</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the critical risks in this engagement?')">Critical Audit Risks</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the top 5 highest value vouchers?')">Top 5 Highest Vouchers</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Are there any GSTIN format or ITC matching issues?')">GSTIN & ITC Compliance</button>
       </div>
 
       <div class="chat-input-bar">
@@ -9088,7 +9088,7 @@ async function renderChecklist() {
 
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           <button class="btn btn-secondary" onclick="openGenerateChecklistModal()" title="Tailor procedures for this engagement">
-            ⚡ Regenerate / Tailor
+            Regenerate / Tailor
           </button>
           <button class="btn btn-primary" onclick="openCreateCustomChecklistItemModal()">
             ➕ Add Custom Procedure
@@ -9102,7 +9102,7 @@ async function renderChecklist() {
       <!-- Professional Standard Skepticism Banner -->
       <div style="background: var(--bg-app); border: 1px solid var(--border); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--text-secondary);">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 16px;">🛡️</span>
+          <span aria-hidden="true" style="font-weight: 700; color: #3b82f6;">i</span>
           <span><b>Auditor Professional Skepticism Policy (SA 200/230):</b> AI audit engines automatically flag exceptions and initiate procedures as <i>'Requires Review'</i> or <i>'Not Started'</i>. Items are <b>never automatically marked Completed</b> by AI without verified auditor working paper sign-off.</span>
         </div>
         <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">Offline Deterministic Check</span>
@@ -9261,7 +9261,7 @@ async function renderChecklist() {
                     ${item.is_custom ? '<span class="badge badge-low" style="font-size: 9px; padding: 1px 4px;">CUSTOM</span>' : ''}
                     ${item.risk_finding_id ? `
                       <span class="badge badge-critical" style="font-size: 9px; padding: 1px 4px; cursor: pointer;" onclick="openLinkedRiskFinding(${item.risk_finding_id})" title="Click to view linked risk finding">
-                        ⚡ RISK #${item.risk_finding_id}
+                        RISK #${item.risk_finding_id}
                       </span>
                     ` : ''}
                   </td>
@@ -11366,7 +11366,7 @@ async function renderReports() {
         </div>
         <button class="btn btn-primary" onclick="triggerGeneratePDFReport('complete_audit_analysis')" style="padding: 8px 16px;">
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          ⚡ Generate Complete Master Analysis (PDF)
+          Generate Complete Master Analysis (PDF)
         </button>
       </div>
 
@@ -11540,7 +11540,7 @@ async function renderAuditTrail() {
             ${logs.length === 0 ? `
               <tr>
                 <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                  <div style="font-size: 36px; margin-bottom: 8px;">🛡️</div>
+                  
                   <div style="font-weight: 600; color: var(--text-secondary);">No audit activity yet</div>
                   <div style="font-size: 12px; margin-top: 4px;">System and user actions will be cryptographically chained and recorded here in compliance with MCA Rule 11(g).</div>
                 </td>
@@ -11591,7 +11591,7 @@ async function renderClients() {
       <!-- Filter / Search Bar -->
       <div class="card" style="padding: 14px 18px; margin-bottom: 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 240px;">
-          <input type="text" id="client-search-input" class="form-control" placeholder="🔍 Search by Client Name, PAN, GSTIN, Contact Person, Industry..." onkeyup="filterClientsLive()">
+          <input type="text" id="client-search-input" class="form-control" placeholder="Search by Client Name, PAN, GSTIN, Contact Person, Industry..." onkeyup="filterClientsLive()">
         </div>
         <div style="width: 200px;">
           <select id="client-entity-filter" class="form-control" onchange="filterClientsLive()">
@@ -11951,7 +11951,7 @@ async function openClientHistoryDrawer(clientId) {
             </div>
             <div style="margin-top: 10px; display: flex; gap: 8px;">
               <button class="btn btn-sm btn-primary" onclick="selectEngagementAndGo(${h.id})">
-                🚀 Open Engagement Context
+                Open Engagement Context
               </button>
               <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${h.id})">
                 📑 Clone to New FY
@@ -11997,7 +11997,7 @@ async function renderEngagements() {
       <!-- Filter Controls -->
       <div class="card" style="padding: 14px 18px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 200px;">
-          <input type="text" id="eng-search-input" class="form-control" placeholder="🔍 Search Engagement Title, Client, FY..." onkeyup="filterEngagementsLive()">
+          <input type="text" id="eng-search-input" class="form-control" placeholder="Search Engagement Title, Client, FY..." onkeyup="filterEngagementsLive()">
         </div>
         <div style="width: 160px;">
           <select id="eng-type-filter" class="form-control" onchange="filterEngagementsLive()">
@@ -12027,7 +12027,7 @@ async function renderEngagements() {
         </div>
         ${engagements.length === 0 ? `
           <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 44px; margin-bottom: 10px;">📁</div>
+            <div style="font-size: 44px; margin-bottom: 10px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10H3V7z"></path></svg></div>
             <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No engagements yet</div>
             <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
               Create an audit engagement for your registered client to establish the audit mandate, financial year, and materiality benchmark.
@@ -12086,7 +12086,7 @@ async function renderEngagements() {
                         ${e.id === state.currentEngagementId ? 'Viewing' : 'Switch Context'}
                       </button>
                       <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${e.id})">
-                        📑 Clone FY
+                        Clone FY
                       </button>
                       ${canCreate ? `
                         <button class="btn btn-sm btn-secondary" onclick="openEditEngagementModal(${e.id})">
@@ -12472,7 +12472,7 @@ async function renderSettings() {
         ${isAdmin ? `
           <div style="margin-top: 16px; display: flex; gap: 10px;">
             <button class="btn btn-primary" onclick="triggerBackup()">
-              💾 Create Full SQLite Backup
+              Create Full SQLite Backup
             </button>
           </div>
         ` : ''}
@@ -12500,7 +12500,7 @@ async function renderSettings() {
             <tr><td><b>Last Login Recorded:</b></td><td class="font-mono">${state.currentUser?.last_login ? state.currentUser.last_login.replace('T', ' ').split('.')[0] : '—'}</td></tr>
           </table>
           <button class="btn btn-secondary" style="width: 100%;" onclick="openChangePasswordModal()">
-            🔒 Change My Account Password
+            Change My Account Password
           </button>
         </div>
       </div>
@@ -12553,7 +12553,7 @@ async function openEvidenceDrawer(findingId) {
     </div>
 
     <div style="margin-bottom: 16px;">
-      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">💡 Local AI Audit Commentary & Analysis:</div>
+      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">Local AI Audit Commentary & Analysis:</div>
       <div style="font-size: 12px; color: var(--text-secondary); padding: 10px; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid var(--border); line-height: 1.5;">
         ${finding.ai_explanation || 'Detailed review required.'}
       </div>
@@ -12648,7 +12648,7 @@ async function renderFinancialStatements() {
   container.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: center; height: 300px; color: var(--text-muted);">
       <div style="text-align: center;">
-        <div style="font-size: 28px; margin-bottom: 8px;">⏳</div>
+        <div style="font-size: 28px; margin-bottom: 8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
         <div>Generating Schedule III Financial Statements & Computing Analytical Ratios...</div>
       </div>
     </div>
@@ -12661,7 +12661,7 @@ async function renderFinancialStatements() {
   } catch (err) {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
-        <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
+        <div style="font-size: 32px; margin-bottom: 10px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
         <h3>Financial Statement Analysis Error</h3>
         <p style="margin-top: 6px; color: var(--text-muted);">${err.message || "Failed to load financial statement data."}</p>
         <button class="btn btn-secondary" style="margin-top: 14px;" onclick="renderFinancialStatements()">Retry Analysis</button>
@@ -13171,7 +13171,7 @@ function renderSignificantMovementsHtml(data, cyYear, pyYear) {
                     <button class="btn btn-sm ${hasExpl ? 'btn-secondary' : (isSig ? 'btn-primary' : 'btn-secondary')}" 
                             style="font-size: 11px; padding: 4px 8px;"
                             onclick="openFSExplanationModal('${c.item_key}', '${c.metric_name.replace(/'/g, "\\'")}', ${c.current_year_value}, ${c.previous_year_value}, ${c.absolute_difference}, ${c.percentage_difference}, '${c.unit}')">
-                      ${hasExpl ? '✏️ Edit Note' : (isSig ? '📝 Enter Explanation' : '➕ Add Note')}
+                      ${hasExpl ? 'Edit Note' : (isSig ? '📝 Enter Explanation' : '➕ Add Note')}
                     </button>
                     ${hasExpl ? `<div style="font-size: 10px; color: #059669; font-weight: 600; margin-top: 2px;">✓ Documented</div>` : ''}
                   </td>
@@ -13335,7 +13335,7 @@ async function renderDuplicateAndMissing() {
   } catch (err) {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
-        <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
+        <div style="font-size: 32px; margin-bottom: 10px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
         <h3>Duplicate & Sequence Gap Detection Error</h3>
         <p style="margin-top: 6px; color: var(--text-muted);">${err.message || "Failed to scan transactions."}</p>
         <button class="btn btn-secondary" style="margin-top: 14px;" onclick="renderDuplicateAndMissing()">Retry Analysis</button>
@@ -13498,7 +13498,7 @@ function renderDuplicateGroupsHtml(data) {
 
     ${filteredGroups.length === 0 ? `
       <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
-        <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+        
         <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No Duplicate Groups Found</div>
         <p style="margin-top: 4px; font-size: 12px;">No transaction pairs matched the selected filter criteria.</p>
       </div>
@@ -13531,7 +13531,7 @@ function renderSingleDuplicateGroupCard(g) {
           </span>
           <span class="badge badge-role-auditor" style="font-size: 11px;">${g.group_type}</span>
           <span style="font-weight: 700; font-size: 12px; color: ${simColor}; background: #fff7ed; padding: 2px 8px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-            ⚡ ${g.similarity_pct}% Similarity
+            ${g.similarity_pct}% Similarity
           </span>
           ${statusBadge}
         </div>
@@ -13721,7 +13721,7 @@ function renderSequenceGapsHtml(data) {
     <!-- Disclaimer / Guidance Banner -->
     <div class="card" style="margin-bottom: 18px; border-left: 4px solid var(--primary); background: var(--bg-app);">
       <div style="display: flex; gap: 12px; align-items: flex-start;">
-        <div style="font-size: 20px;">💡</div>
+        
         <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
           <b>ICAI Standard Audit Guidance on Sequence Gaps:</b>
           Sequence gaps in invoice, voucher, or cheque numbering are treated as <i>exceptions requiring professional inquiry</i> 
@@ -13933,7 +13933,7 @@ function renderAnomalyDetectionUI(data) {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
       <div>
         <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
-          <span>🤖 AI-Assisted Anomaly Detection Engine</span>
+          <span>AI-Assisted Anomaly Detection Engine</span>
           <span class="badge" style="background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 700;">HYBRID 3-TIER</span>
         </h2>
         <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
@@ -13943,17 +13943,17 @@ function renderAnomalyDetectionUI(data) {
 
       <div style="display: flex; gap: 10px;">
         <button class="btn btn-secondary" onclick="triggerFreshAnomalyRun()">
-          ⚡ Re-Run Anomaly Engine
+          Re-run Anomaly Engine
         </button>
         <a class="btn btn-primary" href="${FinAuditAPI.getAnomalyReportDownloadUrl(state.currentEngagementId)}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-          📥 Export Anomaly Report (CSV)
+          Export Anomaly Report (CSV)
         </a>
       </div>
     </div>
 
     <!-- Professional Standard Disclaimer Banner -->
     <div style="background: #eff6ff; border: 1px solid var(--border); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-      <span style="font-size: 20px;">🛡️</span>
+      
       <div style="font-size: 12.5px; color: #1e40af;">
         <b>Professional Auditing Safeguard:</b> <i>Potential anomaly detected. Auditor review recommended.</i> An anomaly does not constitute proof of fraud; it indicates empirical deviation requiring substantive audit inquiry (SA 240, SA 315, SA 520).
       </div>
@@ -14118,7 +14118,7 @@ function renderSingleAnomalyCard(anom, idx) {
 
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-sm btn-secondary" onclick="openAIExplanationModal('${anom.anomaly_id}')" style="font-size: 11.5px;">
-            🤖 AI Working Paper Memo
+            AI Working Paper Memo
           </button>
         </div>
       </div>
@@ -14292,7 +14292,7 @@ async function openAIExplanationModal(anomalyId) {
       <div class="modal-overlay" id="ai-explanation-modal">
         <div class="modal-card" style="max-width: 750px;">
           <div class="modal-header">
-            <div class="modal-title">🤖 AI Audit Working Paper Memorandum — #${anomalyId}</div>
+            <div class="modal-title">AI Audit Working Paper Memorandum — #${anomalyId}</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('ai-explanation-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -14628,10 +14628,10 @@ function renderYoYTableRow(row, idx) {
       <td style="padding: 10px 14px; text-align: center;">
         <div style="display: flex; gap: 4px; justify-content: center;">
           <button class="btn btn-sm btn-secondary" style="padding: 3px 6px; font-size: 11px;" title="Document Working Paper Comment" onclick="openYoYCommentModal('${row.item_key}', '${row.category}', '${row.account_name.replace(/'/g, "\\'")}', '${row.status}', '${(row.auditor_comment || '').replace(/'/g, "\\'")}')">
-            📝
+            Note
           </button>
           <button class="btn btn-sm btn-secondary" style="padding: 3px 6px; font-size: 11px;" title="Generate Factual AI Movement Driver" onclick="triggerYoYFactualAI('${row.item_key}')">
-            🤖
+            Explain
           </button>
         </div>
       </td>
@@ -14736,7 +14736,7 @@ async function triggerYoYFactualAI(itemKey) {
       <div class="modal-overlay" id="yoy-ai-modal">
         <div class="modal-card" style="max-width: 600px;">
           <div class="modal-header">
-            <div class="modal-title">🤖 Factual Movement Analysis: ${res.account_name}</div>
+            <div class="modal-title">Factual Movement Analysis: ${res.account_name}</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('yoy-ai-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -14794,11 +14794,11 @@ async function renderAIAssistant() {
     state.assistantState.messages.push({
       role: "assistant",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      content: `Hello! I am your **100% offline Local AI Audit Assistant** for **${state.activeEngagement?.client_name || 'this client'}** (${state.activeEngagement?.financial_year || 'FY'}).
+      content: `Hello! I am the **Local Audit Assistant** for **${state.activeEngagement?.client_name || 'this client'}** (${state.activeEngagement?.financial_year || 'FY'}).
 
 I evaluate your imported ledger records deterministically and synthesize explainable CA-grade findings without sending any data outside your device.
 
-#### 💡 How can I assist your audit today?
+#### How can I assist your audit today?
 Choose one of the quick prompt chips below or type your specific question:`,
       disclaimer: "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: [],
@@ -14826,8 +14826,8 @@ Choose one of the quick prompt chips below or type your specific question:`,
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">🤖 Local AI Audit Assistant</h2>
-            <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 600; font-size: 11px;">🔒 100% Offline & Private</span>
+            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">Local AI Audit Assistant</h2>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 600; font-size: 11px;">Local model</span>
             <span class="badge" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5; font-weight: 600; font-size: 11px;">Zero Cloud API</span>
           </div>
           <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 3px;">
@@ -14837,17 +14837,17 @@ Choose one of the quick prompt chips below or type your specific question:`,
 
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary btn-sm" onclick="loadExecutiveSummaryNarrative()">
-            📑 Executive Audit Memo
+            Executive Audit Memo
           </button>
           <button class="btn btn-secondary btn-sm" onclick="clearAssistantChat()">
-            🗑️ Clear Chat
+            Clear Chat
           </button>
         </div>
       </div>
 
       <!-- Mandatory Disclaimer Alert -->
       <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #b45309;">
-        <span style="font-size: 16px;">🛡️</span>
+        <span aria-hidden="true" style="font-weight: 700; color: #3b82f6;">i</span>
         <div>
           <strong>Statutory Compliance Disclaimer:</strong> <em>AI-generated assistance. Verify findings against source records before making audit decisions.</em>
         </div>
@@ -14979,7 +14979,7 @@ function renderAssistantMessageItem(msg, idx) {
       <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;">
         ${msg.suggested_actions.map(act => `
           <span style="font-size: 11.5px; background: rgba(99, 102, 241, 0.08); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 14px; padding: 3px 10px;">
-            ⚡ ${escapeHtml(act)}
+            ${escapeHtml(act)}
           </span>
         `).join("")}
       </div>
@@ -14996,7 +14996,7 @@ function renderAssistantMessageItem(msg, idx) {
         ${evidenceHtml}
         ${actionsHtml}
         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-secondary);">
-          <span>🛡️ ${msg.disclaimer || MANDATORY_DISCLAIMER}</span>
+          <span>${msg.disclaimer || MANDATORY_DISCLAIMER}</span>
           <span>${msg.timestamp || ''}</span>
         </div>
       </div>
@@ -15150,7 +15150,7 @@ function inspectAssistantTransaction(item) {
           ` : ''}
 
           <div class="modal-footer" style="padding: 10px 0 0 0; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 11px; color: var(--text-muted);">🛡️ Sourced deterministically from local audit database.</span>
+            <span style="font-size: 11px; color: var(--text-muted);">Sourced from the local audit database.</span>
             <button class="btn btn-primary" onclick="closeModal('assistant-inspect-modal')">Done Reviewing</button>
           </div>
         </div>
@@ -15184,7 +15184,7 @@ function getRiskScoreBadge(score, severity = "MEDIUM", factors = null) {
   }
 
   const tooltip = factors && factors.equation ? `title="${factors.equation}"` : `title="Deterministic Risk Score: ${numScore.toFixed(1)}/10.0"`;
-  return `<span class="risk-score-pill ${pillClass}" ${tooltip}>⚡ ${numScore.toFixed(1)} / 10</span>`;
+  return `<span class="risk-score-pill ${pillClass}" ${tooltip}>${numScore.toFixed(1)} / 10</span>`;
 }
 
 function getFindingStatusBadge(status) {
@@ -15232,13 +15232,13 @@ async function renderFindings() {
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button class="btn btn-secondary" onclick="openCreateCustomFindingModal()">
-            <span>➕</span> Record Manual Observation
+            Record Manual Observation
           </button>
           <a href="${FinAuditAPI.getExportFindingsCsvUrl(state.currentEngagementId)}" download="audit_findings_${state.currentEngagementId}.csv" class="btn btn-secondary" style="text-decoration: none;">
-            <span>📥</span> Export CSV Register
+            Export CSV Register
           </a>
           <button class="btn btn-primary" id="btn-sync-findings" onclick="syncCentralizedFindings()">
-            <span>⚡</span> Sync All Modules
+            Sync All Modules
           </button>
         </div>
       </div>
@@ -15339,13 +15339,13 @@ async function renderFindings() {
             Centralized Findings Register <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(${findings.length} records match filter)</span>
           </div>
           <div style="font-size: 11.5px; color: var(--text-muted);">
-            💡 Click on any risk score to inspect deterministic formula breakdown
+            Click on any risk score to inspect the deterministic formula breakdown
           </div>
         </div>
 
         ${findings.length === 0 ? `
           <div style="padding: 48px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+            
             <div style="font-size: 15px; font-weight: 600; color: #1e293b;">No findings matching current criteria</div>
             <p style="font-size: 12.5px; margin-top: 4px;">Click <strong>"Sync All Modules"</strong> above to aggregate exceptions across all audit subsystems.</p>
           </div>
@@ -15404,7 +15404,7 @@ async function renderFindings() {
                           Inspect
                         </button>
                         <button class="btn btn-sm btn-secondary" onclick="generateFindingAIExplanation(${f.id})" title="View AI Explanation & ICAI Audit Procedures">
-                          🤖 AI
+                          AI explanation
                         </button>
                       </div>
                     </td>
@@ -15456,7 +15456,7 @@ async function syncCentralizedFindings() {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = `<span>⚡</span> Sync All Modules`;
+      btn.innerHTML = `Sync All Modules`;
     }
   }
 }
@@ -15491,7 +15491,7 @@ async function openFindingDetailModal(findingId) {
             <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; ">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                 <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e293b;">
-                  ⚡ Deterministic Risk Calculation Breakdown
+                  Deterministic Risk Calculation Breakdown
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted);">
                   Equation: <code style="background: var(--bg-sidebar); padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #4338ca;">${factors.equation || `${finding.risk_score}/10.0`}</code>
@@ -15677,7 +15677,7 @@ async function updateFindingReview(findingId) {
 async function generateFindingAIExplanation(findingId) {
   try {
     const res = await FinAuditAPI.getFindingAIExplanation(findingId);
-    notifyInfo(`🤖 AI Explainability Analysis for ${res.finding_code}:\n\n${res.ai_explanation}`);
+    notifyInfo(`AI explanation for ${res.finding_code}:\n\n${res.ai_explanation}`);
     await renderFindings();
   } catch (err) {
     notifyError("Error generating AI explanation: " + err.message);
@@ -15828,7 +15828,7 @@ async function renderAuditTrail() {
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
             <h1 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0;">Immutable Audit Trail & System Log</h1>
             <span class="badge" style="background: #ecfdf5; color: #059669; border: 1px solid var(--border); font-weight: 600; padding: 4px 10px; border-radius: 9999px;">
-              🔒 Append-Only Protected
+              Append-only protected
             </span>
           </div>
           <p style="color: var(--text-muted); font-size: 14px; margin: 0;">
@@ -16649,18 +16649,25 @@ let currentAIStatus = null;
 
 async function refreshTopBarAIStatus() {
   const el = document.getElementById("top-ai-status-text");
+  const dot = document.getElementById("top-ai-status-dot");
   if (!el) return;
+
+  const setStatus = (label, state) => {
+    el.textContent = label;
+    if (dot) dot.className = `offline-dot is-${state}`;
+  };
+
   try {
     const status = await FinAuditAPI.getAIStatus();
     if (!status.is_enabled) {
-      el.innerHTML = `<span style="color: var(--text-muted);">🤖 AI: Disabled</span>`;
+      setStatus("Local AI disabled", "disabled");
     } else if (status.is_available) {
-      el.innerHTML = `<span style="color: #10b981; font-weight: 700;">🤖 LM Studio: Connected</span>`;
+      setStatus("Local model connected", "online");
     } else {
-      el.innerHTML = `<span style="color: #f59e0b;">🤖 LM Studio: Offline</span>`;
+      setStatus("Local model unavailable", "offline");
     }
   } catch (e) {
-    el.innerHTML = `<span style="color: var(--text-muted);">🤖 LM Studio: Offline</span>`;
+    setStatus("Status unavailable", "offline");
   }
 }
 
@@ -16687,8 +16694,8 @@ async function renderAIManager() {
           <div>
             <div style="display: flex; align-items: center; gap: 10px;">
               <h1 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0;">LM Studio Local AI Settings</h1>
-              <span class="badge" style="background: #065f46; color: #ffffff; font-weight: 700;">🔒 100% OFFLINE</span>
-              <span class="badge" style="background: #1e3a8a; color: #ffffff; font-weight: 700;">ZERO CLOUD TRANSMISSION</span>
+              <span class="badge" style="background: #065f46; color: #ffffff; font-weight: 700;">Local Processing</span>
+              <span class="badge" style="background: #f1f5f9; color: #334155; font-weight: 600;">Local inference only</span>
             </div>
             <p style="color: var(--text-muted); font-size: 13.5px; margin-top: 4px;">
               Configure LM Studio local server endpoint, loaded models, sampling parameters, and local data privacy guard.
@@ -16712,9 +16719,9 @@ async function renderAIManager() {
         <!-- Zero Cloud Transmission & Privacy Shield Banner -->
         <div class="ai-privacy-shield-box">
           <div style="display: flex; align-items: center; gap: 14px;">
-            <div style="font-size: 32px;">🛡️</div>
+            <div class="privacy-status-mark" aria-hidden="true">LOCAL</div>
             <div>
-              <div style="font-size: 15px; font-weight: 800; letter-spacing: 0.02em;">STRICT LOCAL PRIVACY SHIELD ACTIVE</div>
+              <div style="font-size: 15px; font-weight: 800; letter-spacing: 0.02em;">Local inference and privacy</div>
               <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">
                 Client names, PAN, GSTIN, bank account numbers, raw financial records, and evidence documents are <b>never sent to any external cloud service</b>. All inference executes locally on this device via LM Studio.
               </div>
@@ -16793,7 +16800,7 @@ async function renderAIManager() {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                   <label class="form-label" style="margin: 0; font-weight: 700;">Loaded Model Name</label>
                   <button type="button" class="btn btn-sm btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="handleRefreshLMStudioModels()">
-                    🔄 Refresh Models
+                    Refresh Models
                   </button>
                 </div>
                 <input type="text" id="ai-model-name" class="form-control" value="${escapeHtml(st.model_name || 'local-model')}" placeholder="e.g. meta-llama-3-8b-instruct or local-model">
@@ -16824,7 +16831,7 @@ async function renderAIManager() {
             <!-- Live Test Generation Output Box -->
             <div id="ai-test-output-box" style="display: none; margin-bottom: 20px; padding: 14px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
               <div style="font-weight: 700; color: var(--text-main); font-size: 13px; margin-bottom: 6px;">
-                🧪 Live AI Test Response:
+                Live AI test response:
               </div>
               <div id="ai-test-response-text" style="font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap;"></div>
             </div>
@@ -16832,7 +16839,7 @@ async function renderAIManager() {
             <!-- Redaction & Privacy Guard Demo Box -->
             <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px;">
               <div style="font-weight: 700; color: var(--text-main); font-size: 13px; margin-bottom: 6px;">
-                🔍 Live Data Sanitization & PII Redaction Preview
+                Live Data Sanitization & PII Redaction Preview
               </div>
               <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
                 Test how confidential client data (PAN, GSTIN, Bank Accounts) is automatically redacted before local LM Studio ingestion:
