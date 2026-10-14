@@ -528,8 +528,8 @@ async def upload_supporting_document(
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         with open(dest_path, "xb") as evidence_file:
+            file_created = True
             evidence_file.write(content)
-        file_created = True
 
         doc_id = str(uuid.uuid4())[:8]
         new_doc = {
