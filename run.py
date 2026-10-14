@@ -24,7 +24,7 @@ except ImportError:
     print("Please activate your virtual environment or install dependencies:")
     print("  source venv/bin/activate       # macOS / Linux")
     print("  .\\venv\\Scripts\\activate        # Windows")
-    print("  pip install -r requirements.txt")
+    print("  pip install -r requirements.lock")
     print("=" * 70 + "\n")
     sys.exit(1)
 
