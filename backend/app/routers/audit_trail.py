@@ -652,9 +652,14 @@ def create_full_backup_bundle(current_user: dict = Depends(require_role(["Admin"
 def download_backup_file(filename: str, current_user: dict = Depends(require_role(["Admin"]))):
     """Admin: Download a local backup file."""
     safe_filename = os.path.basename(filename)
-    filepath = os.path.join(BACKUP_DIR, safe_filename)
+    backup_root = os.path.realpath(BACKUP_DIR)
+    filepath = os.path.realpath(os.path.join(backup_root, safe_filename))
+    try:
+        inside_backup_root = os.path.commonpath([backup_root, filepath]) == backup_root
+    except ValueError:
+        inside_backup_root = False
 
-    if not os.path.exists(filepath):
+    if not inside_backup_root or not os.path.isfile(filepath):
         raise HTTPException(status_code=404, detail="Backup file not found")
 
     conn = get_db_connection()
@@ -685,9 +690,14 @@ def restore_database_backup(filename: str, current_user: dict = Depends(require_
     Creates an automatic safety snapshot of the active database before restoring.
     """
     safe_filename = os.path.basename(filename)
-    backup_filepath = os.path.join(BACKUP_DIR, safe_filename)
+    backup_root = os.path.realpath(BACKUP_DIR)
+    backup_filepath = os.path.realpath(os.path.join(backup_root, safe_filename))
+    try:
+        inside_backup_root = os.path.commonpath([backup_root, backup_filepath]) == backup_root
+    except ValueError:
+        inside_backup_root = False
 
-    if not os.path.exists(backup_filepath):
+    if not inside_backup_root or not os.path.isfile(backup_filepath):
         raise HTTPException(status_code=404, detail="Selected backup file not found")
 
     try:
