@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.auth import create_access_token
+from backend.app.auth import create_access_token, get_jwt_secret
 from backend.app.database import get_db_connection
 from backend.app.main import app
 from backend.app.routers.audit_trail import _validate_restorable_sqlite
@@ -35,6 +35,12 @@ def _update_user(username: str, **values) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def test_weak_environment_jwt_secret_is_rejected(monkeypatch):
+    monkeypatch.setenv("FINAUDIT_SECRET_KEY", "too-short")
+    with pytest.raises(RuntimeError, match="at least 32 characters"):
+        get_jwt_secret()
 
 
 def test_activation_expiry_helper_fails_closed():
