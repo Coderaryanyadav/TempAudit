@@ -1023,28 +1023,11 @@ class FinAuditAPI {
     const formData = new FormData();
     formData.append("file", file);
 
-    const token = this.getToken();
-    const headers = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(`${this.BASE_URL}/api/audit-trail/backup/restore-upload`, {
+    // Reuse the common request path so auth headers, 401 handling, and errors stay consistent.
+    return this.request("/api/audit-trail/backup/restore-upload", {
       method: "POST",
-      headers: headers,
       body: formData
     });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: "Database restore failed" }));
-      throw new Error(err.detail || "Database restore failed");
-    }
-    return res.json();
-  }
-
-  // --- Settings & Configuration ---
-  static getSystemInfo() {
-    return this.request("/api/settings/system-info");
   }
 
   static getAppSettings() {
