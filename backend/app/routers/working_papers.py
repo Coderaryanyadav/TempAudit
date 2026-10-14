@@ -616,64 +616,77 @@ def delete_supporting_document(
     doc_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Removes a supporting evidence file from the working paper and logs the audit event.
-    """
+    """Detach a document from active working-paper metadata without destroying evidence."""
     conn = get_db_connection()
-    row = conn.execute("SELECT * FROM working_papers WHERE id = ?", (wp_id,)).fetchone()
-    if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Working paper not found.")
-
-    wp = _parse_wp_row(row)
-    require_engagement_access(wp["engagement_id"], current_user)
-    now_str = datetime.now().isoformat()
-
-    attached_files = wp.get("attached_files") or []
-    removed_doc = None
-    remaining_files = []
-
-    for doc in attached_files:
-        if str(doc.get("id")) == str(doc_id) or doc.get("file_name") == doc_id:
-            removed_doc = doc
-        else:
-            remaining_files.append(doc)
-
-    if not removed_doc:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Document not found on this working paper.")
-
-    # Remove file from disk if present using safe resolved path
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM working_papers WHERE id = ?", (wp_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Working paper not found.")
+
+        wp = _parse_wp_row(row)
+        require_engagement_access(wp["engagement_id"], current_user)
+        attached_files = wp.get("attached_files") or []
+        removed_doc = next(
+            (
+                doc for doc in attached_files
+                if str(doc.get("id")) == str(doc_id) or doc.get("file_name") == doc_id
+            ),
+            None,
+        )
+        if not removed_doc:
+            raise HTTPException(status_code=404, detail="Document not found on this working paper.")
+
+        # Evidence already indexed in the immutable evidence register must not be
+        # physically deleted. Archive it and keep its bytes for audit traceability.
         stored_name = removed_doc.get("file_name") or os.path.basename(removed_doc.get("file_path", ""))
-        full_path = resolve_safe_evidence_path(wp_id, stored_name)
-        if full_path.exists():
-            full_path.unlink()
+        evidence_row = conn.execute(
+            "SELECT id FROM evidence_items WHERE working_paper_id = ? AND filename = ?",
+            (wp_id, stored_name),
+        ).fetchone()
+        if evidence_row:
+            conn.execute(
+                "UPDATE evidence_items SET status = 'ARCHIVED' WHERE id = ?",
+                (evidence_row["id"],),
+            )
+
+        remaining_files = [
+            doc for doc in attached_files
+            if not (str(doc.get("id")) == str(doc_id) or doc.get("file_name") == doc_id)
+        ]
+        now_str = datetime.now().isoformat()
+        cursor = conn.execute(
+            "UPDATE working_papers SET attached_files_json = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(remaining_files), now_str, wp_id),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Working paper attachment metadata was not saved.")
+
+        from backend.app.utils.audit_logger import log_audit_event
+        log_audit_event(
+            conn=conn,
+            action="REMOVE_WP_EVIDENCE",
+            module="WORKING_PAPERS",
+            record_id=wp_id,
+            user=current_user,
+            engagement_id=wp["engagement_id"],
+            details=(
+                f"Detached supporting document '{removed_doc.get('name')}' from active "
+                f"working paper [{wp['wp_reference']}]; physical evidence was retained for audit traceability."
+            ),
+            timestamp=now_str,
+        )
+        conn.commit()
+        return {
+            "status": "success",
+            "message": "Document removed from the active working paper. The original evidence file was retained in the archive.",
+        }
     except Exception:
-        pass
-
-    conn.execute(
-        "UPDATE working_papers SET attached_files_json = ?, updated_at = ? WHERE id = ?",
-        (json.dumps(remaining_files), now_str, wp_id)
-    )
-
-    # Audit log
-    from backend.app.utils.audit_logger import log_audit_event
-    log_audit_event(
-        conn=conn,
-        action="REMOVE_WP_EVIDENCE",
-        module="WORKING_PAPERS",
-        record_id=wp_id,
-        user=current_user,
-        engagement_id=wp["engagement_id"],
-        details=f"Removed supporting document '{removed_doc.get('name')}' from WP [{wp['wp_reference']}]",
-        timestamp=now_str
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {"status": "success", "message": "Document removed successfully."}
+        if conn.in_transaction:
+            conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 @router.get("/download-file/{wp_id}/{doc_id}")
