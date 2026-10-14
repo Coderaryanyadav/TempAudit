@@ -80,6 +80,8 @@ def _check_login_rate_limit(key: str):
         _ensure_rate_limit_table(conn)
         now = time.time()
         cutoff = now - 300
+        # Prune all stale entries so one-off identifiers cannot grow this table forever.
+        conn.execute("DELETE FROM rate_limits WHERE timestamp < ?", (cutoff,))
         db_key = f"login_{key}"
         conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp < ?", (db_key, cutoff))
         row = conn.execute(
@@ -400,7 +402,9 @@ def login(creds: UserLogin):
     Generic error response to prevent user enumeration. Rate limited against brute-force.
     """
     login_identifier = creds.username.strip()
-    _check_login_rate_limit(login_identifier)
+    # The database lookup is case-insensitive; rate limits must be case-insensitive too.
+    rate_limit_key = login_identifier.casefold()
+    _check_login_rate_limit(rate_limit_key)
 
     conn = get_db_connection()
     try:
@@ -410,7 +414,7 @@ def login(creds: UserLogin):
         ).fetchone()
 
         if not user or not verify_password(creds.password, user["password_hash"]):
-            _record_login_failure(login_identifier)
+            _record_login_failure(rate_limit_key)
             raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         user_dict = dict(user)
@@ -434,7 +438,7 @@ def login(creds: UserLogin):
         if account_status not in {"ACTIVE", ""}:
             raise HTTPException(status_code=403, detail="Your account is not active. Please contact audit administration.")
 
-        _clear_login_failures(login_identifier)
+        _clear_login_failures(rate_limit_key)
 
         now_str = datetime.now().isoformat()
         conn.execute("UPDATE users SET last_login = ? WHERE id = ?", (now_str, user["id"]))
