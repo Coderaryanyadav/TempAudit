@@ -182,36 +182,49 @@ def generate_pdf_report(
 
 @router.get("/download/{report_id}")
 def download_report(report_id: int, current_user: dict = Depends(get_current_user)):
-    """Downloads the generated PDF report."""
+    """Download a report only from the application-generated reports directory."""
     conn = get_db_connection()
-    row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
+    try:
+        row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Report not found")
 
-    if not row:
+        require_engagement_access(row["engagement_id"], current_user)
+        file_path = row["file_path"]
+        if not file_path:
+            raise HTTPException(status_code=404, detail="PDF report file does not exist on disk")
+
+        reports_root = os.path.realpath(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "reports_generated")
+        )
+        resolved_path = os.path.realpath(file_path)
+        try:
+            is_inside_reports_dir = os.path.commonpath([reports_root, resolved_path]) == reports_root
+        except ValueError:
+            is_inside_reports_dir = False
+        if not is_inside_reports_dir:
+            raise HTTPException(status_code=409, detail="Stored report path is outside the reports directory.")
+        if not os.path.isfile(resolved_path):
+            raise HTTPException(status_code=404, detail="PDF report file does not exist on disk")
+
+        from backend.app.utils.audit_logger import log_audit_event
+        log_audit_event(
+            conn,
+            action="REPORT_EXPORT",
+            module="REPORTS",
+            record_id=report_id,
+            engagement_id=row["engagement_id"],
+            details=f"Exported / downloaded PDF report '{row['report_title']}'",
+            user=current_user,
+        )
+        conn.commit()
+
+        report_title = os.path.basename(row["report_title"])
+        filename = report_title if report_title.lower().endswith(".pdf") else f"{report_title}.pdf"
+        return FileResponse(
+            path=resolved_path,
+            filename=filename,
+            media_type="application/pdf",
+        )
+    finally:
         conn.close()
-        raise HTTPException(status_code=404, detail="Report not found")
-
-    require_engagement_access(row["engagement_id"], current_user)
-
-    file_path = row["file_path"]
-    if not os.path.exists(file_path):
-        conn.close()
-        raise HTTPException(status_code=404, detail="PDF report file does not exist on disk")
-
-    from backend.app.utils.audit_logger import log_audit_event
-    log_audit_event(
-        conn,
-        action="REPORT_EXPORT",
-        module="REPORTS",
-        record_id=report_id,
-        engagement_id=row["engagement_id"],
-        details=f"Exported / downloaded PDF report '{row['report_title']}'",
-        user=current_user
-    )
-    conn.commit()
-    conn.close()
-
-    return FileResponse(
-        path=file_path,
-        filename=row["report_title"] if row["report_title"].endswith(".pdf") else f"{row['report_title']}.pdf",
-        media_type="application/pdf"
-    )
