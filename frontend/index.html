@@ -241,7 +241,7 @@
           <!-- Local processing and model status -->
           <div id="top-offline-badge" class="top-offline-pill" onclick="navigateTo('ai_manager')"
             title="View local processing and model status">
-            <span class="offline-dot"></span>
+            <span class="offline-dot" id="top-ai-status-dot" aria-hidden="true"></span>
             <span id="top-ai-status-text">Checking local model…</span>
           </div>
 
@@ -256,13 +256,13 @@
             <!-- Profile Dropdown -->
             <div class="user-dropdown-menu" id="user-dropdown-menu" role="menu">
               <div class="user-dropdown-item" role="menuitem" tabindex="0" onclick="openChangePasswordModal()">
-                <span aria-hidden="true">●</span> Change My Password
+                Change My Password
               </div>
               <div class="user-dropdown-item" role="menuitem" tabindex="0" onclick="navigateTo('ai_manager')">
-                <span aria-hidden="true">◉</span> Local AI Manager
+                Local AI Manager
               </div>
               <div class="user-dropdown-item danger" role="menuitem" tabindex="0" onclick="handleLogout()">
-                <span aria-hidden="true">↪</span> Sign Out
+                Sign Out
               </div>
             </div>
           </div>
