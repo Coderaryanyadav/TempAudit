@@ -30,6 +30,31 @@ def calculate_file_hash(filepath: str) -> str:
     return sha256.hexdigest()
 
 
+def _validate_restorable_sqlite(filepath: str) -> None:
+    """Reject corrupt or unrelated SQLite files before they can replace the live audit database."""
+    if not os.path.isfile(filepath):
+        raise ValueError("Backup database file does not exist.")
+    conn = None
+    try:
+        conn = sqlite3.connect(filepath)
+        checks = conn.execute("PRAGMA quick_check").fetchall()
+        if not checks or any(row[0] != "ok" for row in checks):
+            raise ValueError("Backup database failed SQLite integrity validation.")
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        }
+        required_tables = {"users", "app_settings", "clients", "engagements"}
+        missing = sorted(required_tables - tables)
+        if missing:
+            raise ValueError("Backup is missing required FinAuditPro tables: " + ", ".join(missing))
+    except sqlite3.DatabaseError as exc:
+        raise ValueError(f"Backup is not a healthy SQLite database: {exc}") from exc
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 def _get_user_scoped_engagement_condition(current_user: dict, conn) -> tuple:
     """
     If current user is an Admin, returns no extra scoping condition.
@@ -666,11 +691,9 @@ def restore_database_backup(filename: str, current_user: dict = Depends(require_
         raise HTTPException(status_code=404, detail="Selected backup file not found")
 
     try:
-        test_conn = sqlite3.connect(backup_filepath)
-        test_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-        test_conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid or corrupted SQLite backup file: {str(e)}")
+        _validate_restorable_sqlite(backup_filepath)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     # 1. Take automatic pre-restore safety snapshot of current active DB
     safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
@@ -732,11 +755,13 @@ async def restore_database_upload(
     Admin: Upload an external SQLite .db file and restore the local database from it using SQLite Online Backup API.
     Automatically creates a pre-restore safety snapshot before replacing active DB. Enforces 100MB size limit.
     """
-    if not file.filename.endswith(".db") and not file.filename.endswith(".sqlite"):
+    original_filename = os.path.basename(file.filename or "")
+    extension = os.path.splitext(original_filename)[1].lower()
+    if extension not in {".db", ".sqlite"}:
         raise HTTPException(status_code=400, detail="Only .db or .sqlite database files are accepted.")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    uploaded_backup_filename = f"uploaded_restore_{timestamp}_{os.path.basename(file.filename)}"
+    uploaded_backup_filename = f"uploaded_restore_{timestamp}_{uuid.uuid4().hex[:8]}_{original_filename or 'uploaded.db'}"
     uploaded_filepath = os.path.join(BACKUP_DIR, uploaded_backup_filename)
 
     total_size = 0
@@ -751,13 +776,11 @@ async def restore_database_upload(
             buffer.write(chunk)
 
     try:
-        test_conn = sqlite3.connect(uploaded_filepath)
-        test_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-        test_conn.close()
-    except Exception as e:
+        _validate_restorable_sqlite(uploaded_filepath)
+    except ValueError as exc:
         if os.path.exists(uploaded_filepath):
             os.remove(uploaded_filepath)
-        raise HTTPException(status_code=400, detail=f"Uploaded file is not a valid SQLite database: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Uploaded file is not a valid FinAuditPro backup: {exc}")
 
     # 1. Take automatic pre-restore safety snapshot
     safety_filename = f"pre_restore_safety_{timestamp}.db"
