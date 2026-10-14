@@ -1480,7 +1480,7 @@ async function handleGlobalSearchQuery(e) {
     matchedTabs.forEach(t => {
       html += `
         <div class="search-result-row" onclick="navigateToTabFromSearch('${t.id}')">
-          <div class="search-result-icon">⚡</div>
+          <div class="search-result-icon" aria-hidden="true">→</div>
           <div class="search-result-details">
             <div class="search-result-title">${escapeHTML(t.label)}</div>
             <div class="search-result-sub">${escapeHTML(t.desc)}</div>
@@ -1514,7 +1514,7 @@ window.selectEngagementFromSearch = async function(engId) {
 function renderEmptyEngagementGuide(container, tabName = "dashboard") {
   container.innerHTML = `
     <div class="onboarding-hero-card">
-      <div class="onboarding-hero-icon">🚀</div>
+      <div class="onboarding-hero-icon" aria-hidden="true">FA</div>
       <h2 class="onboarding-hero-title">Welcome to FinAuditPro!</h2>
       <p class="onboarding-hero-desc">
         You don't have any audit engagements configured yet. To begin auditing, create a client record and initialize your first audit engagement.
@@ -4152,7 +4152,7 @@ function openNormalizationSandboxModal() {
                 <input type="text" id="sandbox-raw-input" class="form-control font-mono" placeholder="e.g. 01-Apr-2026 or ₹ 1,50,000.00" value="01-Apr-2026" required>
               </div>
               <div>
-                <button type="submit" class="btn btn-primary" style="padding: 8px 14px;">⚡ Transform</button>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 14px;">Transform</button>
               </div>
             </div>
           </form>
@@ -8401,7 +8401,7 @@ async function viewReconciliationDetails(reconId) {
             ✓ Exact Matches
           </button>
           <button class="demo-chip ${reconFilterState.matchLevel === 'HIGH CONFIDENCE' ? 'active' : ''}" style="${reconFilterState.matchLevel === 'HIGH CONFIDENCE' ? 'background:#0284c7; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'HIGH CONFIDENCE', 'ALL')">
-            ⚡ High Confidence
+            High Confidence
           </button>
           <button class="demo-chip ${reconFilterState.matchLevel === 'POSSIBLE MATCH' ? 'active' : ''}" style="${reconFilterState.matchLevel === 'POSSIBLE MATCH' ? 'background:#ea580c; color:white;' : ''}" onclick="setReconFilter(${reconId}, 'POSSIBLE MATCH', 'ALL')">
             ⚠️ Possible Matches
@@ -8795,10 +8795,10 @@ async function renderAIAssistant() {
       </div>
 
       <div style="padding: 8px 16px; background: var(--bg-sidebar); display: flex; gap: 8px; overflow-x: auto;">
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Show large cash transactions above Section 40A(3) limit')">💡 Section 40A(3) Cash Violations</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the critical risks in this engagement?')">💡 Critical Audit Risks</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the top 5 highest value vouchers?')">💡 Top 5 Highest Vouchers</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Are there any GSTIN format or ITC matching issues?')">💡 GSTIN & ITC Compliance</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Show large cash transactions above Section 40A(3) limit')">Section 40A(3) Cash Violations</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the critical risks in this engagement?')">Critical Audit Risks</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the top 5 highest value vouchers?')">Top 5 Highest Vouchers</button>
+        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Are there any GSTIN format or ITC matching issues?')">GSTIN & ITC Compliance</button>
       </div>
 
       <div class="chat-input-bar">
@@ -9102,7 +9102,7 @@ async function renderChecklist() {
       <!-- Professional Standard Skepticism Banner -->
       <div style="background: var(--bg-app); border: 1px solid var(--border); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--text-secondary);">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 16px;">🛡️</span>
+          <span aria-hidden="true" style="font-weight: 700; color: #3b82f6;">i</span>
           <span><b>Auditor Professional Skepticism Policy (SA 200/230):</b> AI audit engines automatically flag exceptions and initiate procedures as <i>'Requires Review'</i> or <i>'Not Started'</i>. Items are <b>never automatically marked Completed</b> by AI without verified auditor working paper sign-off.</span>
         </div>
         <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">Offline Deterministic Check</span>
@@ -9261,7 +9261,7 @@ async function renderChecklist() {
                     ${item.is_custom ? '<span class="badge badge-low" style="font-size: 9px; padding: 1px 4px;">CUSTOM</span>' : ''}
                     ${item.risk_finding_id ? `
                       <span class="badge badge-critical" style="font-size: 9px; padding: 1px 4px; cursor: pointer;" onclick="openLinkedRiskFinding(${item.risk_finding_id})" title="Click to view linked risk finding">
-                        ⚡ RISK #${item.risk_finding_id}
+                        RISK #${item.risk_finding_id}
                       </span>
                     ` : ''}
                   </td>
@@ -11540,7 +11540,7 @@ async function renderAuditTrail() {
             ${logs.length === 0 ? `
               <tr>
                 <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                  <div style="font-size: 36px; margin-bottom: 8px;">🛡️</div>
+                  
                   <div style="font-weight: 600; color: var(--text-secondary);">No audit activity yet</div>
                   <div style="font-size: 12px; margin-top: 4px;">System and user actions will be cryptographically chained and recorded here in compliance with MCA Rule 11(g).</div>
                 </td>
@@ -13498,7 +13498,7 @@ function renderDuplicateGroupsHtml(data) {
 
     ${filteredGroups.length === 0 ? `
       <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
-        <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+        
         <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No Duplicate Groups Found</div>
         <p style="margin-top: 4px; font-size: 12px;">No transaction pairs matched the selected filter criteria.</p>
       </div>
@@ -13721,7 +13721,7 @@ function renderSequenceGapsHtml(data) {
     <!-- Disclaimer / Guidance Banner -->
     <div class="card" style="margin-bottom: 18px; border-left: 4px solid var(--primary); background: var(--bg-app);">
       <div style="display: flex; gap: 12px; align-items: flex-start;">
-        <div style="font-size: 20px;">💡</div>
+        
         <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
           <b>ICAI Standard Audit Guidance on Sequence Gaps:</b>
           Sequence gaps in invoice, voucher, or cheque numbering are treated as <i>exceptions requiring professional inquiry</i> 
@@ -13953,7 +13953,7 @@ function renderAnomalyDetectionUI(data) {
 
     <!-- Professional Standard Disclaimer Banner -->
     <div style="background: #eff6ff; border: 1px solid var(--border); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-      <span style="font-size: 20px;">🛡️</span>
+      
       <div style="font-size: 12.5px; color: #1e40af;">
         <b>Professional Auditing Safeguard:</b> <i>Potential anomaly detected. Auditor review recommended.</i> An anomaly does not constitute proof of fraud; it indicates empirical deviation requiring substantive audit inquiry (SA 240, SA 315, SA 520).
       </div>
@@ -14628,10 +14628,10 @@ function renderYoYTableRow(row, idx) {
       <td style="padding: 10px 14px; text-align: center;">
         <div style="display: flex; gap: 4px; justify-content: center;">
           <button class="btn btn-sm btn-secondary" style="padding: 3px 6px; font-size: 11px;" title="Document Working Paper Comment" onclick="openYoYCommentModal('${row.item_key}', '${row.category}', '${row.account_name.replace(/'/g, "\\'")}', '${row.status}', '${(row.auditor_comment || '').replace(/'/g, "\\'")}')">
-            📝
+            Note
           </button>
           <button class="btn btn-sm btn-secondary" style="padding: 3px 6px; font-size: 11px;" title="Generate Factual AI Movement Driver" onclick="triggerYoYFactualAI('${row.item_key}')">
-            🤖
+            Explain
           </button>
         </div>
       </td>
@@ -14847,7 +14847,7 @@ Choose one of the quick prompt chips below or type your specific question:`,
 
       <!-- Mandatory Disclaimer Alert -->
       <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #b45309;">
-        <span style="font-size: 16px;">🛡️</span>
+        <span aria-hidden="true" style="font-weight: 700; color: #3b82f6;">i</span>
         <div>
           <strong>Statutory Compliance Disclaimer:</strong> <em>AI-generated assistance. Verify findings against source records before making audit decisions.</em>
         </div>
@@ -14979,7 +14979,7 @@ function renderAssistantMessageItem(msg, idx) {
       <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;">
         ${msg.suggested_actions.map(act => `
           <span style="font-size: 11.5px; background: rgba(99, 102, 241, 0.08); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 14px; padding: 3px 10px;">
-            ⚡ ${escapeHtml(act)}
+            ${escapeHtml(act)}
           </span>
         `).join("")}
       </div>
@@ -14996,7 +14996,7 @@ function renderAssistantMessageItem(msg, idx) {
         ${evidenceHtml}
         ${actionsHtml}
         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-secondary);">
-          <span>🛡️ ${msg.disclaimer || MANDATORY_DISCLAIMER}</span>
+          <span>${msg.disclaimer || MANDATORY_DISCLAIMER}</span>
           <span>${msg.timestamp || ''}</span>
         </div>
       </div>
@@ -15184,7 +15184,7 @@ function getRiskScoreBadge(score, severity = "MEDIUM", factors = null) {
   }
 
   const tooltip = factors && factors.equation ? `title="${factors.equation}"` : `title="Deterministic Risk Score: ${numScore.toFixed(1)}/10.0"`;
-  return `<span class="risk-score-pill ${pillClass}" ${tooltip}>⚡ ${numScore.toFixed(1)} / 10</span>`;
+  return `<span class="risk-score-pill ${pillClass}" ${tooltip}>${numScore.toFixed(1)} / 10</span>`;
 }
 
 function getFindingStatusBadge(status) {
@@ -15232,13 +15232,13 @@ async function renderFindings() {
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button class="btn btn-secondary" onclick="openCreateCustomFindingModal()">
-            <span>➕</span> Record Manual Observation
+            Record Manual Observation
           </button>
           <a href="${FinAuditAPI.getExportFindingsCsvUrl(state.currentEngagementId)}" download="audit_findings_${state.currentEngagementId}.csv" class="btn btn-secondary" style="text-decoration: none;">
-            <span>📥</span> Export CSV Register
+            Export CSV Register
           </a>
           <button class="btn btn-primary" id="btn-sync-findings" onclick="syncCentralizedFindings()">
-            <span>⚡</span> Sync All Modules
+            Sync All Modules
           </button>
         </div>
       </div>
@@ -15339,13 +15339,13 @@ async function renderFindings() {
             Centralized Findings Register <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(${findings.length} records match filter)</span>
           </div>
           <div style="font-size: 11.5px; color: var(--text-muted);">
-            💡 Click on any risk score to inspect deterministic formula breakdown
+            Click on any risk score to inspect the deterministic formula breakdown
           </div>
         </div>
 
         ${findings.length === 0 ? `
           <div style="padding: 48px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+            
             <div style="font-size: 15px; font-weight: 600; color: #1e293b;">No findings matching current criteria</div>
             <p style="font-size: 12.5px; margin-top: 4px;">Click <strong>"Sync All Modules"</strong> above to aggregate exceptions across all audit subsystems.</p>
           </div>
@@ -15404,7 +15404,7 @@ async function renderFindings() {
                           Inspect
                         </button>
                         <button class="btn btn-sm btn-secondary" onclick="generateFindingAIExplanation(${f.id})" title="View AI Explanation & ICAI Audit Procedures">
-                          🤖 AI
+                          AI explanation
                         </button>
                       </div>
                     </td>
@@ -15456,7 +15456,7 @@ async function syncCentralizedFindings() {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = `<span>⚡</span> Sync All Modules`;
+      btn.innerHTML = `Sync All Modules`;
     }
   }
 }
@@ -16712,7 +16712,7 @@ async function renderAIManager() {
         <!-- Zero Cloud Transmission & Privacy Shield Banner -->
         <div class="ai-privacy-shield-box">
           <div style="display: flex; align-items: center; gap: 14px;">
-            <div style="font-size: 32px;">🛡️</div>
+            <div class="privacy-status-mark" aria-hidden="true">LOCAL</div>
             <div>
               <div style="font-size: 15px; font-weight: 800; letter-spacing: 0.02em;">STRICT LOCAL PRIVACY SHIELD ACTIVE</div>
               <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">
