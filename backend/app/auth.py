@@ -33,6 +33,11 @@ def get_jwt_secret() -> str:
     """Return an environment secret or atomically create/read the persisted local secret."""
     env_secret = os.environ.get("FINAUDIT_SECRET_KEY")
     if env_secret:
+        env_secret = env_secret.strip()
+        if len(env_secret) < 32:
+            raise RuntimeError(
+                "FINAUDIT_SECRET_KEY must contain at least 32 characters; generate a random key with 'openssl rand -hex 32'."
+            )
         return env_secret
 
     conn = None
