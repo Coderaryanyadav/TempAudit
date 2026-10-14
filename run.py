@@ -31,20 +31,28 @@ except ImportError:
 import webbrowser
 import threading
 import time
+import urllib.request
 
 def open_browser():
-    time.sleep(1.5)
-    webbrowser.open("http://127.0.0.1:8000")
+    """Open the UI only after FastAPI has completed startup and its health check responds."""
+    deadline = time.monotonic() + 30
+    health_url = "http://127.0.0.1:8000/api/health"
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(health_url, timeout=1) as response:
+                if response.status == 200:
+                    webbrowser.open("http://127.0.0.1:8000")
+                    return
+        except Exception:
+            time.sleep(0.5)
+    print("[WARN] Server health check did not succeed; open http://127.0.0.1:8000 after startup if the server is running.")
+
 
 if __name__ == "__main__":
     print("==================================================================")
     print("  FinAuditPro - AI-Assisted Auditing Software (Offline Edition)  ")
     print("  Standalone Desktop Server starting on http://127.0.0.1:8000     ")
     print("==================================================================")
-
-    # Initialize database schema
-    from backend.app.database import init_db
-    init_db()
 
     # Launch browser in separate thread
     threading.Thread(target=open_browser, daemon=True).start()
