@@ -2,16 +2,19 @@
 
 import io
 import os
+import sqlite3
 import tarfile
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.auth import create_access_token
 from backend.app.database import get_db_connection
 from backend.app.main import app
+from backend.app.routers.audit_trail import _validate_restorable_sqlite
 from backend.app.routers.auth import _activation_token_is_expired
 from backend.app.services.backup_service import BACKUP_DIR, BackupService
 
@@ -146,8 +149,19 @@ def test_verified_backup_rejects_path_traversal(tmp_path):
             os.remove(escaped_path)
 
 
-def test_root_compose_requires_an_explicit_jwt_secret():
+def test_root_compose_requires_localhost_and_an_explicit_jwt_secret():
     project_root = Path(__file__).resolve().parents[2]
     compose = (project_root / "compose.yaml").read_text(encoding="utf-8")
+    assert '"127.0.0.1:8000:8000"' in compose
     assert "FINAUDIT_SECRET_KEY: ${FINAUDIT_SECRET_KEY:?Set FINAUDIT_SECRET_KEY" in compose
     assert "c9d79e627e7813a37c8440ddc4d27f5a455c14243828a1c8f15499f1702d4e68" not in compose
+
+    devops_compose = (project_root / "DevOps" / "docker" / "compose.yaml").read_text(encoding="utf-8")
+    assert '"127.0.0.1:8000:8000"' in devops_compose
+
+
+def test_restore_validator_rejects_unrelated_sqlite_database(tmp_path):
+    unrelated_db = tmp_path / "unrelated.sqlite"
+    sqlite3.connect(unrelated_db).close()
+    with pytest.raises(ValueError, match="missing required FinAuditPro tables"):
+        _validate_restorable_sqlite(str(unrelated_db))
