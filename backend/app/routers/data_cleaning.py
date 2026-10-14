@@ -1,4 +1,5 @@
 import json
+import math
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -129,87 +130,139 @@ def review_cleaning_log(
     req: CleaningLogReviewRequest,
     current_user: dict = Depends(require_role(["Admin", "Auditor"]))
 ):
-    """
-    Allows the auditor to review, accept, override, or revert an automatic normalization transformation.
-    Updates the database record and synchronizes the active transaction.
-    """
+    """Review a transformation and synchronize any linked transaction atomically."""
     if req.action not in ["Accepted", "Overridden", "Reverted"]:
-        raise HTTPException(status_code=400, detail="Action must be 'Accepted', 'Overridden', or 'Reverted'.")
+        raise HTTPException(
+            status_code=400,
+            detail="Action must be 'Accepted', 'Overridden', or 'Reverted'.",
+        )
 
     conn = get_db_connection()
-    log_row = conn.execute("SELECT * FROM data_cleaning_logs WHERE id = ?", (log_id,)).fetchone()
-    if not log_row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Cleaning log record not found.")
+    try:
+        # This route updates two business records and the audit chain. With SQLite
+        # autocommit connections, an explicit transaction is required for atomicity.
+        conn.execute("BEGIN IMMEDIATE")
+        log_row = conn.execute(
+            "SELECT * FROM data_cleaning_logs WHERE id = ?",
+            (log_id,),
+        ).fetchone()
+        if not log_row:
+            raise HTTPException(status_code=404, detail="Cleaning log record not found.")
 
-    log = dict(log_row)
-    require_engagement_access(log["engagement_id"], current_user)
-    now_str = datetime.now().isoformat()
+        log = dict(log_row)
+        require_engagement_access(log["engagement_id"], current_user)
+        now_str = datetime.now().isoformat()
 
-    new_normalized_val = log["normalized_value"]
-    if req.action == "Reverted":
-        new_normalized_val = log["original_value"]
-    elif req.action == "Overridden" and req.custom_normalized_value is not None:
-        new_normalized_val = req.custom_normalized_value.strip()
+        new_normalized_val = log["normalized_value"]
+        if req.action == "Reverted":
+            new_normalized_val = log["original_value"]
+        elif req.action == "Overridden" and req.custom_normalized_value is not None:
+            new_normalized_val = req.custom_normalized_value.strip()
 
-    # Update cleaning log record
-    conn.execute("""
-    UPDATE data_cleaning_logs SET
-        normalized_value = ?,
-        review_status = ?,
-        auditor_comment = ?,
-        reviewed_by = ?,
-        reviewed_at = ?
-    WHERE id = ?
-    """, (
-        new_normalized_val,
-        req.action,
-        req.auditor_comment or log.get("auditor_comment", ""),
-        current_user.get("full_name") or current_user.get("username", "Auditor"),
-        now_str,
-        log_id
-    ))
+        transaction_update = None
+        tx_id = log.get("transaction_id")
+        field = log.get("field_name")
+        valid_cols = {
+            "date", "ledger", "party_name", "voucher_no", "invoice_no",
+            "gstin", "description", "debit", "credit", "amount",
+        }
+        numeric_cols = {"debit", "credit", "amount"}
 
-    # Synchronize transaction record if linked
-    if log.get("transaction_id") and log.get("field_name"):
-        field = log["field_name"]
-        tx_id = log["transaction_id"]
-        
-        # Valid column check
-        valid_cols = ["date", "ledger", "party_name", "voucher_no", "invoice_no", "gstin", "description", "debit", "credit", "amount"]
-        if field in valid_cols:
-            if field in ["debit", "credit", "amount"]:
+        if tx_id and field:
+            if field not in valid_cols:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This cleaning log references an unsupported transaction field; no changes were saved.",
+                )
+
+            tx_row = conn.execute(
+                "SELECT id FROM transactions WHERE id = ? AND engagement_id = ?",
+                (tx_id, log["engagement_id"]),
+            ).fetchone()
+            if not tx_row:
+                raise HTTPException(
+                    status_code=409,
+                    detail="The linked transaction no longer exists in this engagement; no changes were saved.",
+                )
+
+            if field in numeric_cols:
                 try:
-                    num_val = float(str(new_normalized_val).replace(",", "").strip())
-                    conn.execute(f"UPDATE transactions SET {field} = ? WHERE id = ?", (num_val, tx_id))
-                except Exception:
-                    pass
+                    numeric_value = float(str(new_normalized_val).replace(",", "").strip())
+                except (TypeError, ValueError, OverflowError) as exc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"The normalized value for {field} must be a valid finite number.",
+                    ) from exc
+                if not math.isfinite(numeric_value):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"The normalized value for {field} must be a valid finite number.",
+                    )
+                transaction_update = (numeric_value, tx_id)
             else:
-                conn.execute(f"UPDATE transactions SET {field} = ? WHERE id = ?", (new_normalized_val, tx_id))
+                transaction_update = (new_normalized_val, tx_id)
 
-    # Audit log
-    from backend.app.utils.audit_logger import log_audit_event
-    log_audit_event(
-        conn=conn,
-        action="REVIEW_NORMALIZATION",
-        module="DATA_CLEANING",
-        record_id=log_id,
-        user=current_user,
-        engagement_id=log.get("engagement_id"),
-        details=f"Auditor reviewed transformation #{log_id} ({log['field_name']}): {req.action}. Value set to '{new_normalized_val}'.",
-        timestamp=now_str
-    )
+        # Validate and resolve everything before the first mutation.
+        cursor = conn.execute(
+            """
+            UPDATE data_cleaning_logs
+            SET normalized_value = ?, review_status = ?, auditor_comment = ?,
+                reviewed_by = ?, reviewed_at = ?
+            WHERE id = ?
+            """,
+            (
+                new_normalized_val,
+                req.action,
+                req.auditor_comment or log.get("auditor_comment", ""),
+                current_user.get("full_name") or current_user.get("username", "Auditor"),
+                now_str,
+                log_id,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Cleaning log update did not affect exactly one row.")
 
-    conn.commit()
-    conn.close()
+        if transaction_update is not None:
+            value, linked_tx_id = transaction_update
+            cursor = conn.execute(
+                f"UPDATE transactions SET {field} = ? WHERE id = ? AND engagement_id = ?",
+                (value, linked_tx_id, log["engagement_id"]),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError("Linked transaction update did not affect exactly one row.")
 
-    return {
-        "status": "success",
-        "log_id": log_id,
-        "action": req.action,
-        "normalized_value": new_normalized_val,
-        "message": f"Transformation #{log_id} has been {req.action.lower()}."
-    }
+        from backend.app.utils.audit_logger import log_audit_event
+        log_audit_event(
+            conn=conn,
+            action="REVIEW_NORMALIZATION",
+            module="DATA_CLEANING",
+            record_id=log_id,
+            old_value={"normalized_value": log["normalized_value"], "review_status": log.get("review_status")},
+            new_value={"normalized_value": new_normalized_val, "review_status": req.action},
+            user=current_user,
+            engagement_id=log.get("engagement_id"),
+            details=(
+                f"Auditor reviewed transformation #{log_id} ({log['field_name']}): "
+                f"{req.action}. Value set to '{new_normalized_val}'."
+            ),
+            timestamp=now_str,
+        )
+
+        conn.commit()
+        return {
+            "status": "success",
+            "log_id": log_id,
+            "action": req.action,
+            "normalized_value": new_normalized_val,
+            "message": f"Transformation #{log_id} has been {req.action.lower()}.",
+        }
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 @router.post("/normalize-preview")
 def test_normalization_preview(req: NormalizationPreviewRequest, current_user: dict = Depends(get_current_user)):
