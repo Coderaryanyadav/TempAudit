@@ -243,7 +243,7 @@ function renderErrorBanner(err, contextTitle = "Action Failed") {
   return `
     <div class="error-banner-card">
       <div class="error-banner-header">
-        <div class="error-banner-icon">⚠️</div>
+        <div class="error-banner-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
         <div>
           <h4 class="error-banner-title">${escapeHTML(translated.title)}</h4>
           <p class="error-banner-message">${escapeHTML(translated.friendlyMessage)}</p>
@@ -1065,7 +1065,7 @@ function showSystemDatabaseError(errorMsg) {
   overlay.innerHTML = `
     <div class="login-card" style="max-width: 500px; border-top: 4px solid #ef4444;">
       <div class="login-header" style="background: #0f172a; padding: 24px; text-align: center;">
-        <div style="font-size: 36px; margin-bottom: 8px;">⚠️</div>
+        <div style="font-size: 36px; margin-bottom: 8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
         <div class="login-title" style="font-size: 20px; color: #f87171;">Installation Diagnostic Alert</div>
         <div class="login-subtitle">FinAuditPro could not safely open this installation</div>
       </div>
@@ -1437,7 +1437,7 @@ async function handleGlobalSearchQuery(e) {
     matchedEngagements.forEach(eng => {
       html += `
         <div class="search-result-row" onclick="selectEngagementFromSearch(${eng.id})">
-          <div class="search-result-icon">📁</div>
+          <div class="search-result-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10H3V7z"></path></svg></div>
           <div class="search-result-details">
             <div class="search-result-title">${escapeHTML(eng.client_name)} — ${escapeHTML(eng.title)}</div>
             <div class="search-result-sub">FY ${escapeHTML(eng.financial_year)} • ${escapeHTML(eng.audit_type || 'Statutory Audit')}</div>
@@ -2164,7 +2164,7 @@ async function renderClients(searchQuery = null, entityFilter = null) {
         </div>
         ${clients.length === 0 ? `
           <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 44px; margin-bottom: 10px;">🏢</div>
+            <div style="font-size: 44px; margin-bottom: 10px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg></div>
             <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No clients yet</div>
             <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
               Register your audited entity to establish tenancy, define statutory identifiers (PAN, GSTIN), and begin creating audit engagements.
@@ -4296,10 +4296,10 @@ async function renderDashboard() {
               </button>
             ` : ''}
             <button class="btn btn-secondary" onclick="navigateTo('clients')">
-              🏢 Clients
+              Clients
             </button>
             <button class="btn btn-secondary" onclick="navigateTo('settings')">
-              ⚙️ Settings
+              Settings
             </button>
           </div>
         </div>
@@ -4309,7 +4309,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-blue" onclick="navigateTo('clients')" title="Click to view all active clients">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Active Clients</span>
-              <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">🏢</div>
+              <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg></div>
             </div>
             <div class="dash-stat-val">${cards.active_clients_count || 0}</div>
             <div class="dash-stat-sub"><span>Registered audit clients</span></div>
@@ -4318,7 +4318,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-indigo" onclick="navigateTo('engagements')" title="Click to view all active audit engagements">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Active Engagements</span>
-              <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">📁</div>
+              <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10H3V7z"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #4f46e5;">${cards.active_engagements_count || 0}</div>
             <div class="dash-stat-sub"><span>In Progress / Draft audits</span></div>
@@ -4327,7 +4327,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-amber">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Open Findings</span>
-              <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">⚠️</div>
+              <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #d97706;">0</div>
             <div class="dash-stat-sub"><span>Unresolved observations</span></div>
@@ -4336,7 +4336,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-red">
             <div class="dash-stat-header">
               <span class="dash-stat-title">High-Risk Findings</span>
-              <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">🚨</div>
+              <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #dc2626;">0</div>
             <div class="dash-stat-sub"><span>Critical & High severity</span></div>
@@ -4345,7 +4345,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-purple">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Unmatched Txns</span>
-              <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">⚖️</div>
+              <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m-4 6H4m0 0l4 4m-4-4l4-4"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #9333ea;">0</div>
             <div class="dash-stat-sub"><span>BRS & GST 2B unreconciled</span></div>
@@ -4354,7 +4354,7 @@ async function renderDashboard() {
           <div class="dash-stat-card card-orange">
             <div class="dash-stat-header">
               <span class="dash-stat-title">Pending Reviews</span>
-              <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">⏳</div>
+              <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
             </div>
             <div class="dash-stat-val font-mono" style="color: #ea580c;">0</div>
             <div class="dash-stat-sub"><span>Awaiting sign-off / WPs</span></div>
@@ -4478,7 +4478,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-blue" onclick="navigateTo('clients')" title="Click to view all active clients">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Active Clients</span>
-            <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">🏢</div>
+            <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path></svg></div>
           </div>
           <div class="dash-stat-val">${cards.active_clients_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4489,7 +4489,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-indigo" onclick="navigateTo('engagements')" title="Click to view all active audit engagements">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Active Engagements</span>
-            <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;">📁</div>
+            <div class="dash-stat-icon" style="background: #e0e7ff; color: #4f46e5;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10H3V7z"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #4f46e5;">${cards.active_engagements_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4500,7 +4500,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-amber" onclick="openDashboardFindingsModal('OPEN', null)" title="Click to inspect all Open findings">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Open Findings</span>
-            <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;">⚠️</div>
+            <div class="dash-stat-icon" style="background: #fef3c7; color: #d97706;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #d97706;">${cards.open_findings_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4511,7 +4511,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-red" onclick="openDashboardFindingsModal('HIGH', null)" title="Click to inspect Critical & High risk findings">
           <div class="dash-stat-header">
             <span class="dash-stat-title">High-Risk Findings</span>
-            <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;">🚨</div>
+            <div class="dash-stat-icon" style="background: #fee2e2; color: #dc2626;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #dc2626;">${cards.high_risk_findings_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4522,7 +4522,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-purple" onclick="openDashboardReconciliationModal('UNMATCHED')" title="Click to inspect unmatched BRS / GST records">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Unmatched Txns</span>
-            <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;">⚖️</div>
+            <div class="dash-stat-icon" style="background: #f3e8ff; color: #9333ea;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m-4 6H4m0 0l4 4m-4-4l4-4"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #9333ea;">${cards.unmatched_transactions_count || 0}</div>
           <div class="dash-stat-sub">
@@ -4533,7 +4533,7 @@ async function renderDashboard() {
         <div class="dash-stat-card card-orange" onclick="openDashboardPendingReviewsModal()" title="Click to inspect pending Partner reviews">
           <div class="dash-stat-header">
             <span class="dash-stat-title">Pending Reviews</span>
-            <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;">⏳</div>
+            <div class="dash-stat-icon" style="background: #ffedd5; color: #ea580c;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
           </div>
           <div class="dash-stat-val font-mono" style="color: #ea580c;">${cards.pending_reviews_count || 0}</div>
           <div class="dash-stat-sub">
@@ -12027,7 +12027,7 @@ async function renderEngagements() {
         </div>
         ${engagements.length === 0 ? `
           <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 44px; margin-bottom: 10px;">📁</div>
+            <div style="font-size: 44px; margin-bottom: 10px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10H3V7z"></path></svg></div>
             <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No engagements yet</div>
             <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
               Create an audit engagement for your registered client to establish the audit mandate, financial year, and materiality benchmark.
@@ -12648,7 +12648,7 @@ async function renderFinancialStatements() {
   container.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: center; height: 300px; color: var(--text-muted);">
       <div style="text-align: center;">
-        <div style="font-size: 28px; margin-bottom: 8px;">⏳</div>
+        <div style="font-size: 28px; margin-bottom: 8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
         <div>Generating Schedule III Financial Statements & Computing Analytical Ratios...</div>
       </div>
     </div>
@@ -12661,7 +12661,7 @@ async function renderFinancialStatements() {
   } catch (err) {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
-        <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
+        <div style="font-size: 32px; margin-bottom: 10px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
         <h3>Financial Statement Analysis Error</h3>
         <p style="margin-top: 6px; color: var(--text-muted);">${err.message || "Failed to load financial statement data."}</p>
         <button class="btn btn-secondary" style="margin-top: 14px;" onclick="renderFinancialStatements()">Retry Analysis</button>
@@ -13335,7 +13335,7 @@ async function renderDuplicateAndMissing() {
   } catch (err) {
     container.innerHTML = `
       <div class="card" style="padding: 30px; text-align: center; color: #dc2626;">
-        <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
+        <div style="font-size: 32px; margin-bottom: 10px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86l-8 14A2 2 0 004 21h16a2 2 0 001.71-3l-8-14a2 2 0 00-3.42 0z"></path></svg></div>
         <h3>Duplicate & Sequence Gap Detection Error</h3>
         <p style="margin-top: 6px; color: var(--text-muted);">${err.message || "Failed to scan transactions."}</p>
         <button class="btn btn-secondary" style="margin-top: 14px;" onclick="renderDuplicateAndMissing()">Retry Analysis</button>
