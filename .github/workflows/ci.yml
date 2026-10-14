@@ -11,6 +11,8 @@ jobs:
   focused-regression-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -40,7 +42,7 @@ jobs:
 
       - name: Run backend migration, auth and backup regressions
         run: >
-          pytest -q
+          python -m pytest -q
           backend/tests/test_migrations_and_database_foundation.py
           backend/tests/test_login_session_refresh.py
           backend/tests/test_security_regressions.py
