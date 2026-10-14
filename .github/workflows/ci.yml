@@ -47,3 +47,5 @@ jobs:
           backend/tests/test_login_session_refresh.py
           backend/tests/test_security_regressions.py
           backend/tests/test_verified_backup_and_integrity_dashboard.py
+          backend/tests/test_evidence_hashing_and_versioning.py
+          backend/tests/test_data_cleaning.py
