@@ -23,28 +23,65 @@ class EvidenceRepository:
         replacement_reason: Optional[str] = None,
         version: int = 1
     ) -> int:
-        now_str = datetime.now().isoformat()
-        cursor = self.conn.cursor()
-        cursor.execute("""
-        INSERT INTO evidence_items (
-            engagement_id, working_paper_id, filename, original_filename,
-            storage_path, file_size, mime_type, sha256_hash, version,
-            parent_evidence_id, replacement_reason, uploaded_by, uploaded_at, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
-        """, (
-            engagement_id, working_paper_id, filename, original_filename,
-            storage_path, file_size, mime_type, sha256_hash, version,
-            parent_evidence_id, replacement_reason, uploaded_by, now_str
-        ))
-        
-        # If this is a new version superseding an old one, mark parent as SUPERSEDED
-        if parent_evidence_id:
-            cursor.execute(
-                "UPDATE evidence_items SET status = 'SUPERSEDED' WHERE id = ?",
-                (parent_evidence_id,)
+        """Register an immutable evidence version with a validated parent relationship."""
+        owns_transaction = not self.conn.in_transaction
+        try:
+            if owns_transaction:
+                self.conn.execute("BEGIN IMMEDIATE")
+
+            parent = None
+            if parent_evidence_id is not None:
+                parent = self.conn.execute(
+                    """
+                    SELECT id, engagement_id, working_paper_id, original_filename, status
+                    FROM evidence_items WHERE id = ?
+                    """,
+                    (parent_evidence_id,),
+                ).fetchone()
+                if parent is None:
+                    raise ValueError("Parent evidence record does not exist.")
+                if (
+                    parent["engagement_id"] != engagement_id
+                    or parent["working_paper_id"] != working_paper_id
+                    or parent["original_filename"] != original_filename
+                ):
+                    raise ValueError(
+                        "Parent evidence must belong to the same engagement, working paper, and original filename."
+                    )
+
+            now_str = datetime.now().isoformat()
+            cursor = self.conn.execute(
+                """
+                INSERT INTO evidence_items (
+                    engagement_id, working_paper_id, filename, original_filename,
+                    storage_path, file_size, mime_type, sha256_hash, version,
+                    parent_evidence_id, replacement_reason, uploaded_by, uploaded_at, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+                """,
+                (
+                    engagement_id, working_paper_id, filename, original_filename,
+                    storage_path, file_size, mime_type, sha256_hash, version,
+                    parent_evidence_id, replacement_reason, uploaded_by, now_str,
+                ),
             )
-            
-        return cursor.lastrowid
+            new_id = cursor.lastrowid
+
+            # A newer version supersedes its parent only when that parent is currently active.
+            if parent is not None and str(parent["status"] or "").upper() == "ACTIVE":
+                updated = self.conn.execute(
+                    "UPDATE evidence_items SET status = 'SUPERSEDED' WHERE id = ? AND status = 'ACTIVE'",
+                    (parent_evidence_id,),
+                )
+                if updated.rowcount != 1:
+                    raise RuntimeError("Parent evidence status changed during version registration.")
+
+            if owns_transaction:
+                self.conn.commit()
+            return new_id
+        except Exception:
+            if owns_transaction and self.conn.in_transaction:
+                self.conn.rollback()
+            raise
 
     def get_by_id(self, evidence_id: int) -> Optional[Dict[str, Any]]:
         row = self.conn.execute("SELECT * FROM evidence_items WHERE id = ?", (evidence_id,)).fetchone()
