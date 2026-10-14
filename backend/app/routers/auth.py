@@ -38,48 +38,78 @@ def _ensure_rate_limit_table(conn):
         )
     """)
 
+def _activation_token_is_expired(exp_str: Optional[str]) -> bool:
+    """Treat missing or malformed activation expiries as invalid; compare aware times in UTC."""
+    if not exp_str:
+        return True
+    try:
+        expires_at = datetime.fromisoformat(exp_str)
+    except (TypeError, ValueError):
+        return True
+    if expires_at.tzinfo is None:
+        # Existing installations may contain legacy naive local timestamps.
+        return datetime.now() >= expires_at
+    return datetime.now(timezone.utc) >= expires_at.astimezone(timezone.utc)
+
+
 def _check_setup_rate_limit():
     conn = get_db_connection()
-    _ensure_rate_limit_table(conn)
-    now = time.time()
-    cutoff = now - 60
-    conn.execute("DELETE FROM rate_limits WHERE key = 'setup' AND timestamp < ?", (cutoff,))
-    
-    row = conn.execute("SELECT COUNT(*) as count FROM rate_limits WHERE key = 'setup'").fetchone()
-    if row and row["count"] >= 5:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many initial setup attempts. Please wait 60 seconds before retrying."
-        )
-    conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES ('setup', ?)", (now,))
+    try:
+        _ensure_rate_limit_table(conn)
+        now = time.time()
+        cutoff = now - 60
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("DELETE FROM rate_limits WHERE key = 'setup' AND timestamp < ?", (cutoff,))
+        row = conn.execute("SELECT COUNT(*) as count FROM rate_limits WHERE key = 'setup'").fetchone()
+        if row and row["count"] >= 5:
+            conn.rollback()
+            raise HTTPException(status_code=429, detail="Too many initial setup attempts. Please wait 60 seconds before retrying.")
+        conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES ('setup', ?)", (now,))
+        conn.commit()
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 def _check_login_rate_limit(key: str):
     conn = get_db_connection()
-    _ensure_rate_limit_table(conn)
-    now = time.time()
-    cutoff = now - 300 # 5 minute window
-    db_key = f"login_{key}"
-    conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp < ?", (db_key, cutoff))
-    
-    row = conn.execute("SELECT COUNT(*) as count FROM rate_limits WHERE key = ? AND timestamp >= ?", (db_key, cutoff)).fetchone()
-    if row and row["count"] >= 10:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many unsuccessful attempts. Please try again later."
-        )
+    try:
+        _ensure_rate_limit_table(conn)
+        now = time.time()
+        cutoff = now - 300
+        # Prune all stale entries so one-off identifiers cannot grow this table forever.
+        conn.execute("DELETE FROM rate_limits WHERE timestamp < ?", (cutoff,))
+        db_key = f"login_{key}"
+        conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp < ?", (db_key, cutoff))
+        row = conn.execute(
+            "SELECT COUNT(*) as count FROM rate_limits WHERE key = ? AND timestamp >= ?",
+            (db_key, cutoff),
+        ).fetchone()
+        if row and row["count"] >= 10:
+            raise HTTPException(status_code=429, detail="Too many unsuccessful attempts. Please try again later.")
+    finally:
+        conn.close()
+
 
 def _record_login_failure(key: str):
     conn = get_db_connection()
-    _ensure_rate_limit_table(conn)
-    now = time.time()
-    db_key = f"login_{key}"
-    conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES (?, ?)", (db_key, now))
+    try:
+        _ensure_rate_limit_table(conn)
+        conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES (?, ?)", (f"login_{key}", time.time()))
+    finally:
+        conn.close()
+
 
 def _clear_login_failures(key: str):
     conn = get_db_connection()
-    _ensure_rate_limit_table(conn)
-    db_key = f"login_{key}"
-    conn.execute("DELETE FROM rate_limits WHERE key = ?", (db_key,))
+    try:
+        _ensure_rate_limit_table(conn)
+        conn.execute("DELETE FROM rate_limits WHERE key = ?", (f"login_{key}",))
+    finally:
+        conn.close()
 
 
 # ----------------- FIRST-LAUNCH DETECTION & SETUP STATUS -----------------
@@ -372,7 +402,9 @@ def login(creds: UserLogin):
     Generic error response to prevent user enumeration. Rate limited against brute-force.
     """
     login_identifier = creds.username.strip()
-    _check_login_rate_limit(login_identifier)
+    # The database lookup is case-insensitive; rate limits must be case-insensitive too.
+    rate_limit_key = login_identifier.casefold()
+    _check_login_rate_limit(rate_limit_key)
 
     conn = get_db_connection()
     try:
@@ -382,7 +414,7 @@ def login(creds: UserLogin):
         ).fetchone()
 
         if not user or not verify_password(creds.password, user["password_hash"]):
-            _record_login_failure(login_identifier)
+            _record_login_failure(rate_limit_key)
             raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         user_dict = dict(user)
@@ -394,14 +426,19 @@ def login(creds: UserLogin):
                 detail="Your account is pending activation. Please use your activation link or contact your administrator."
             )
 
-        # Check disabled status
-        if not user_dict.get("is_active", 1) or user_dict.get("status") == "DISABLED":
+        # Check account status consistently with protected-route authentication.
+        account_status = str(user_dict.get("status") or "ACTIVE").strip().upper()
+        if not user_dict.get("is_active", 1) or account_status == "DISABLED":
             raise HTTPException(
                 status_code=403,
                 detail="Your user account has been disabled by the Administrator. Please contact audit administration."
             )
+        if account_status == "LOCKED":
+            raise HTTPException(status_code=403, detail="Your account is locked. Please contact audit administration.")
+        if account_status not in {"ACTIVE", ""}:
+            raise HTTPException(status_code=403, detail="Your account is not active. Please contact audit administration.")
 
-        _clear_login_failures(login_identifier)
+        _clear_login_failures(rate_limit_key)
 
         now_str = datetime.now().isoformat()
         conn.execute("UPDATE users SET last_login = ? WHERE id = ?", (now_str, user["id"]))
@@ -534,33 +571,25 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
 
 @router.get("/activation-info/{token}")
 def get_activation_info(token: str):
-    """
-    Public Endpoint: Checks validity of a user activation token.
-    Returns invitee details for the onboarding screen.
-    """
+    """Validate an invitation token without treating malformed expiry as valid."""
     conn = get_db_connection()
     try:
         user = conn.execute(
-            "SELECT id, username, email, full_name, role, designation, status, activation_expires_at FROM users WHERE activation_token = ?",
-            (token.strip(),)
+            "SELECT id, username, email, full_name, role, designation, status, activation_expires_at "
+            "FROM users WHERE activation_token = ?",
+            (token.strip(),),
         ).fetchone()
-
         if not user:
             raise HTTPException(status_code=404, detail="Invalid or unrecognized activation token.")
 
         u = dict(user)
-        exp_str = u.get("activation_expires_at")
-        if exp_str:
-            try:
-                exp_dt = datetime.fromisoformat(exp_str)
-                if datetime.now() > exp_dt:
-                    return {
-                        "is_valid": False,
-                        "expired": True,
-                        "message": "This activation token has expired. Please ask your administrator to issue a new one."
-                    }
-            except Exception:
-                pass
+        expired = _activation_token_is_expired(u.get("activation_expires_at"))
+        if str(u.get("status") or "").upper() != "INVITED" or expired:
+            return {
+                "is_valid": False,
+                "expired": True,
+                "message": "This activation token is invalid or expired. Please ask your administrator to issue a new one.",
+            }
 
         return {
             "is_valid": True,
@@ -570,7 +599,7 @@ def get_activation_info(token: str):
             "full_name": u["full_name"],
             "email": u["email"],
             "role": u["role"],
-            "designation": u["designation"]
+            "designation": u["designation"],
         }
     finally:
         conn.close()
@@ -578,41 +607,48 @@ def get_activation_info(token: str):
 
 @router.post("/activate-user")
 def activate_user(req: UserActivationSubmit):
-    """
-    Public Endpoint: Activates an invited user account by setting their permanent password.
-    Transitions account from INVITED to ACTIVE. Issues immediate access token.
-    """
+    """Activate one invitation atomically and issue a token for its new token version."""
     token = req.activation_token.strip()
     if len(req.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
 
     conn = get_db_connection()
     try:
+        conn.execute("BEGIN IMMEDIATE")
         user = conn.execute("SELECT * FROM users WHERE activation_token = ?", (token,)).fetchone()
         if not user:
+            conn.rollback()
             raise HTTPException(status_code=404, detail="Invalid or expired activation token.")
 
         u = dict(user)
-        exp_str = u.get("activation_expires_at")
-        if exp_str:
-            try:
-                exp_dt = datetime.fromisoformat(exp_str)
-                if datetime.now() > exp_dt:
-                    raise HTTPException(status_code=400, detail="Activation token has expired. Request a new token from your administrator.")
-            except Exception:
-                pass
+        if str(u.get("status") or "").upper() != "INVITED":
+            conn.rollback()
+            raise HTTPException(status_code=404, detail="Invalid or expired activation token.")
+        if _activation_token_is_expired(u.get("activation_expires_at")):
+            conn.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail="Activation token has expired. Request a new token from your administrator.",
+            )
 
         new_hash = hash_password(req.password)
-        now_str = datetime.now().isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
         full_name = req.full_name.strip() if req.full_name else u["full_name"]
         phone = req.phone.strip() if req.phone else u.get("phone", "")
 
-        conn.execute("""
+        cursor = conn.execute(
+            """
             UPDATE users
             SET password_hash = ?, full_name = ?, phone = ?, status = 'ACTIVE', is_active = 1,
-                activation_token = NULL, activation_expires_at = NULL, token_version = COALESCE(token_version, 1) + 1
-            WHERE id = ?
-        """, (new_hash, full_name, phone, u["id"]))
+                activation_token = NULL, activation_expires_at = NULL,
+                token_version = COALESCE(token_version, 1) + 1
+            WHERE id = ? AND activation_token = ? AND status = 'INVITED'
+            """,
+            (new_hash, full_name, phone, u["id"], token),
+        )
+        if cursor.rowcount != 1:
+            conn.rollback()
+            raise HTTPException(status_code=409, detail="Activation token has already been used. Request a new token.")
 
         log_audit_event(
             conn=conn,
@@ -620,14 +656,24 @@ def activate_user(req: UserActivationSubmit):
             module="AUTH",
             record_id=u["id"],
             details=f"User '{u['username']}' completed account onboarding and activation",
-            user={"id": u["id"], "username": u["username"]}
+            user={"id": u["id"], "username": u["username"]},
         )
         conn.commit()
 
         role = normalize_role(u["role"])
-        updated_row = conn.execute("SELECT token_version FROM users WHERE id = ?", (u["id"],)).fetchone()
-        new_token_ver = updated_row["token_version"] if updated_row and updated_row["token_version"] else 2
-        access_token = create_access_token({"sub": u["username"], "role": role, "uid": u["id"], "token_version": new_token_ver})
+        updated_row = conn.execute(
+            "SELECT token_version FROM users WHERE id = ?",
+            (u["id"],),
+        ).fetchone()
+        if updated_row is None:
+            raise RuntimeError("Activated user disappeared before access-token issuance.")
+        new_token_ver = max(1, int(updated_row["token_version"] or 1))
+        access_token = create_access_token({
+            "sub": u["username"],
+            "role": role,
+            "uid": u["id"],
+            "token_version": new_token_ver,
+        })
 
         return {
             "status": "success",
@@ -639,9 +685,13 @@ def activate_user(req: UserActivationSubmit):
                 "username": u["username"],
                 "full_name": full_name,
                 "role": role,
-                "email": u["email"]
-            }
+                "email": u["email"],
+            },
         }
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -734,7 +784,7 @@ def invite_user(invite_data: UserInviteCreate, current_user: dict = Depends(requ
 
     role = normalize_role(invite_data.role)
     token = secrets.token_urlsafe(24)
-    expires_at = (datetime.now() + timedelta(hours=48)).isoformat()
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
     now_str = datetime.now().isoformat()
 
     conn = get_db_connection()
@@ -886,7 +936,7 @@ def reset_user_activation(user_id: int, current_user: dict = Depends(require_rol
             raise HTTPException(status_code=404, detail="User not found")
 
         token = secrets.token_urlsafe(24)
-        expires_at = (datetime.now() + timedelta(hours=48)).isoformat()
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
         now_str = datetime.now().isoformat()
 
         conn.execute("""

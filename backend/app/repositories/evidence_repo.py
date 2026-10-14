@@ -23,28 +23,65 @@ class EvidenceRepository:
         replacement_reason: Optional[str] = None,
         version: int = 1
     ) -> int:
-        now_str = datetime.now().isoformat()
-        cursor = self.conn.cursor()
-        cursor.execute("""
-        INSERT INTO evidence_items (
-            engagement_id, working_paper_id, filename, original_filename,
-            storage_path, file_size, mime_type, sha256_hash, version,
-            parent_evidence_id, replacement_reason, uploaded_by, uploaded_at, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
-        """, (
-            engagement_id, working_paper_id, filename, original_filename,
-            storage_path, file_size, mime_type, sha256_hash, version,
-            parent_evidence_id, replacement_reason, uploaded_by, now_str
-        ))
-        
-        # If this is a new version superseding an old one, mark parent as SUPERSEDED
-        if parent_evidence_id:
-            cursor.execute(
-                "UPDATE evidence_items SET status = 'SUPERSEDED' WHERE id = ?",
-                (parent_evidence_id,)
+        """Register an immutable evidence version with a validated parent relationship."""
+        owns_transaction = not self.conn.in_transaction
+        try:
+            if owns_transaction:
+                self.conn.execute("BEGIN IMMEDIATE")
+
+            parent = None
+            if parent_evidence_id is not None:
+                parent = self.conn.execute(
+                    """
+                    SELECT id, engagement_id, working_paper_id, original_filename, status
+                    FROM evidence_items WHERE id = ?
+                    """,
+                    (parent_evidence_id,),
+                ).fetchone()
+                if parent is None:
+                    raise ValueError("Parent evidence record does not exist.")
+                if (
+                    parent["engagement_id"] != engagement_id
+                    or parent["working_paper_id"] != working_paper_id
+                    or parent["original_filename"] != original_filename
+                ):
+                    raise ValueError(
+                        "Parent evidence must belong to the same engagement, working paper, and original filename."
+                    )
+
+            now_str = datetime.now().isoformat()
+            cursor = self.conn.execute(
+                """
+                INSERT INTO evidence_items (
+                    engagement_id, working_paper_id, filename, original_filename,
+                    storage_path, file_size, mime_type, sha256_hash, version,
+                    parent_evidence_id, replacement_reason, uploaded_by, uploaded_at, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+                """,
+                (
+                    engagement_id, working_paper_id, filename, original_filename,
+                    storage_path, file_size, mime_type, sha256_hash, version,
+                    parent_evidence_id, replacement_reason, uploaded_by, now_str,
+                ),
             )
-            
-        return cursor.lastrowid
+            new_id = cursor.lastrowid
+
+            # A newer version supersedes its parent only when that parent is currently active.
+            if parent is not None and str(parent["status"] or "").upper() == "ACTIVE":
+                updated = self.conn.execute(
+                    "UPDATE evidence_items SET status = 'SUPERSEDED' WHERE id = ? AND status = 'ACTIVE'",
+                    (parent_evidence_id,),
+                )
+                if updated.rowcount != 1:
+                    raise RuntimeError("Parent evidence status changed during version registration.")
+
+            if owns_transaction:
+                self.conn.commit()
+            return new_id
+        except Exception:
+            if owns_transaction and self.conn.in_transaction:
+                self.conn.rollback()
+            raise
 
     def get_by_id(self, evidence_id: int) -> Optional[Dict[str, Any]]:
         row = self.conn.execute("SELECT * FROM evidence_items WHERE id = ?", (evidence_id,)).fetchone()
@@ -64,25 +101,52 @@ class EvidenceRepository:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    @staticmethod
+    def resolve_storage_path(storage_path: str, base_dir: Optional[str] = None) -> Optional[str]:
+        """Resolve only relative evidence paths contained by the uploaded_files root.
+
+        `base_dir` is the backend directory that contains uploaded_files. Absolute,
+        parent-relative, Windows-style, and symlink-escaped paths are rejected.
+        """
+        if not isinstance(storage_path, str) or not storage_path.strip():
+            return None
+        raw_path = storage_path.strip()
+        if os.path.isabs(raw_path) or raw_path.startswith(("/", "\\")) or "\\" in raw_path:
+            return None
+        raw_parts = raw_path.split("/")
+        if any(part in {"", ".", ".."} for part in raw_parts) or ":" in raw_parts[0]:
+            return None
+
+        backend_dir = base_dir or os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+        evidence_root = os.path.realpath(os.path.join(backend_dir, "uploaded_files"))
+        candidate = os.path.realpath(os.path.join(backend_dir, raw_path))
+        try:
+            if os.path.commonpath([evidence_root, candidate]) != evidence_root:
+                return None
+        except ValueError:
+            return None
+        return candidate
+
     def verify_physical_integrity(self, evidence_id: int, base_dir: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Calculates SHA-256 of physical file on disk and compares against registered sha256_hash.
-        """
+        """Verify a registered evidence file without following paths outside uploaded_files."""
         row = self.get_by_id(evidence_id)
         if not row:
             return {"status": "NOT_FOUND", "valid": False, "error": "Evidence record does not exist."}
 
-        rel_path = row["storage_path"]
-        # Handle relative or absolute paths
-        if os.path.isabs(rel_path):
-            abs_path = rel_path
-        else:
-            if base_dir:
-                abs_path = os.path.join(base_dir, rel_path)
-            else:
-                abs_path = os.path.abspath(rel_path)
+        abs_path = self.resolve_storage_path(row.get("storage_path"), base_dir=base_dir)
+        if abs_path is None:
+            return {
+                "status": "INVALID_PATH",
+                "valid": False,
+                "evidence_id": evidence_id,
+                "expected_hash": row.get("sha256_hash"),
+                "actual_hash": None,
+                "error": "Evidence storage path is invalid or escapes the evidence storage directory.",
+            }
 
-        if not os.path.exists(abs_path):
+        if not os.path.isfile(abs_path):
             return {
                 "status": "FILE_MISSING",
                 "valid": False,
@@ -90,17 +154,15 @@ class EvidenceRepository:
                 "expected_hash": row["sha256_hash"],
                 "actual_hash": None,
                 "path": abs_path,
-                "error": "Evidence file does not exist on disk."
+                "error": "Evidence file does not exist on disk.",
             }
 
-        # Compute SHA-256
         sha = hashlib.sha256()
-        with open(abs_path, "rb") as f:
-            while chunk := f.read(65536):
+        with open(abs_path, "rb") as evidence_file:
+            while chunk := evidence_file.read(65536):
                 sha.update(chunk)
         disk_hash = sha.hexdigest()
-
-        is_intact = (disk_hash == row["sha256_hash"])
+        is_intact = disk_hash == row["sha256_hash"]
         return {
             "status": "VALID" if is_intact else "CORRUPTED",
             "valid": is_intact,
@@ -108,5 +170,5 @@ class EvidenceRepository:
             "expected_hash": row["sha256_hash"],
             "actual_hash": disk_hash,
             "path": abs_path,
-            "version": row["version"]
+            "version": row["version"],
         }

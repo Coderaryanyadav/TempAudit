@@ -291,8 +291,13 @@ def create_backup(current_user: dict = Depends(require_role(["Admin"]))):
 def download_backup(filename: str, current_user: dict = Depends(require_role(["Admin"]))):
     """Admin: Downloads a local database backup file."""
     safe_filename = os.path.basename(filename)
-    file_path = os.path.join(BACKUP_DIR, safe_filename)
-    if not os.path.exists(file_path):
+    backup_root = os.path.realpath(BACKUP_DIR)
+    file_path = os.path.realpath(os.path.join(backup_root, safe_filename))
+    try:
+        inside_backup_root = os.path.commonpath([backup_root, file_path]) == backup_root
+    except ValueError:
+        inside_backup_root = False
+    if not inside_backup_root or not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Backup file not found")
 
     conn = get_db_connection()

@@ -234,5 +234,58 @@ class TestDataCleaningAndNormalization(unittest.TestCase):
         self.assertEqual(reverted_txn["party_name"], "acme private limited")
         conn.close()
 
+
+    def test_08_invalid_numeric_override_is_rejected_without_partial_updates(self):
+        """A bad numeric override must not update either the cleaning log or transaction."""
+        conn = get_db_connection()
+        eng = conn.execute("SELECT id FROM engagements LIMIT 1").fetchone()
+        self.assertIsNotNone(eng, "Test database must contain an engagement")
+        eng_id = eng["id"]
+
+        cursor = conn.execute(
+            """
+            INSERT INTO transactions (engagement_id, date, ledger, debit, credit, amount, voucher_no)
+            VALUES (?, '2026-10-01', 'Test Expenses', 0, 0, 42.5, ?)
+            """,
+            (eng_id, "TEST-NUMERIC-" + str(os.getpid())),
+        )
+        tx_id = cursor.lastrowid
+        cursor = conn.execute(
+            """
+            INSERT INTO data_cleaning_logs (
+                engagement_id, transaction_id, row_number, field_name, original_value,
+                normalized_value, transformation_rule, review_status, created_at
+            ) VALUES (?, ?, 999, 'amount', '42.50', '42.50', 'TEST_NUMERIC', 'Auto-Applied', datetime('now'))
+            """,
+            (eng_id, tx_id),
+        )
+        log_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        response = self.client.put(
+            f"/api/cleaning/logs/{log_id}/review",
+            headers=self.headers,
+            json={
+                "action": "Overridden",
+                "custom_normalized_value": "NaN",
+                "auditor_comment": "Invalid numeric value must not be saved",
+            },
+        )
+        self.assertEqual(response.status_code, 400, response.text)
+
+        conn = get_db_connection()
+        try:
+            tx = conn.execute("SELECT amount FROM transactions WHERE id = ?", (tx_id,)).fetchone()
+            log = conn.execute(
+                "SELECT normalized_value, review_status FROM data_cleaning_logs WHERE id = ?",
+                (log_id,),
+            ).fetchone()
+            self.assertAlmostEqual(tx["amount"], 42.5)
+            self.assertEqual(log["normalized_value"], "42.50")
+            self.assertEqual(log["review_status"], "Auto-Applied")
+        finally:
+            conn.close()
+
 if __name__ == "__main__":
     unittest.main()

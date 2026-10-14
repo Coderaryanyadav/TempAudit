@@ -9,9 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install only the runtime dependencies declared by the existing project.
-COPY requirements.txt ./requirements.txt
+COPY requirements.lock ./requirements.lock
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.lock
 
 COPY backend ./backend
 COPY frontend ./frontend
