@@ -16649,18 +16649,25 @@ let currentAIStatus = null;
 
 async function refreshTopBarAIStatus() {
   const el = document.getElementById("top-ai-status-text");
+  const dot = document.getElementById("top-ai-status-dot");
   if (!el) return;
+
+  const setStatus = (label, state) => {
+    el.textContent = label;
+    if (dot) dot.className = `offline-dot is-${state}`;
+  };
+
   try {
     const status = await FinAuditAPI.getAIStatus();
     if (!status.is_enabled) {
-      el.innerHTML = `<span style="color: var(--text-muted);">AI: Disabled</span>`;
+      setStatus("Local AI disabled", "disabled");
     } else if (status.is_available) {
-      el.innerHTML = `<span style="color: #10b981; font-weight: 700;">LM Studio: Connected</span>`;
+      setStatus("Local model connected", "online");
     } else {
-      el.innerHTML = `<span style="color: #f59e0b;">LM Studio: Offline</span>`;
+      setStatus("Local model unavailable", "offline");
     }
   } catch (e) {
-    el.innerHTML = `<span style="color: var(--text-muted);">LM Studio: Offline</span>`;
+    setStatus("Status unavailable", "offline");
   }
 }
 
