@@ -697,7 +697,7 @@ function showSetupWizard(step = 1, errorMsg = null) {
           </div>
 
           <div style="background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
-            <div style="font-weight: 700; font-size: 14px; color: #0284c7; margin-bottom: 6px;">🤖 Local AI Inference Privacy Shield</div>
+            <div style="font-weight: 700; font-size: 14px; color: #0284c7; margin-bottom: 6px;">Local model processing</div>
             <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
               FinAuditPro connects strictly to offline local LLMs (LM Studio / Ollama / Built-in Reasoner). All prompts automatically sanitize client PANs, GSTINs, bank accounts, and entity names.
             </div>
@@ -998,7 +998,7 @@ function showActivationModal(initialToken = "") {
 
         <div style="display: flex; justify-content: center; gap: 8px; margin-top: 14px;">
           <button class="btn btn-secondary btn-sm" onclick="checkAuthSession()">← Back to Setup / Login</button>
-          <button class="btn btn-outline btn-sm" onclick="showSetupWizard(1)" style="color: #0284c7; border-color: #0284c7;">🚀 First-Time Setup</button>
+          <button class="btn btn-outline btn-sm" onclick="showSetupWizard(1)" style="color: #0284c7; border-color: #0284c7;">First-Time Setup</button>
         </div>
       </div>
     </div>
@@ -3399,7 +3399,7 @@ function renderMappingWorkspace(preview) {
             🔍 Validate Data Integrity
           </button>
           <button class="btn btn-primary" onclick="handleConfirmImport(${preview.file_id}, '${preview.data_category}')">
-            ⚡ Confirm & Import Data
+            Confirm & Import Data
           </button>
         </div>
       </div>
@@ -3472,7 +3472,7 @@ function renderMappingWorkspace(preview) {
 
         <div style="margin-top: 16px; padding: 12px; background: var(--bg-app); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
           <div style="font-size: 12px; color: var(--text-muted);">
-            💡 <b>Auditor Tip:</b> FinAuditPro never alters raw values. Original strings are stored for audit defense.
+            <b>Auditor note:</b> FinAuditPro never alters raw values. Original strings are stored for audit defense.
           </div>
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-secondary" onclick="document.getElementById('mapping-workspace-container').innerHTML = ''">Cancel</button>
@@ -3661,7 +3661,7 @@ async function handleConfirmImport(fileId, dataCategory) {
                 📊 View Trial Balance
               </button>
               <button class="btn btn-primary" style="flex: 1;" onclick="closeModal('import-success-modal'); triggerRunHybridEngine()">
-                ⚡ Run Audit Engine
+                Run Audit Engine
               </button>
             </div>
           </div>
@@ -3754,7 +3754,7 @@ async function renderDataCleaningLogs() {
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary" onclick="openNormalizationSandboxModal()">
-            ⚡ Rule Sandbox & Tester
+            Rule Sandbox & Tester
           </button>
           <button class="btn btn-primary" onclick="navigateTo('import')">
             + Import More Data
@@ -4111,7 +4111,7 @@ function openNormalizationSandboxModal() {
     <div class="modal-overlay" id="sandbox-modal">
       <div class="modal-card" style="max-width: 650px;">
         <div class="modal-header">
-          <div class="modal-title">⚡ Interactive Data Normalization Sandbox</div>
+          <div class="modal-title">Data Normalization Sandbox</div>
           <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('sandbox-modal')">✕</button>
         </div>
         <div class="modal-body">
@@ -4225,7 +4225,7 @@ async function handleSandboxPreviewSubmit(event) {
             <b>Applied Rule:</b> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${escapeHtml(res.transformation_rule)}</code>
           </div>
           <div style="font-size: 11px; color: var(--text-muted);">
-            ${res.is_transformed ? '✨ Transformed from raw' : 'Identical to raw'}
+            ${res.is_transformed ? 'Transformed from raw' : 'Identical to raw'}
           </div>
         </div>
       </div>
@@ -4365,7 +4365,7 @@ async function renderDashboard() {
         <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--primary);">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div class="card-title" style="font-size: 16px; font-weight: 700;">🚀 Practice Setup & Getting Started Guide</div>
+              <div class="card-title" style="font-size: 16px; font-weight: 700;">Practice Setup & Getting Started Guide</div>
               <div class="card-subtitle">Zero data has been preloaded. Follow the sequential workflow below to initialize your practice:</div>
             </div>
           </div>
@@ -5761,7 +5761,7 @@ async function renderTrialBalance() {
             📥 Download Analysis Report (CSV)
           </a>
           <button class="btn btn-primary" onclick="renderTrialBalance()">
-            ⚡ Re-Analyze TB
+            Re-analyze trial balance
           </button>
         </div>
       </div>
@@ -5913,7 +5913,7 @@ async function renderTrialBalance() {
                           </button>
                         ` : ''}
                         <button class="btn btn-sm btn-secondary" style="font-size: 10.5px; padding: 2px 6px; color: var(--primary);" onclick='openTBExceptionAIExplanation(${JSON.stringify(JSON.stringify(ex))})'>
-                          💡 AI Explanation
+                          AI Explanation
                         </button>
                       </div>
                     </td>
@@ -6270,7 +6270,7 @@ async function renderGeneralLedger() {
             📥 Download GL Audit Report (CSV)
           </a>
           <button class="btn btn-primary" onclick="renderGeneralLedger()">
-            ⚡ Re-Scan Ledger
+            Re-scan ledger
           </button>
         </div>
       </div>
@@ -6317,7 +6317,7 @@ async function renderGeneralLedger() {
       <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
-            ⚡ Quick 13-Point Anomaly Filter Chips
+            13-Point Anomaly Filters
           </div>
           ${isFilterActive ? `
             <button class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 2px 8px; color: #dc2626;" onclick="resetGLFilters()">
@@ -6720,7 +6720,7 @@ async function openGLTransactionDrawer(txId) {
 
       <!-- Compliance Disclaimer -->
       <div style="padding: 10px 12px; background: var(--bg-sidebar); border-radius: var(--radius-md); font-size: 11px; color: var(--text-muted); margin-bottom: 16px;">
-        🛡️ <b>ICAI Audit Assistant Guideline:</b> FinAuditPro flags items as <i>"Potential anomaly"</i> or <i>"Requires review"</i>. Findings do not constitute a legal determination of fraud.
+        <b>Audit review note:</b> FinAuditPro flags items as <i>"Potential anomaly"</i> or <i>"Requires review"</i>. Findings do not constitute a legal determination of fraud.
       </div>
 
       <!-- Working Paper Notes -->
@@ -6820,17 +6820,17 @@ async function renderReconciliation() {
             </button>
             <button class="btn btn-primary" onclick="openRunGSTReconModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Run GST Reconciliation
+              Run GST Reconciliation
             </button>
           ` : (reconActiveSubTab === "sales_purchase" ? `
             <button class="btn btn-primary" onclick="openRunSalesPurchaseReconModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Run Sales & Purchase Reconciliation
+              Run Sales & Purchase Reconciliation
             </button>
           ` : `
             <button class="btn btn-primary" onclick="openRunBRSModal()">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              ⚡ Execute Bank BRS Reconciliation
+              Execute Bank Reconciliation
             </button>
           `)}
         </div>
@@ -7081,7 +7081,7 @@ async function openRunGSTReconModal() {
       <div class="modal-overlay" id="run-gst-recon-modal">
         <div class="modal-card" style="max-width: 620px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute GST Audit Reconciliation</div>
+            <div class="modal-title">Execute GST Reconciliation</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-gst-recon-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -7216,7 +7216,7 @@ async function viewGSTReconciliationDetails(reconId) {
       if (c === "Partially matched") return `<span class="badge" style="background:#fffbeb; color:#b45309; border: 1px solid var(--border);">⚠️ Partially Matched</span>`;
       if (c === "Missing in source A") return `<span class="badge" style="background:#fef2f2; color:#991b1b; border: 1px solid var(--border);">❌ Missing in Source A</span>`;
       if (c === "Missing in source B") return `<span class="badge" style="background:#fdf2f8; color:#9d174d; border: 1px solid var(--border);">📦 Missing in Source B</span>`;
-      return `<span class="badge badge-critical">⚡ Mismatched</span>`;
+      return `<span class="badge badge-critical">Mismatched</span>`;
     };
 
     const getStatusPill = (status) => {
@@ -7323,7 +7323,7 @@ async function viewGSTReconciliationDetails(reconId) {
             ⚠️ Partially Matched
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Mismatched' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Mismatched' ? 'background:#dc2626; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Mismatched')">
-            ⚡ Mismatched
+            Mismatched
           </button>
           <button class="demo-chip ${reconGSTFilterState.matchCategory === 'Missing in source A' ? 'active' : ''}" style="${reconGSTFilterState.matchCategory === 'Missing in source A' ? 'background:#7c2d12; color:white;' : ''}" onclick="setGSTFilter(${reconId}, 'Missing in source A')">
             ❌ Missing in Source A (Portal)
@@ -7716,7 +7716,7 @@ async function openRunSalesPurchaseReconModal() {
       <div class="modal-overlay" id="run-sp-recon-modal">
         <div class="modal-card" style="max-width: 600px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute Sales & Purchase Reconciliation</div>
+            <div class="modal-title">Execute Sales & Purchase Reconciliation</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-sp-recon-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -8167,7 +8167,7 @@ async function openRunBRSModal() {
       <div class="modal-overlay" id="run-brs-modal">
         <div class="modal-card" style="max-width: 580px;">
           <div class="modal-header">
-            <div class="modal-title">⚡ Execute Bank Reconciliation (BRS Engine)</div>
+            <div class="modal-title">Execute Bank Reconciliation</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('run-brs-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -8265,7 +8265,7 @@ async function viewReconciliationDetails(reconId) {
     const getMatchLevelBadge = (level, score) => {
       const l = (level || "UNMATCHED").toUpperCase();
       if (l === "EXACT MATCH") return `<span class="badge badge-resolved" style="font-size: 11px;">✓ EXACT (100%)</span>`;
-      if (l === "HIGH CONFIDENCE") return `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 11px;">⚡ HIGH (${score || 90}%)</span>`;
+      if (l === "HIGH CONFIDENCE") return `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 11px;">HIGH (${score || 90}%)</span>`;
       if (l === "POSSIBLE MATCH") return `<span class="badge badge-medium" style="font-size: 11px;">⚠️ POSSIBLE (${score || 65}%)</span>`;
       return `<span class="badge badge-disabled" style="font-size: 11px;">UNMATCHED</span>`;
     };
@@ -9088,7 +9088,7 @@ async function renderChecklist() {
 
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           <button class="btn btn-secondary" onclick="openGenerateChecklistModal()" title="Tailor procedures for this engagement">
-            ⚡ Regenerate / Tailor
+            Regenerate / Tailor
           </button>
           <button class="btn btn-primary" onclick="openCreateCustomChecklistItemModal()">
             ➕ Add Custom Procedure
@@ -11366,7 +11366,7 @@ async function renderReports() {
         </div>
         <button class="btn btn-primary" onclick="triggerGeneratePDFReport('complete_audit_analysis')" style="padding: 8px 16px;">
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          ⚡ Generate Complete Master Analysis (PDF)
+          Generate Complete Master Analysis (PDF)
         </button>
       </div>
 
@@ -11951,7 +11951,7 @@ async function openClientHistoryDrawer(clientId) {
             </div>
             <div style="margin-top: 10px; display: flex; gap: 8px;">
               <button class="btn btn-sm btn-primary" onclick="selectEngagementAndGo(${h.id})">
-                🚀 Open Engagement Context
+                Open Engagement Context
               </button>
               <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${h.id})">
                 📑 Clone to New FY
@@ -12553,7 +12553,7 @@ async function openEvidenceDrawer(findingId) {
     </div>
 
     <div style="margin-bottom: 16px;">
-      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">💡 Local AI Audit Commentary & Analysis:</div>
+      <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">Local AI Audit Commentary & Analysis:</div>
       <div style="font-size: 12px; color: var(--text-secondary); padding: 10px; background: #eff6ff; border-radius: var(--radius-md); border: 1px solid var(--border); line-height: 1.5;">
         ${finding.ai_explanation || 'Detailed review required.'}
       </div>
@@ -13531,7 +13531,7 @@ function renderSingleDuplicateGroupCard(g) {
           </span>
           <span class="badge badge-role-auditor" style="font-size: 11px;">${g.group_type}</span>
           <span style="font-weight: 700; font-size: 12px; color: ${simColor}; background: #fff7ed; padding: 2px 8px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-            ⚡ ${g.similarity_pct}% Similarity
+            ${g.similarity_pct}% Similarity
           </span>
           ${statusBadge}
         </div>
@@ -13933,7 +13933,7 @@ function renderAnomalyDetectionUI(data) {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
       <div>
         <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
-          <span>🤖 AI-Assisted Anomaly Detection Engine</span>
+          <span>AI-Assisted Anomaly Detection Engine</span>
           <span class="badge" style="background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 700;">HYBRID 3-TIER</span>
         </h2>
         <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
@@ -13943,7 +13943,7 @@ function renderAnomalyDetectionUI(data) {
 
       <div style="display: flex; gap: 10px;">
         <button class="btn btn-secondary" onclick="triggerFreshAnomalyRun()">
-          ⚡ Re-Run Anomaly Engine
+          Re-run Anomaly Engine
         </button>
         <a class="btn btn-primary" href="${FinAuditAPI.getAnomalyReportDownloadUrl(state.currentEngagementId)}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
           📥 Export Anomaly Report (CSV)
@@ -14118,7 +14118,7 @@ function renderSingleAnomalyCard(anom, idx) {
 
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-sm btn-secondary" onclick="openAIExplanationModal('${anom.anomaly_id}')" style="font-size: 11.5px;">
-            🤖 AI Working Paper Memo
+            AI Working Paper Memo
           </button>
         </div>
       </div>
@@ -14292,7 +14292,7 @@ async function openAIExplanationModal(anomalyId) {
       <div class="modal-overlay" id="ai-explanation-modal">
         <div class="modal-card" style="max-width: 750px;">
           <div class="modal-header">
-            <div class="modal-title">🤖 AI Audit Working Paper Memorandum — #${anomalyId}</div>
+            <div class="modal-title">AI Audit Working Paper Memorandum — #${anomalyId}</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('ai-explanation-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -14736,7 +14736,7 @@ async function triggerYoYFactualAI(itemKey) {
       <div class="modal-overlay" id="yoy-ai-modal">
         <div class="modal-card" style="max-width: 600px;">
           <div class="modal-header">
-            <div class="modal-title">🤖 Factual Movement Analysis: ${res.account_name}</div>
+            <div class="modal-title">Factual Movement Analysis: ${res.account_name}</div>
             <button class="btn btn-sm btn-secondary" style="border: none;" onclick="closeModal('yoy-ai-modal')">✕</button>
           </div>
           <div class="modal-body">
@@ -14826,8 +14826,8 @@ Choose one of the quick prompt chips below or type your specific question:`,
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">🤖 Local AI Audit Assistant</h2>
-            <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 600; font-size: 11px;">🔒 100% Offline & Private</span>
+            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">Local AI Audit Assistant</h2>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 600; font-size: 11px;">Local model</span>
             <span class="badge" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5; font-weight: 600; font-size: 11px;">Zero Cloud API</span>
           </div>
           <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 3px;">
@@ -15150,7 +15150,7 @@ function inspectAssistantTransaction(item) {
           ` : ''}
 
           <div class="modal-footer" style="padding: 10px 0 0 0; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 11px; color: var(--text-muted);">🛡️ Sourced deterministically from local audit database.</span>
+            <span style="font-size: 11px; color: var(--text-muted);">Sourced from the local audit database.</span>
             <button class="btn btn-primary" onclick="closeModal('assistant-inspect-modal')">Done Reviewing</button>
           </div>
         </div>
@@ -15491,7 +15491,7 @@ async function openFindingDetailModal(findingId) {
             <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; ">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                 <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e293b;">
-                  ⚡ Deterministic Risk Calculation Breakdown
+                  Deterministic Risk Calculation Breakdown
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted);">
                   Equation: <code style="background: var(--bg-sidebar); padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #4338ca;">${factors.equation || `${finding.risk_score}/10.0`}</code>
@@ -15677,7 +15677,7 @@ async function updateFindingReview(findingId) {
 async function generateFindingAIExplanation(findingId) {
   try {
     const res = await FinAuditAPI.getFindingAIExplanation(findingId);
-    notifyInfo(`🤖 AI Explainability Analysis for ${res.finding_code}:\n\n${res.ai_explanation}`);
+    notifyInfo(`AI explanation for ${res.finding_code}:\n\n${res.ai_explanation}`);
     await renderFindings();
   } catch (err) {
     notifyError("Error generating AI explanation: " + err.message);
@@ -16653,14 +16653,14 @@ async function refreshTopBarAIStatus() {
   try {
     const status = await FinAuditAPI.getAIStatus();
     if (!status.is_enabled) {
-      el.innerHTML = `<span style="color: var(--text-muted);">🤖 AI: Disabled</span>`;
+      el.innerHTML = `<span style="color: var(--text-muted);">AI: Disabled</span>`;
     } else if (status.is_available) {
-      el.innerHTML = `<span style="color: #10b981; font-weight: 700;">🤖 LM Studio: Connected</span>`;
+      el.innerHTML = `<span style="color: #10b981; font-weight: 700;">LM Studio: Connected</span>`;
     } else {
-      el.innerHTML = `<span style="color: #f59e0b;">🤖 LM Studio: Offline</span>`;
+      el.innerHTML = `<span style="color: #f59e0b;">LM Studio: Offline</span>`;
     }
   } catch (e) {
-    el.innerHTML = `<span style="color: var(--text-muted);">🤖 LM Studio: Offline</span>`;
+    el.innerHTML = `<span style="color: var(--text-muted);">LM Studio: Offline</span>`;
   }
 }
 
@@ -16687,7 +16687,7 @@ async function renderAIManager() {
           <div>
             <div style="display: flex; align-items: center; gap: 10px;">
               <h1 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0;">LM Studio Local AI Settings</h1>
-              <span class="badge" style="background: #065f46; color: #ffffff; font-weight: 700;">🔒 100% OFFLINE</span>
+              <span class="badge" style="background: #065f46; color: #ffffff; font-weight: 700;">Local Processing</span>
               <span class="badge" style="background: #1e3a8a; color: #ffffff; font-weight: 700;">ZERO CLOUD TRANSMISSION</span>
             </div>
             <p style="color: var(--text-muted); font-size: 13.5px; margin-top: 4px;">
