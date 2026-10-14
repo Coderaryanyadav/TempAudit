@@ -17,6 +17,7 @@ from backend.app.main import app
 from backend.app.routers.audit_trail import _validate_restorable_sqlite
 from backend.app.routers.auth import _activation_token_is_expired
 from backend.app.services.backup_service import BACKUP_DIR, BackupService
+from backend.app.repositories.evidence_repo import EvidenceRepository
 
 client = TestClient(app)
 
@@ -153,6 +154,38 @@ def test_verified_backup_rejects_path_traversal(tmp_path):
     finally:
         if os.path.exists(escaped_path):
             os.remove(escaped_path)
+
+
+def test_evidence_path_resolver_rejects_absolute_traversal_and_symlinks(tmp_path):
+    repo = EvidenceRepository(sqlite3.connect(":memory:"))
+    upload_root = tmp_path / "uploaded_files"
+    upload_root.mkdir()
+    safe_dir = upload_root / "working_papers" / "wp_1"
+    safe_dir.mkdir(parents=True)
+    safe_file = safe_dir / "evidence.pdf"
+    safe_file.write_bytes(b"evidence")
+
+    safe_path = repo.resolve_storage_path(
+        "uploaded_files/working_papers/wp_1/evidence.pdf",
+        base_dir=str(tmp_path),
+    )
+    assert safe_path == str(safe_file.resolve())
+
+    secret_file = tmp_path / "secret.txt"
+    secret_file.write_text("not evidence", encoding="utf-8")
+    assert repo.resolve_storage_path("../secret.txt", base_dir=str(tmp_path)) is None
+    assert repo.resolve_storage_path(str(secret_file), base_dir=str(tmp_path)) is None
+
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    outside_file = outside_dir / "sensitive.txt"
+    outside_file.write_text("sensitive", encoding="utf-8")
+    symlink = upload_root / "linked-outside"
+    symlink.symlink_to(outside_dir, target_is_directory=True)
+    assert repo.resolve_storage_path(
+        "uploaded_files/linked-outside/sensitive.txt",
+        base_dir=str(tmp_path),
+    ) is None
 
 
 def test_root_compose_requires_localhost_and_an_explicit_jwt_secret():
