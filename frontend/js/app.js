@@ -2221,14 +2221,14 @@ async function renderClients(searchQuery = null, entityFilter = null) {
                     <td class="text-center">
                       <div style="display: flex; gap: 6px; justify-content: center;">
                         <button class="btn btn-sm btn-secondary" onclick="openClientHistoryDrawer(${c.id})" title="View Historical Multi-Year Timeline">
-                          📅 Previous Years
+                          Previous Years
                         </button>
                         ${isAuditorOrAdmin ? `
                           <button class="btn btn-sm btn-secondary" onclick="openCreateEngagementModal(${c.id})" title="Create Audit Engagement">
                             + Engagement
                           </button>
                           <button class="btn btn-sm btn-secondary" onclick="openEditClientModal(${c.id})" title="Edit Client Profile">
-                            ✏️ Edit
+                            Edit
                           </button>
                         ` : ''}
                       </div>
@@ -2753,10 +2753,10 @@ async function renderEngagements(statusFilter = null, clientFilter = null, fyFil
                         `}
                         ${isAuditorOrAdmin ? `
                           <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${e.id})" title="Duplicate structure to a new financial year">
-                            📑 Clone FY
+                            Clone FY
                           </button>
                           <button class="btn btn-sm btn-secondary" onclick="openEditEngagementModal(${e.id})" title="Edit Details">
-                            ✏️ Edit
+                            Edit
                           </button>
                         ` : ''}
                       </div>
@@ -4554,10 +4554,10 @@ async function renderDashboard() {
               📅 Multi-Year History
             </button>
             <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${state.currentEngagementId})">
-              📑 Clone for Next FY
+              Clone for Next FY
             </button>
             <button class="btn btn-sm btn-secondary" onclick="navigateTo('trial_balance')">
-              📊 Trial Balance
+              Trial Balance
             </button>
           </div>
         </div>
@@ -4594,7 +4594,7 @@ async function renderDashboard() {
           <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); cursor: pointer;" onclick="openDashboardTransactionsModal('', 'All Transactions')">
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL TRANSACTIONS</div>
             <div class="font-mono font-bold" style="font-size: 18px; color: #2563eb; margin-top: 2px;">${(overview.total_transactions || 0).toLocaleString()} Entries</div>
-            <div style="font-size: 11.5px; color: #2563eb;">🔍 Click to inspect all</div>
+            <div style="font-size: 11.5px; color: #2563eb;">Click to inspect all</div>
           </div>
           <div style="padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card);">
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL DEBIT TURNOVER</div>
@@ -5758,7 +5758,7 @@ async function renderTrialBalance() {
         </div>
         <div style="display: flex; gap: 8px;">
           <a href="${FinAuditAPI.getTrialBalanceReportDownloadUrl(state.currentEngagementId)}" target="_blank" class="btn btn-secondary">
-            📥 Download Analysis Report (CSV)
+            Download Analysis Report (CSV)
           </a>
           <button class="btn btn-primary" onclick="renderTrialBalance()">
             Re-analyze trial balance
@@ -8781,7 +8781,7 @@ async function renderAIAssistant() {
       <div>
         <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Local AI Audit Assistant & Query Engine</h2>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
-          100% Offline AI Natural Language Auditor • Evidence-backed reasoning
+          Audit Assistant • Evidence-backed responses
         </div>
       </div>
     </div>
@@ -11591,7 +11591,7 @@ async function renderClients() {
       <!-- Filter / Search Bar -->
       <div class="card" style="padding: 14px 18px; margin-bottom: 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 240px;">
-          <input type="text" id="client-search-input" class="form-control" placeholder="🔍 Search by Client Name, PAN, GSTIN, Contact Person, Industry..." onkeyup="filterClientsLive()">
+          <input type="text" id="client-search-input" class="form-control" placeholder="Search by Client Name, PAN, GSTIN, Contact Person, Industry..." onkeyup="filterClientsLive()">
         </div>
         <div style="width: 200px;">
           <select id="client-entity-filter" class="form-control" onchange="filterClientsLive()">
@@ -11997,7 +11997,7 @@ async function renderEngagements() {
       <!-- Filter Controls -->
       <div class="card" style="padding: 14px 18px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 200px;">
-          <input type="text" id="eng-search-input" class="form-control" placeholder="🔍 Search Engagement Title, Client, FY..." onkeyup="filterEngagementsLive()">
+          <input type="text" id="eng-search-input" class="form-control" placeholder="Search Engagement Title, Client, FY..." onkeyup="filterEngagementsLive()">
         </div>
         <div style="width: 160px;">
           <select id="eng-type-filter" class="form-control" onchange="filterEngagementsLive()">
@@ -12086,7 +12086,7 @@ async function renderEngagements() {
                         ${e.id === state.currentEngagementId ? 'Viewing' : 'Switch Context'}
                       </button>
                       <button class="btn btn-sm btn-secondary" onclick="openDuplicateEngagementModal(${e.id})">
-                        📑 Clone FY
+                        Clone FY
                       </button>
                       ${canCreate ? `
                         <button class="btn btn-sm btn-secondary" onclick="openEditEngagementModal(${e.id})">
@@ -12472,7 +12472,7 @@ async function renderSettings() {
         ${isAdmin ? `
           <div style="margin-top: 16px; display: flex; gap: 10px;">
             <button class="btn btn-primary" onclick="triggerBackup()">
-              💾 Create Full SQLite Backup
+              Create Full SQLite Backup
             </button>
           </div>
         ` : ''}
@@ -12500,7 +12500,7 @@ async function renderSettings() {
             <tr><td><b>Last Login Recorded:</b></td><td class="font-mono">${state.currentUser?.last_login ? state.currentUser.last_login.replace('T', ' ').split('.')[0] : '—'}</td></tr>
           </table>
           <button class="btn btn-secondary" style="width: 100%;" onclick="openChangePasswordModal()">
-            🔒 Change My Account Password
+            Change My Account Password
           </button>
         </div>
       </div>
@@ -13171,7 +13171,7 @@ function renderSignificantMovementsHtml(data, cyYear, pyYear) {
                     <button class="btn btn-sm ${hasExpl ? 'btn-secondary' : (isSig ? 'btn-primary' : 'btn-secondary')}" 
                             style="font-size: 11px; padding: 4px 8px;"
                             onclick="openFSExplanationModal('${c.item_key}', '${c.metric_name.replace(/'/g, "\\'")}', ${c.current_year_value}, ${c.previous_year_value}, ${c.absolute_difference}, ${c.percentage_difference}, '${c.unit}')">
-                      ${hasExpl ? '✏️ Edit Note' : (isSig ? '📝 Enter Explanation' : '➕ Add Note')}
+                      ${hasExpl ? 'Edit Note' : (isSig ? '📝 Enter Explanation' : '➕ Add Note')}
                     </button>
                     ${hasExpl ? `<div style="font-size: 10px; color: #059669; font-weight: 600; margin-top: 2px;">✓ Documented</div>` : ''}
                   </td>
@@ -13946,7 +13946,7 @@ function renderAnomalyDetectionUI(data) {
           Re-run Anomaly Engine
         </button>
         <a class="btn btn-primary" href="${FinAuditAPI.getAnomalyReportDownloadUrl(state.currentEngagementId)}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-          📥 Export Anomaly Report (CSV)
+          Export Anomaly Report (CSV)
         </a>
       </div>
     </div>
@@ -14794,11 +14794,11 @@ async function renderAIAssistant() {
     state.assistantState.messages.push({
       role: "assistant",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      content: `Hello! I am your **100% offline Local AI Audit Assistant** for **${state.activeEngagement?.client_name || 'this client'}** (${state.activeEngagement?.financial_year || 'FY'}).
+      content: `Hello! I am the **Local Audit Assistant** for **${state.activeEngagement?.client_name || 'this client'}** (${state.activeEngagement?.financial_year || 'FY'}).
 
 I evaluate your imported ledger records deterministically and synthesize explainable CA-grade findings without sending any data outside your device.
 
-#### 💡 How can I assist your audit today?
+#### How can I assist your audit today?
 Choose one of the quick prompt chips below or type your specific question:`,
       disclaimer: "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: [],
@@ -14837,10 +14837,10 @@ Choose one of the quick prompt chips below or type your specific question:`,
 
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary btn-sm" onclick="loadExecutiveSummaryNarrative()">
-            📑 Executive Audit Memo
+            Executive Audit Memo
           </button>
           <button class="btn btn-secondary btn-sm" onclick="clearAssistantChat()">
-            🗑️ Clear Chat
+            Clear Chat
           </button>
         </div>
       </div>
@@ -15828,7 +15828,7 @@ async function renderAuditTrail() {
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
             <h1 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0;">Immutable Audit Trail & System Log</h1>
             <span class="badge" style="background: #ecfdf5; color: #059669; border: 1px solid var(--border); font-weight: 600; padding: 4px 10px; border-radius: 9999px;">
-              🔒 Append-Only Protected
+              Append-only protected
             </span>
           </div>
           <p style="color: var(--text-muted); font-size: 14px; margin: 0;">
@@ -16688,7 +16688,7 @@ async function renderAIManager() {
             <div style="display: flex; align-items: center; gap: 10px;">
               <h1 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0;">LM Studio Local AI Settings</h1>
               <span class="badge" style="background: #065f46; color: #ffffff; font-weight: 700;">Local Processing</span>
-              <span class="badge" style="background: #1e3a8a; color: #ffffff; font-weight: 700;">ZERO CLOUD TRANSMISSION</span>
+              <span class="badge" style="background: #f1f5f9; color: #334155; font-weight: 600;">Local inference only</span>
             </div>
             <p style="color: var(--text-muted); font-size: 13.5px; margin-top: 4px;">
               Configure LM Studio local server endpoint, loaded models, sampling parameters, and local data privacy guard.
@@ -16714,7 +16714,7 @@ async function renderAIManager() {
           <div style="display: flex; align-items: center; gap: 14px;">
             <div class="privacy-status-mark" aria-hidden="true">LOCAL</div>
             <div>
-              <div style="font-size: 15px; font-weight: 800; letter-spacing: 0.02em;">STRICT LOCAL PRIVACY SHIELD ACTIVE</div>
+              <div style="font-size: 15px; font-weight: 800; letter-spacing: 0.02em;">Local inference and privacy</div>
               <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">
                 Client names, PAN, GSTIN, bank account numbers, raw financial records, and evidence documents are <b>never sent to any external cloud service</b>. All inference executes locally on this device via LM Studio.
               </div>
@@ -16793,7 +16793,7 @@ async function renderAIManager() {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                   <label class="form-label" style="margin: 0; font-weight: 700;">Loaded Model Name</label>
                   <button type="button" class="btn btn-sm btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="handleRefreshLMStudioModels()">
-                    🔄 Refresh Models
+                    Refresh Models
                   </button>
                 </div>
                 <input type="text" id="ai-model-name" class="form-control" value="${escapeHtml(st.model_name || 'local-model')}" placeholder="e.g. meta-llama-3-8b-instruct or local-model">
@@ -16824,7 +16824,7 @@ async function renderAIManager() {
             <!-- Live Test Generation Output Box -->
             <div id="ai-test-output-box" style="display: none; margin-bottom: 20px; padding: 14px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
               <div style="font-weight: 700; color: var(--text-main); font-size: 13px; margin-bottom: 6px;">
-                🧪 Live AI Test Response:
+                Live AI test response:
               </div>
               <div id="ai-test-response-text" style="font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap;"></div>
             </div>
@@ -16832,7 +16832,7 @@ async function renderAIManager() {
             <!-- Redaction & Privacy Guard Demo Box -->
             <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px;">
               <div style="font-weight: 700; color: var(--text-main); font-size: 13px; margin-bottom: 6px;">
-                🔍 Live Data Sanitization & PII Redaction Preview
+                Live Data Sanitization & PII Redaction Preview
               </div>
               <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
                 Test how confidential client data (PAN, GSTIN, Bank Accounts) is automatically redacted before local LM Studio ingestion:
