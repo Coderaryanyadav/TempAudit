@@ -93,8 +93,7 @@ FinAuditPro implements a 3-tier hybrid audit architecture:
      day-of-month.
    - **3-Sigma Z-Score Univariate Outliers:** Flags entries deviating
      $> 3\sigma$ from historical ledger means.
-   - **Weekend & Timing Spikes:** Flags high-value entries booked on non-working
-     days (Sundays).
+   - **Weekend & Timing Spikes:** Flags high-value entries booked on    non-working days (Sundays).
 
 3. **Local AI Engine:**
    - Explains findings with statutory context, expected vs actual values, and
