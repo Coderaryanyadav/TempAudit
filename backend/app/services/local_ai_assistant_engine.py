@@ -235,10 +235,31 @@ class LocalAIAssistantEngine:
                         prompt=prompt,
                         system_prompt="You are a professional statutory auditor assistant. Ground your response strictly in the authoritative evidence provided."
                     )
-                    if gen_res and gen_res.get("text") and len(gen_res["text"].strip()) > 20:
-                        res["response"] = gen_res["text"].strip()
-                        provenance = "LOCAL_LLM"
-                        model_name = gen_res.get("model", model_name)
+                    gen_text = gen_res.get("text", "").strip() if gen_res else ""
+                    if gen_text and len(gen_text) > 20:
+                        # Hallucination guard: If authoritative deterministic results found violations/anomalies,
+                        # reject model output that contradicts them with false compliance claims.
+                        viol_count = calc_metrics.get("violations_count", 0) or calc_metrics.get("critical_count", 0) or len(res.get("evidence", []))
+                        is_contradiction = (
+                            viol_count > 0 and 
+                            any(phrase in gen_text.lower() for phrase in ["no issues found", "everything is compliant", "all transactions are compliant", "zero findings"])
+                        )
+
+                        if is_contradiction:
+                            logging.getLogger(__name__).warning("Model output contradicted authoritative deterministic findings; suppressing model response.")
+                            provenance = "FALLBACK"
+                        else:
+                            # Preserve authoritative deterministic analysis and provide model explanation
+                            res["response"] = (
+                                f"{deterministic_response}\n\n"
+                                f"---\n"
+                                f"### 🤖 Local AI Narrative Synthesis ({gen_res.get('model', model_name)})\n"
+                                f"> *Advisory note: Synthesized by local LLM. Numerical metrics, findings, and evidence above are authoritative.*  \n\n"
+                                f"{gen_text}"
+                            )
+                            res["ai_narrative"] = gen_text
+                            provenance = "LOCAL_LLM"
+                            model_name = gen_res.get("model", model_name)
             except Exception as e:
                 logging.getLogger(__name__).warning("Local LLM synthesis fallback triggered: %s", e)
                 # Retain deterministic response as fallback

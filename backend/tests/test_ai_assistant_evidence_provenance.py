@@ -138,3 +138,29 @@ def test_ai_assistant_refusal_not_overwritten_by_mocked_llm(seeded_ai_engagement
         assert "Everything is compliant" not in res.get("response", "")
         assert res.get("provenance") == "DETERMINISTIC_RULE"
 
+def test_ai_assistant_hallucination_contradiction_guard(seeded_ai_engagement):
+    """
+    Verifies that when an active transaction has verified violations,
+    if a model returns 'Everything is compliant' / 'No issues found',
+    the assistant suppresses the contradictory model text and falls back to deterministic findings.
+    """
+    data = seeded_ai_engagement
+    engine = LocalAIAssistantEngine(data["eng_id"])
+
+    mock_provider = MagicMock()
+    mock_provider.check_health.return_value = (True, "Running", "qwen2.5-coder")
+    mock_provider.generate.return_value = {
+        "text": "No issues found. Everything is compliant with all statutory guidelines.",
+        "model": "qwen2.5-coder",
+        "provenance": "LOCAL_LLM"
+    }
+
+    with patch("backend.app.services.local_ai_provider.LocalAIModelManager.get_active_provider", return_value=mock_provider), \
+         patch("backend.app.services.local_ai_provider.LocalAIModelManager.get_config", return_value={"is_enabled": True, "engine": "LMStudio", "model_name": "qwen2.5-coder"}):
+        res = engine.process_query(query="Explain this transaction", transaction_id=data["tx1_id"])
+        # tx1 has a violation, so false compliance claim must be rejected and fallback to deterministic
+        assert res.get("provenance") == "FALLBACK"
+        assert "Section 40A(3)" in res.get("response", "") or "V-TEST-9101" in res.get("response", "")
+        assert "Everything is compliant" not in res.get("response", "")
+
+
