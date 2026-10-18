@@ -150,6 +150,21 @@ def test_backup_tampered_manifest_and_malicious_archive(tmp_path):
     val_tamper_sig = BackupService.validate_bundle(tampered_sig_bundle)
     assert val_tamper_sig["valid"] is False
     assert "cryptographic authenticity violation" in val_tamper_sig["error"].lower()
+
+    # 1c. Signature stripping test: attacker removes manifest_signature completely
+    del m_data["manifest_signature"]
+    m_data["manifest_checksum"] = compute_canonical_manifest_checksum(m_data)
+    with open(manifest_file, "w") as f:
+        json.dump(m_data, f, indent=2)
+
+    stripped_sig_bundle = str(tmp_path / "stripped_signature.finpkg")
+    with tarfile.open(stripped_sig_bundle, "w:gz") as tar:
+        tar.add(str(tampered_dir / "finauditpro.db"), arcname="finauditpro.db")
+        tar.add(str(manifest_file), arcname="manifest.json")
+
+    val_stripped_sig = BackupService.validate_bundle(stripped_sig_bundle)
+    assert val_stripped_sig["valid"] is False
+    assert "missing cryptographic manifest_signature" in val_stripped_sig["error"].lower()
     
     # 2. Malicious member test: attempt archive with path traversal member
     malicious_bundle = str(tmp_path / "malicious_member.finpkg")

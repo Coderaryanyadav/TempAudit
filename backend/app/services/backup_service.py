@@ -198,16 +198,19 @@ class BackupService:
                     "error": "Manifest integrity violation: recorded checksum does not match computed checksum."
                 }
 
-            # Verify cryptographic signature if present
+            # Verify cryptographic signature
             recorded_sig = manifest.get("manifest_signature")
-            if recorded_sig:
-                expected_sig = compute_manifest_signature(manifest)
-                if not hmac.compare_digest(recorded_sig, expected_sig):
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                    return {
-                        "valid": False,
-                        "error": "Cryptographic authenticity violation: manifest signature mismatch (backup not signed by authorized key)."
-                    }
+            if not recorded_sig:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return {"valid": False, "error": "Manifest verification failed: missing cryptographic manifest_signature."}
+
+            expected_sig = compute_manifest_signature(manifest)
+            if not hmac.compare_digest(recorded_sig, expected_sig):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return {
+                    "valid": False,
+                    "error": "Cryptographic authenticity violation: manifest signature mismatch (backup not signed by authorized key)."
+                }
 
             # 2. Validate database file existence and checksum
             db_file = os.path.join(temp_dir, "finauditpro.db")
