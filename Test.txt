@@ -1,0 +1,41 @@
+# 1. Navigate to project root
+cd C:\Users\sbmpc.student\Desktop\Audit
+
+# 2. Configure Git identity (if not already set)
+git config --global user.name "Coderaryanyadav"
+git config --global user.email aryanjyadav@gmail.com"
+
+# 3. Check status & remote URL
+git status
+git remote -v
+
+# 4. Stage and commit all project files
+git add .
+git commit -m "feat: complete DevOps SLA tasks configuration"
+
+# 5. Push to GitHub repository (origin main)
+git push -u origin main
+
+# -------------------------------------------------------------
+# Demonstration of Git Stash "Push & Pop" Operations:
+# -------------------------------------------------------------
+
+# 6. Modify a file temporarily to demonstrate stash push
+Add-Content README.md -Value "`n<!-- Temporary edit for stash demo -->"
+git status
+
+# 7. Push changes to Git Stash Stack
+git stash push -m "WIP: temporary stash for SLA demo"
+
+# 8. Verify clean working directory and list stashes
+git status
+git stash list
+
+# 9. Pop the saved changes off the stash stack back to workspace
+git stash pop
+
+# 10. Confirm restored status
+git status
+
+docker : 
+docker compose up --build -d

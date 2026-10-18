@@ -138,31 +138,64 @@ class LocalAIAssistantEngine:
         and constructs evidence-based response with inspectable source records.
         """
         intent = detect_intent(query)
+        res = None
 
         if finding_id or intent == "CREATE_AUDIT_OBSERVATION":
-            return self._handle_audit_observation(query, finding_id)
+            res = self._handle_audit_observation(query, finding_id)
         elif intent == "EXPLAIN_FLAGGED_TRANSACTION":
-            return self._handle_explain_flagged_transaction(query, transaction_id, voucher_no)
+            res = self._handle_explain_flagged_transaction(query, transaction_id, voucher_no)
         elif intent == "UNUSUAL_TRANSACTIONS":
-            return self._handle_unusual_transactions(query)
+            res = self._handle_unusual_transactions(query)
         elif intent == "YOY_CHANGES":
-            return self._handle_yoy_changes(query)
+            res = self._handle_yoy_changes(query)
         elif intent == "UNMATCHED_BANK":
-            return self._handle_unmatched_bank(query)
+            res = self._handle_unmatched_bank(query)
         elif intent == "SUMMARIZE_EXCEPTIONS":
-            return self._handle_summarize_exceptions(query)
+            res = self._handle_summarize_exceptions(query)
         elif intent == "ACCOUNTS_REQUIRE_REVIEW":
-            return self._handle_accounts_require_review(query)
+            res = self._handle_accounts_require_review(query)
         elif intent == "EXPLAIN_RECONCILIATION":
-            return self._handle_explain_reconciliation(query)
+            res = self._handle_explain_reconciliation(query)
         elif intent == "FINANCIAL_MOVEMENT":
-            return self._handle_financial_movement(query)
+            res = self._handle_financial_movement(query)
         elif intent == "CASH_STATUTORY_LIMITS":
-            return self._handle_cash_limits(query)
+            res = self._handle_cash_limits(query)
         elif intent == "LARGEST_TRANSACTIONS":
-            return self._handle_largest_transactions(query)
+            res = self._handle_largest_transactions(query)
         else:
-            return self._handle_general_query(query)
+            res = self._handle_general_query(query)
+
+        # Provenance attribution & optional Local LLM enhancement for freeform questions
+        from backend.app.services.local_ai_provider import LocalAIModelManager
+        config = LocalAIModelManager.get_config()
+        provider = LocalAIModelManager.get_active_provider()
+        
+        provenance = "DETERMINISTIC_RULE"
+        model_name = config.get("model_name", "builtin-deterministic")
+
+        # If user asks an open-ended general query and LM Studio is active, attempt local model inference
+        if intent == "GENERAL_AUDIT_QUERY" and config.get("is_enabled", True) and config.get("engine") == "LMStudio":
+            try:
+                is_avail, _, _ = provider.check_health()
+                if is_avail:
+                    prompt = (
+                        f"Context: Audit engagement '{self.engagement.get('title')}' for client '{self.client_info.get('name')}'.\n"
+                        f"Summary: {len(self.transactions)} transactions, {len(self.findings)} findings logged.\n"
+                        f"Question: {query}\n"
+                        f"Provide a concise, professional audit answer based strictly on this engagement."
+                    )
+                    gen_res = provider.generate(prompt=prompt, system_prompt="You are a professional statutory auditor assistant. Keep responses factual and concise.")
+                    if gen_res.get("text"):
+                        res["response"] = gen_res["text"].strip()
+                        provenance = "LOCAL_LLM"
+                        model_name = gen_res.get("model", model_name)
+            except Exception:
+                # Retain deterministic response as fallback
+                provenance = "FALLBACK"
+
+        res["provenance"] = provenance
+        res["model_name"] = model_name
+        return res
 
     # ----------------------------------------------------------------------
     # INTENT HANDLER 1: Unusual Transactions
@@ -294,8 +327,19 @@ The Hybrid AI Anomaly Engine analyzed **{len(self.transactions):,}** transaction
         if not target_tx and voucher_no:
             target_tx = next((t for t in self.transactions if (t.get("voucher_no") or "").upper() == voucher_no.upper()), None)
 
-        # 4. Fallback to highest risk flagged transaction in findings/anomalies
+        # 4. Fallback to highest risk flagged transaction in findings/anomalies only if no specific identifier was requested
         if not target_tx:
+            if transaction_id or voucher_no:
+                # User asked for a specific transaction/voucher that does not exist in this engagement
+                identifier = f"ID #{transaction_id}" if transaction_id else f"Voucher '{voucher_no}'"
+                return {
+                    "query": query,
+                    "intent": "EXPLAIN_FLAGGED_TRANSACTION",
+                    "response": f"Transaction {identifier} could not be resolved from the records of this audit engagement. Please verify the transaction ID or voucher reference.",
+                    "disclaimer": MANDATORY_DISCLAIMER,
+                    "evidence": [],
+                    "source_transactions": []
+                }
             anomaly_results = detect_all_anomalies(self.engagement_id)
             anoms = anomaly_results.get("anomalies", [])
             if anoms:
@@ -303,13 +347,13 @@ The Hybrid AI Anomaly Engine analyzed **{len(self.transactions):,}** transaction
                 target_tx = next((t for t in self.transactions if t.get("id") == top_anom.get("transaction_id")), None)
 
         if not target_tx:
-            if self.transactions:
+            if self.transactions and not (transaction_id or voucher_no):
                 target_tx = self.transactions[0]
             else:
                 return {
                     "query": query,
                     "intent": "EXPLAIN_FLAGGED_TRANSACTION",
-                    "response": "No transactions are available in the currently selected audit engagement to explain.",
+                    "response": "No matching or flagged transactions are available in the currently selected audit engagement to explain.",
                     "disclaimer": MANDATORY_DISCLAIMER,
                     "evidence": [],
                     "source_transactions": []
@@ -495,9 +539,22 @@ The Hybrid AI Anomaly Engine analyzed **{len(self.transactions):,}** transaction
         finally:
             conn.close()
 
-        unmatched_bank = [i for i in bank_items if i.get("match_status") in ["UNMATCHED", "UNMATCHED_BANK", "Missing in Books"]]
-        unmatched_books = [i for i in bank_items if i.get("match_status") in ["UNMATCHED_BOOKS", "Missing in Bank"]]
-        amount_diffs = [i for i in bank_items if abs(float(i.get("amount_difference") or 0.0)) > 0]
+        unmatched_bank = [
+            i for i in bank_items 
+            if i.get("match_status") in ["UNMATCHED", "UNMATCHED_BANK", "Missing in Books"] 
+            or i.get("match_level") in ["UNMATCHED_BANK", "UNMATCHED"]
+            or (i.get("status") in ["Unmatched", "Mismatch"] and not (i.get("book_tx_id") or i.get("amount_a")))
+        ]
+        unmatched_books = [
+            i for i in bank_items 
+            if i.get("match_status") in ["UNMATCHED_BOOKS", "Missing in Bank"] 
+            or i.get("match_level") in ["UNMATCHED_BOOKS", "UNMATCHED_BOOK"]
+            or (i.get("status") in ["Unmatched", "Mismatch"] and not (i.get("bank_tx_id") or i.get("amount_b")))
+        ]
+        amount_diffs = [
+            i for i in bank_items 
+            if abs(float(i.get("amount_difference") or i.get("difference") or 0.0)) > 0.01
+        ]
 
         # If no explicit bank reconciliation items recorded yet, evaluate bank ledger entries directly
         if not bank_items:
@@ -560,10 +617,12 @@ The audit engine evaluated **{len(bank_txs)}** bank transactions from the genera
 """
         evidence = []
         for item in (unmatched_bank + unmatched_books + amount_diffs)[:8]:
-            bank_amt = float(item.get("bank_amount") or 0.0)
-            book_amt = float(item.get("book_amount") or 0.0)
-            diff = float(item.get("amount_difference") or (bank_amt - book_amt))
-            narrative += f"- **[{item.get('match_status')}]:** Bank: ₹{bank_amt:,.2f} | Books: ₹{book_amt:,.2f} | Diff: ₹{diff:+,.2f} ({item.get('bank_description') or item.get('book_description') or 'N/A'})\n"
+            bank_amt = float(item.get("bank_amount") or item.get("amount_b") or 0.0)
+            book_amt = float(item.get("book_amount") or item.get("amount_a") or 0.0)
+            diff = float(item.get("amount_difference") or item.get("difference") or (bank_amt - book_amt))
+            stat = item.get("match_status") or item.get("match_level") or item.get("status") or "Unmatched"
+            desc = item.get("bank_description") or item.get("description_b") or item.get("book_description") or item.get("description_a") or "N/A"
+            narrative += f"- **[{stat}]:** Bank: ₹{bank_amt:,.2f} | Books: ₹{book_amt:,.2f} | Diff: ₹{diff:+,.2f} ({desc})\n"
             evidence.append(item)
 
         return {
@@ -832,14 +891,23 @@ The audit engine identified **{len(ledger_risk_map)}** ledger account(s) that re
             target_finding = next((f for f in self.findings if f.get("id") == finding_id), None)
         
         if not target_finding:
+            if finding_id:
+                return {
+                    "query": query,
+                    "intent": "CREATE_AUDIT_OBSERVATION",
+                    "response": f"Finding ID #{finding_id} could not be resolved from active audit findings for this engagement. Please verify the finding ID.",
+                    "disclaimer": MANDATORY_DISCLAIMER,
+                    "evidence": [],
+                    "source_transactions": []
+                }
             # Match finding by code or query
             match = re.search(r'\b(F-\d+|FIND-\d+|\d+)\b', query, re.IGNORECASE)
             if match:
                 cand = match.group(1)
                 target_finding = next((f for f in self.findings if str(f.get("id")) == cand or (f.get("finding_code") or "").upper() == cand.upper()), None)
 
-        if not target_finding and self.findings:
-            # Pick highest severity finding
+        if not target_finding and self.findings and not finding_id:
+            # Pick highest severity finding only if no specific finding was requested
             critical = [f for f in self.findings if f.get("severity") == "CRITICAL"]
             target_finding = critical[0] if critical else self.findings[0]
 

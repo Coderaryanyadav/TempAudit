@@ -2,15 +2,24 @@ const API_BASE = "";
 
 class FinAuditAPI {
   static getToken() {
-    return localStorage.getItem("finaudit_token") || "";
+    try {
+      if (typeof localStorage !== "undefined") {
+        return localStorage.getItem("finaudit_token") || "";
+      }
+    } catch (e) {}
+    return "";
   }
 
   static setToken(token) {
-    if (token) {
-      localStorage.setItem("finaudit_token", token);
-    } else {
-      localStorage.removeItem("finaudit_token");
-    }
+    try {
+      if (typeof localStorage !== "undefined") {
+        if (token) {
+          localStorage.setItem("finaudit_token", token);
+        } else {
+          localStorage.removeItem("finaudit_token");
+        }
+      }
+    } catch (e) {}
   }
 
   static async request(endpoint, options = {}) {
@@ -35,29 +44,64 @@ class FinAuditAPI {
       }
     };
 
+    // Capture the exact bearer token used for this specific request
+    let requestToken = null;
+    if (config.headers && Object.prototype.hasOwnProperty.call(config.headers, "Authorization")) {
+      const authHeader = config.headers["Authorization"];
+      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+        requestToken = authHeader.substring(7).trim();
+      } else {
+        requestToken = null;
+      }
+    } else if (token) {
+      requestToken = token;
+    }
+
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, config);
       if (!response.ok) {
         let errorMsg = `HTTP Error ${response.status}`;
+        let errData = null;
         try {
-          const errData = await response.json();
+          errData = await response.json();
           if (Array.isArray(errData.detail)) {
             errorMsg = errData.detail.map(d => `${d.loc.slice(-1)[0]}: ${d.msg}`).join(", ");
           } else {
             errorMsg = errData.detail || errorMsg;
           }
         } catch (e) {}
-        
-        if (response.status === 401 && !endpoint.includes("/api/auth/login") && !endpoint.includes("/api/auth/setup-status")) {
-          // Token expired or invalid
-          this.setToken(null);
-          if (typeof window.checkAuthSession === "function") {
-            window.checkAuthSession();
-          } else if (typeof window.showLoginScreen === "function") {
-            window.showLoginScreen("Session expired. Please log in again.");
+
+        const isPublicAuthEndpoint =
+          endpoint.includes("/api/auth/login") ||
+          endpoint.includes("/api/auth/setup-status") ||
+          endpoint.includes("/api/auth/initial-setup") ||
+          endpoint.includes("/api/auth/activation-info") ||
+          endpoint.includes("/api/auth/activate-user");
+
+        if (response.status === 401 && !isPublicAuthEndpoint) {
+          const currentToken = this.getToken();
+          // Clear stored token ONLY when:
+          // 1. The failing request actually sent a token (requestToken is non-empty).
+          // 2. The failing request used the EXACT same token that is still stored (not a newer token).
+          if (requestToken && currentToken && requestToken === currentToken) {
+            this.setToken(null);
+            // Avoid recursive checkAuthSession call if this request was already /api/auth/me
+            if (!endpoint.includes("/api/auth/me")) {
+              if (typeof window !== "undefined") {
+                if (typeof window.checkAuthSession === "function") {
+                  window.checkAuthSession();
+                } else if (typeof window.showLoginScreen === "function") {
+                  window.showLoginScreen("Session expired. Please log in again.");
+                }
+              }
+            }
           }
         }
-        throw new Error(errorMsg);
+
+        const error = new Error(errorMsg);
+        error.status = response.status;
+        error.detail = errData ? errData.detail : null;
+        throw error;
       }
       return await response.json();
     } catch (err) {
@@ -666,25 +710,23 @@ class FinAuditAPI {
     });
   }
 
-  // --- AI Assistant ---
-  static queryAssistant(data) {
-    return this.request("/api/assistant/query", {
-      method: "POST",
-      body: JSON.stringify(data)
-    });
-  }
-
   // --- Local AI Assistant ---
-  static queryAssistant(engagementId, query, findingId = null, transactionId = null, voucherNo = null) {
-    return this.request("/api/assistant/query", {
-      method: "POST",
-      body: JSON.stringify({
-        engagement_id: engagementId,
+  static queryAssistant(arg1, query = null, findingId = null, transactionId = null, voucherNo = null) {
+    let payload = {};
+    if (typeof arg1 === "object" && arg1 !== null) {
+      payload = arg1;
+    } else {
+      payload = {
+        engagement_id: arg1,
         query: query,
         finding_id: findingId,
         transaction_id: transactionId,
         voucher_no: voucherNo
-      })
+      };
+    }
+    return this.request("/api/assistant/query", {
+      method: "POST",
+      body: JSON.stringify(payload)
     });
   }
 
@@ -1067,7 +1109,34 @@ class FinAuditAPI {
       })
     });
   }
+
+  // --- Authenticated File Downloads ---
+  static async downloadFile(endpoint, filename = "download") {
+    const token = this.getToken();
+    const headers = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const res = await fetch(endpoint, { headers });
+    if (!res.ok) {
+      throw new Error(`Download failed with status ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
 }
 
-window.FinAuditAPI = FinAuditAPI;
+if (typeof window !== "undefined") {
+  window.FinAuditAPI = FinAuditAPI;
+}
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { FinAuditAPI };
+}
 

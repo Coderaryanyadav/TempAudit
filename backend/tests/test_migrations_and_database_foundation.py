@@ -18,6 +18,14 @@ def test_database_pragmas_and_wal():
     finally:
         conn.close()
 
+def test_drop_all_sql_is_excluded_from_automatic_migration_discovery():
+    """Administrative teardown scripts must never be auto-discovered or executed as migrations."""
+    files = get_migration_files()
+    assert all(os.path.basename(path) != "drop_all.sql" for path in files)
+    assert not any("drop_all" in os.path.basename(path).lower() for path in files)
+    assert "001_initial_schema.sql" in [os.path.basename(path) for path in files]
+
+
 def test_migrations_tracking_and_idempotency(tmp_path):
     """Verify migrations runner creates schema_migrations, records versions, and is idempotent."""
     db_file = str(tmp_path / "test_mig.db")

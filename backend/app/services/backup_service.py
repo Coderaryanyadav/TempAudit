@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 
-from backend.app.database import DB_PATH, get_db_connection
+from backend.app.database import get_db_connection, get_db_path
 from backend.migrations.runner import get_migration_status
 
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backups")
@@ -41,7 +41,8 @@ class BackupService:
         os.makedirs(temp_dir, exist_ok=True)
         temp_db = os.path.join(temp_dir, "finauditpro.db")
 
-        src_conn = sqlite3.connect(DB_PATH)
+        db_path = get_db_path()
+        src_conn = sqlite3.connect(db_path)
         dst_conn = sqlite3.connect(temp_db)
         try:
             src_conn.backup(dst_conn)
@@ -171,8 +172,9 @@ class BackupService:
         safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
         safety_filename = f"pre_restore_safety_{safety_ts}_{uuid.uuid4().hex[:6]}.db"
         safety_filepath = os.path.join(BACKUP_DIR, safety_filename)
-        if os.path.exists(DB_PATH):
-            src_conn = sqlite3.connect(DB_PATH)
+        current_db_path = get_db_path()
+        if os.path.exists(current_db_path):
+            src_conn = sqlite3.connect(current_db_path)
             snap_conn = sqlite3.connect(safety_filepath)
             try:
                 src_conn.backup(snap_conn)
@@ -183,7 +185,7 @@ class BackupService:
         # 2. Restore DB using Online Backup API
         restored_db = os.path.join(extracted, "finauditpro.db")
         backup_src = sqlite3.connect(restored_db)
-        active_target = sqlite3.connect(DB_PATH)
+        active_target = sqlite3.connect(current_db_path)
         try:
             backup_src.backup(active_target)
         finally:

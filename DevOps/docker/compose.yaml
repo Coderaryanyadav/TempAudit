@@ -1,0 +1,26 @@
+services:
+  tempaudit:
+    build:
+      context: ../..
+      dockerfile: DevOps/docker/Dockerfile
+    image: tempaudit-sla:2026
+    container_name: tempaudit-sla
+    ports:
+      - "8000:8000"
+    environment:
+      FINAUDIT_DB_PATH: /data/finauditpro.db
+      # For a dedicated demo, set a random secret in a local .env file.
+      # Do not commit secrets to GitHub.
+      FINAUDIT_SECRET_KEY: ${FINAUDIT_SECRET_KEY:?Set FINAUDIT_SECRET_KEY in .env}
+    volumes:
+      - tempaudit_data:/data
+      - tempaudit_uploads:/app/backend/uploaded_files
+      - tempaudit_backups:/app/backend/backups
+      - tempaudit_reports:/app/backend/reports_generated
+    restart: unless-stopped
+
+volumes:
+  tempaudit_data:
+  tempaudit_uploads:
+  tempaudit_backups:
+  tempaudit_reports:

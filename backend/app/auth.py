@@ -4,7 +4,7 @@ import hmac
 import jwt
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from backend.app.database import get_db_connection
 import secrets
@@ -114,36 +114,46 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
 
 def revoke_token_by_jti(jti: str, username: str, exp_timestamp: Optional[datetime] = None):
     """Adds a token's JTI to revoked_tokens table."""
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         now_str = datetime.now(timezone.utc).isoformat()
         exp_str = exp_timestamp.isoformat() if exp_timestamp else (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
         conn.execute("INSERT OR REPLACE INTO revoked_tokens (jti, username, revoked_at, expires_at) VALUES (?, ?, ?, ?)",
                      (jti, username, now_str, exp_str))
         conn.commit()
-        conn.close()
     except Exception:
         pass
+    finally:
+        conn.close()
 
 def invalidate_user_sessions(user_id: int):
     """Increments the user's token_version, instantly invalidating all previously issued JWTs."""
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         conn.execute("UPDATE users SET token_version = COALESCE(token_version, 1) + 1 WHERE id = ?", (user_id,))
         conn.commit()
-        conn.close()
     except Exception:
         pass
+    finally:
+        conn.close()
 
-def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
-    if not credentials or not credentials.credentials:
+def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    request: Request = None
+) -> dict:
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    elif request and request.query_params.get("token"):
+        token = request.query_params.get("token")
+
+    if not token:
         raise HTTPException(
             status_code=401,
             detail="Authentication required. Please provide a valid Bearer token.",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    token = credentials.credentials
     secret = get_jwt_secret()
     try:
         payload = jwt.decode(
@@ -160,25 +170,26 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
             raise HTTPException(status_code=401, detail="Invalid authentication credentials")
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
-    except Exception:
+    except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid or malformed authentication token")
 
     conn = get_db_connection()
-    # Check if JTI was explicitly revoked (Flaw 27)
-    if jti:
-        revoked = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti = ?", (jti,)).fetchone()
-        if revoked:
-            conn.close()
-            raise HTTPException(status_code=401, detail="Token has been revoked. Please log in again.")
+    try:
+        # Check if JTI was explicitly revoked (Flaw 27)
+        if jti:
+            revoked = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti = ?", (jti,)).fetchone()
+            if revoked:
+                raise HTTPException(status_code=401, detail="Token has been revoked. Please log in again.")
 
-    user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    conn.close()
+        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    finally:
+        conn.close()
     
     if user is None:
         raise HTTPException(status_code=401, detail="User account not found")
     
     user_dict = dict(user)
-    if not user_dict.get("is_active", 1):
+    if not user_dict.get("is_active", 1) or user_dict.get("status") == "DISABLED":
         raise HTTPException(status_code=403, detail="Account is disabled. Please contact your audit administrator.")
 
     # Check token_version for password changes / admin resets (Flaws 28, 29)

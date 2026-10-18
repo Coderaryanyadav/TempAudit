@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FinAuditPro — Offline AI-Assisted Audit Assistant</title>
+  <title>FinAuditPro — Statutory Audit & Financial Verification Suite</title>
   <link rel="stylesheet" href="/static/css/styles.css?v=2.0.0">
 </head>
 
@@ -21,9 +21,11 @@
           <div class="brand-title">FinAuditPro</div>
           <div class="brand-subtitle" style="font-size: 10px; color: #94a3b8;">Standalone CA Suite</div>
         </div>
-        <button id="sidebar-collapse-toggle" class="sidebar-toggle-btn" title="Toggle Sidebar Width" aria-label="Toggle Sidebar">
+        <button id="sidebar-collapse-toggle" class="sidebar-toggle-btn" title="Toggle Sidebar Width"
+          aria-label="Toggle Sidebar">
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7">
+            </path>
           </svg>
         </button>
       </div>
@@ -118,12 +120,12 @@
           <span class="nav-item-text">Duplicates & Sequence Gaps</span>
         </button>
 
-        <div class="nav-section-title">AI & Exception Engine</div>
+        <div class="nav-section-title">Audit Intelligence</div>
         <button class="nav-item" data-tab="anomaly_detection" role="tab" aria-selected="false" tabindex="0">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
           </svg>
-          <span class="nav-item-text">Anomaly & ML Engine</span>
+          <span class="nav-item-text">Anomaly Detection</span>
         </button>
         <button class="nav-item" data-tab="findings" role="tab" aria-selected="false" tabindex="0">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -139,7 +141,7 @@
               d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z">
             </path>
           </svg>
-          <span class="nav-item-text">AI Audit Assistant</span>
+          <span class="nav-item-text">Audit Assistant</span>
         </button>
 
         <div class="nav-section-title">Compliance & Output</div>
@@ -189,7 +191,7 @@
               d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
             </path>
           </svg>
-          <span class="nav-item-text">Offline AI Manager</span>
+          <span class="nav-item-text">Assistant Settings</span>
         </button>
         <button class="nav-item" data-tab="settings" role="tab" aria-selected="false" tabindex="0">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -204,13 +206,16 @@
       </div>
 
       <div class="sidebar-footer">
-        <span class="offline-pill"><span class="offline-dot"></span> <span class="sidebar-footer-text">100% OFFLINE</span></span>
+        <span class="offline-pill"><span class="offline-dot"></span> <span class="sidebar-footer-text">100%
+            OFFLINE</span></span>
         <span class="sidebar-footer-text">Local SQLite</span>
       </div>
     </nav>
 
     <!-- Mobile Sidebar Backdrop -->
-    <div id="mobile-sidebar-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 90;" onclick="toggleMobileSidebar(false)"></div>
+    <div id="mobile-sidebar-backdrop"
+      style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 90;"
+      onclick="toggleMobileSidebar(false)"></div>
 
     <!-- Main Content Wrapper -->
     <div id="main-wrapper">
@@ -229,42 +234,65 @@
           </select>
         </div>
 
-        <button id="global-search-btn" class="global-search-trigger" onclick="openGlobalSearchModal()" title="Global Search across transactions, findings & working papers (⌘K)">
+        <button id="global-search-btn" class="global-search-trigger" onclick="openGlobalSearchModal()"
+          title="Global Search across transactions, findings & working papers (⌘K)">
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
           </svg>
           <span>Search audit data...</span>
           <kbd>⌘K</kbd>
         </button>
 
         <div class="top-bar-actions" style="display: flex; align-items: center; gap: 14px; margin-left: auto;">
-          <!-- Prominent Offline Mode & AI Indicator -->
+          <!-- Restrained Status Indicator -->
           <div id="top-offline-badge" class="top-offline-pill" onclick="navigateTo('ai_manager')"
-            title="100% Offline Standalone Application — Click to configure Local AI Model & Privacy Guard">
-            <span class="offline-dot"></span>
-            <span style="font-weight: 700; letter-spacing: 0.03em;">OFFLINE MODE</span>
-            <span style="color: #475569;">|</span>
-            <span id="top-ai-status-text">🤖 Local AI: Checking...</span>
+            title="Local standalone environment — click to configure assistant settings">
+            <span class="offline-dot" aria-hidden="true"></span>
+            <span class="status-label">Offline</span>
+            <span class="status-divider" aria-hidden="true">|</span>
+            <span id="top-ai-status-text">Local Model: Checking...</span>
           </div>
 
           <div class="user-profile-menu-wrap">
-            <div class="user-profile-badge" id="top-user-badge" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="User profile menu">
+            <div class="user-profile-badge" id="top-user-badge" tabindex="0" role="button" aria-haspopup="true"
+              aria-expanded="false" aria-label="User profile menu">
               <div class="user-avatar admin" id="top-user-avatar">CA</div>
               <span id="top-user-name">Loading User...</span>
               <span id="top-user-role-badge"></span>
-              <span style="font-size: 10px; color: #64748b;">▼</span>
+              <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+                style="color: #64748b;">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
             </div>
 
             <!-- Profile Dropdown -->
             <div class="user-dropdown-menu" id="user-dropdown-menu" role="menu">
               <div class="user-dropdown-item" role="menuitem" tabindex="0" onclick="openChangePasswordModal()">
-                <span>🔒</span> Change My Password
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                  </path>
+                </svg>
+                <span>Change Password</span>
               </div>
               <div class="user-dropdown-item" role="menuitem" tabindex="0" onclick="navigateTo('ai_manager')">
-                <span>🤖</span> Local AI Manager
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                  </path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span>Assistant Settings</span>
               </div>
               <div class="user-dropdown-item danger" role="menuitem" tabindex="0" onclick="handleLogout()">
-                <span>🚪</span> Sign Out
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                  </path>
+                </svg>
+                <span>Sign Out</span>
               </div>
             </div>
           </div>
@@ -283,7 +311,12 @@
   <aside id="evidence-drawer" role="dialog" aria-modal="true" aria-label="Audit Evidence Details">
     <div class="drawer-header">
       <h3 id="drawer-title" style="font-size: 14px; font-weight: 700; color: #0f172a;">Audit Evidence</h3>
-      <button id="drawer-close-btn" class="btn btn-sm btn-secondary" aria-label="Close drawer" style="border: none; font-size: 16px;">✕</button>
+      <button id="drawer-close-btn" class="btn btn-sm btn-secondary" aria-label="Close drawer"
+        style="border: none; padding: 4px; display: inline-flex; align-items: center; justify-content: center;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
     </div>
     <div class="drawer-body" id="drawer-content">
       <!-- Populated dynamically -->

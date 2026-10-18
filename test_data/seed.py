@@ -200,9 +200,28 @@ def seed_company_engagement(conn, company: dict) -> dict:
     }
 
 def seed_test_database():
-    """Seeds the SQLite database with both Aryan Fintech and Hitansh Fintech datasets and test users."""
+    """Seeds the SQLite database with both Aryan Fintech and Hitansh Fintech datasets, firm settings, and test users."""
     init_db()
     conn = get_db_connection()
+    now_str = datetime.now().isoformat()
+
+    # Seed app_settings so that the setup wizard does not trap demo users
+    default_settings = [
+        ("is_initial_setup_completed", "1"),
+        ("firm_name", "Alpha & Associates Chartered Accountants"),
+        ("firm_registration_no", "FRN-109283W"),
+        ("firm_email", "admin@finauditpro.local"),
+        ("firm_phone", "+91 98765 43210"),
+        ("firm_address", "Suite 401, Nariman Point, Mumbai - 400021"),
+        ("system_currency", "INR"),
+        ("default_financial_year", "2025-26")
+    ]
+    for key, val in default_settings:
+        conn.execute("""
+            INSERT OR REPLACE INTO app_settings (key, value, updated_at)
+            VALUES (?, ?, ?)
+        """, (key, val, now_str))
+
     seed_test_users(conn)
     res_aryan = seed_company_engagement(conn, ARYAN_COMPANY)
     res_hitansh = seed_company_engagement(conn, HITANSH_COMPANY)

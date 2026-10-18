@@ -3,7 +3,7 @@ import sqlite3
 from typing import Dict, Any, List
 from datetime import datetime
 
-from backend.app.database import DB_PATH, get_db_connection
+from backend.app.database import get_db_connection, get_db_path
 from backend.migrations.runner import get_migration_status
 from backend.app.utils.audit_logger import verify_audit_trail_integrity
 from backend.app.repositories.evidence_repo import EvidenceRepository
@@ -37,7 +37,7 @@ class SystemIntegrityChecker:
                 "journal_mode": journal,
                 "foreign_keys_enabled": bool(foreign_keys),
                 "busy_timeout_ms": busy_timeout,
-                "path": os.path.basename(DB_PATH)
+                "path": os.path.basename(get_db_path())
             }
 
             results["foreign_keys"] = {
