@@ -1,0 +1,54 @@
+name: TempAudit CI & Production Readiness Tests
+
+on:
+  push:
+    branches: [ main, repair/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Backend & Frontend Automated Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
+          pip install pytest pytest-cov anyio pytest-mock httpx
+
+      - name: Run Backend Pytest Suite
+        env:
+          FINAUDIT_DB_PATH: /tmp/test_ci_db.db
+          FINAUDIT_SECRET_KEY: test_secret_key_for_ci_pipeline_only_1234567890
+          FINAUDIT_ENV: testing
+        run: |
+          python -m pytest backend/tests -v --durations=10
+
+      - name: Run Frontend Session & API Regression Tests
+        run: |
+          node frontend/tests/test_login_session_refresh.js
+          node frontend/tests/test_api_client_and_download_tokens.js
+
+      - name: Run 24-Step End-to-End Audit Workflow Verification
+        env:
+          FINAUDIT_DB_PATH: /tmp/test_ci_e2e_db.db
+          FINAUDIT_SECRET_KEY: test_secret_key_for_ci_pipeline_only_1234567890
+          FINAUDIT_ENV: testing
+        run: |
+          python scripts/e2e_full_audit_workflow.py

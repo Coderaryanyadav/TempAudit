@@ -201,6 +201,13 @@ def seed_company_engagement(conn, company: dict) -> dict:
 
 def seed_test_database():
     """Seeds the SQLite database with both Aryan Fintech and Hitansh Fintech datasets, firm settings, and test users."""
+    env = os.environ.get("FINAUDIT_ENV", os.environ.get("ENVIRONMENT", "development")).lower()
+    if env == "production":
+        raise RuntimeError(
+            "FATAL: test_data/seed.py cannot be executed in a production environment. "
+            "Seeding default test credentials into a live database is strictly prohibited."
+        )
+
     init_db()
     conn = get_db_connection()
     now_str = datetime.now().isoformat()

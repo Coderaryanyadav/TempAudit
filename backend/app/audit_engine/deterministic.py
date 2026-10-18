@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 GSTIN_REGEX = r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
 PAN_REGEX = r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$"
@@ -98,40 +98,62 @@ class DeterministicAuditEngine:
                     seen_exact[key] = t
 
     def check_section_40a3_cash_payments(self):
-        """Rule: Income Tax Act Section 40A(3) - Cash payments exceeding ₹10,000 per person per day."""
+        """
+        Rule: Income Tax Act Section 40A(3) - Cash payments exceeding ₹10,000 per person per day.
+        Accounting Semantics:
+        - When the pure cash asset ledger ('Cash in hand', 'Petty Cash', 'Cash Account') is debited,
+          it represents cash being received (Receipt).
+        - When an expense or vendor ledger is debited (or transaction is a Payment), it represents an expenditure/payment.
+        """
         cash_keywords = ['cash', 'petty cash', 'cash in hand', 'bearer cheque']
         cash_by_party_day = {}
 
         for t in self.transactions:
-            ledger = str(t.get('ledger') or '').lower()
-            desc = str(t.get('description') or '').lower()
-            tx_type = str(t.get('transaction_type') or '').lower()
-            voucher_type = str(t.get('voucher_type') or '').lower()
+            ledger = str(t.get('ledger') or '').strip().lower()
+            desc = str(t.get('description') or '').strip().lower()
+            tx_type = str(t.get('transaction_type') or '').strip().lower()
+            voucher_type = str(t.get('voucher_type') or '').strip().lower()
 
-            # Ensure this is a cash transaction
-            is_cash = any(k in ledger or k in desc or k in tx_type or k in voucher_type for k in cash_keywords)
+            is_pure_cash_asset = ledger in ['cash', 'petty cash', 'cash in hand', 'cash account'] or ledger.startswith('cash in hand') or ledger.startswith('petty cash')
+            is_cash_tx = is_pure_cash_asset or any(k in desc or k in tx_type or k in voucher_type or k in ledger for k in cash_keywords)
 
-            # Determine direction: 40A(3) applies strictly to expenditures / payments / debits
             debit = float(t.get('debit') or 0.0)
             credit = float(t.get('credit') or 0.0)
             raw_amt = float(t.get('amount') or 0.0)
 
-            is_payment = (
-                debit > 0 or
-                'payment' in tx_type or 'payment' in voucher_type or
-                'expenditure' in desc or 'expense' in desc or 'purchase' in desc or
-                (raw_amt > 0 and credit == 0 and 'receipt' not in tx_type and 'receipt' not in voucher_type)
-            )
+            # Determine if this transaction is a payment / expenditure:
+            # Case 1: Pure cash asset ledger credited -> cash outflow / payment
+            # Case 2: Non-cash expense/vendor ledger debited with cash keyword in ledger/desc/type
+            is_payment = False
+            amount = 0.0
 
-            # A pure receipt/credit must not trigger payment disallowance
-            if credit > 0 and debit == 0 and ('receipt' in tx_type or 'receipt' in voucher_type):
+            if is_pure_cash_asset:
+                if credit > 0:
+                    is_payment = True
+                    amount = credit
+                elif 'payment' in tx_type or 'payment' in voucher_type or 'paid' in desc or 'expense' in desc or 'purchase' in desc:
+                    is_payment = True
+                    amount = raw_amt if raw_amt > 0 else (debit if debit > 0 else 0.0)
+            else:
+                # Ledger is expense, vendor, or nominal account (e.g. 'Freight (Cash)', 'Office Rent')
+                if debit > 0 and ('receipt' not in tx_type and 'receipt' not in voucher_type and 'received' not in desc):
+                    is_payment = True
+                    amount = debit
+                elif 'payment' in tx_type or 'payment' in voucher_type or 'paid' in desc or 'expense' in desc:
+                    is_payment = True
+                    amount = debit if debit > 0 else raw_amt
+
+            # Pure receipts must never be classified as 40A(3) payments
+            if 'receipt' in tx_type or 'receipt' in voucher_type or 'received' in desc:
                 is_payment = False
 
-            amount = debit if debit > 0 else raw_amt
-
-            if is_cash and is_payment and amount > 0:
+            if is_cash_tx and is_payment and amount > 0:
                 date = str(t.get('date') or '').split('T')[0]
-                party = str(t.get('party_name') or t.get('ledger') or 'Unknown Party').strip()
+                party = str(t.get('party_name') or '').strip()
+                if not party or party.lower() in ['cash', 'cash account', 'cash in hand', 'petty cash']:
+                    party = str(t.get('ledger') or 'Unknown Party').strip()
+                    party = re.sub(r'\s*\(\s*cash\s*\)', '', party, flags=re.IGNORECASE).strip()
+
                 key = (date, party)
                 if key not in cash_by_party_day:
                     cash_by_party_day[key] = {"total": 0.0, "records": [], "vouchers": []}
@@ -140,7 +162,7 @@ class DeterministicAuditEngine:
                 cash_by_party_day[key]["vouchers"].append(t.get('voucher_no'))
 
         for (date, party), data in cash_by_party_day.items():
-            if data["total"] > 10000.0 and party.lower() not in ['cash', 'petty cash', 'bank']:
+            if data["total"] > 10000.0 and party.lower() not in ['cash', 'petty cash', 'bank', 'cash account', 'cash in hand']:
                 self.findings.append({
                     "finding_code": "DET-TAX-40A3",
                     "category": "Statutory Compliance",
@@ -167,52 +189,109 @@ class DeterministicAuditEngine:
                 })
 
     def check_section_269st_cash_receipts(self):
-        """Rule: Income Tax Act Section 269ST - Cash receipt of ₹2,00,000 or more."""
+        """
+        Rule: Income Tax Act Section 269ST - Cash receipts of ₹2,00,000 or more:
+        (a) In aggregate from a person in a day; or
+        (b) In respect of a single transaction; or
+        (c) In respect of transactions relating to one event or occasion from a person.
+        Penalty under Section 271DA equals 100% of sum received.
+        """
         cash_keywords = ['cash', 'petty cash', 'cash in hand']
+        receipts_by_person_day: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
         for t in self.transactions:
             credit = float(t.get('credit') or 0.0)
             debit = float(t.get('debit') or 0.0)
             raw_amt = float(t.get('amount') or 0.0)
-            ledger = str(t.get('ledger') or '').lower()
-            desc = str(t.get('description') or '').lower()
-            tx_type = str(t.get('transaction_type') or '').lower()
-            voucher_type = str(t.get('voucher_type') or '').lower()
+            ledger = str(t.get('ledger') or '').strip().lower()
+            desc = str(t.get('description') or '').strip().lower()
+            tx_type = str(t.get('transaction_type') or '').strip().lower()
+            voucher_type = str(t.get('voucher_type') or '').strip().lower()
 
-            is_cash = any(k in ledger or k in desc or k in tx_type or k in voucher_type for k in cash_keywords)
+            is_pure_cash_asset = ledger in ['cash', 'petty cash', 'cash in hand', 'cash account'] or ledger.startswith('cash in hand') or ledger.startswith('petty cash')
+            is_cash_tx = is_pure_cash_asset or any(k in desc or k in tx_type or k in voucher_type or k in ledger for k in cash_keywords)
 
-            # Strictly verify receipt direction: credits, receipts, or raw amount when not a debit payment
-            is_receipt = (
-                credit > 0 or
-                'receipt' in tx_type or 'receipt' in voucher_type or
-                'received' in desc or 'receipt' in desc or
-                (raw_amt > 0 and debit == 0 and 'payment' not in tx_type and 'payment' not in voucher_type)
-            )
+            # Determine whether this is a cash receipt:
+            # Case 1: Pure cash asset debited -> cash inflow / receipt
+            # Case 2: Revenue / customer ledger credited with cash keyword (e.g. 'Cash Sales')
+            # Case 3: Explicit receipt transaction type
+            is_receipt = False
+            amount = 0.0
 
-            # Explicit payment/debit must never be classified as a receipt violation
-            if debit > 0 and credit == 0 and ('payment' in tx_type or 'payment' in voucher_type or 'expense' in desc or 'purchase' in desc):
+            if is_pure_cash_asset:
+                if debit > 0:
+                    is_receipt = True
+                    amount = debit
+                elif 'receipt' in tx_type or 'receipt' in voucher_type or 'received' in desc:
+                    is_receipt = True
+                    amount = raw_amt if raw_amt > 0 else (credit if credit > 0 else 0.0)
+            else:
+                if credit > 0 and ('payment' not in tx_type and 'payment' not in voucher_type and 'expense' not in desc and 'purchase' not in desc):
+                    is_receipt = True
+                    amount = credit
+                elif 'receipt' in tx_type or 'receipt' in voucher_type or 'received' in desc:
+                    is_receipt = True
+                    amount = credit if credit > 0 else raw_amt
+
+            # Pure payments must never be classified as receipts
+            if 'payment' in tx_type or 'payment' in voucher_type or 'paid' in desc:
                 is_receipt = False
 
-            amount = credit if credit > 0 else (raw_amt if is_receipt else 0.0)
+            if not is_cash_tx or not is_receipt or amount <= 0:
+                continue
 
-            if is_cash and is_receipt and amount >= 200000.0:
-                party = t.get('party_name') or t.get('ledger') or 'Unknown'
+            date = str(t.get('date') or '').split('T')[0]
+            party = str(t.get('party_name') or '').strip()
+            if not party or party.lower() in ['cash', 'cash account', 'cash in hand', 'petty cash']:
+                party = str(t.get('ledger') or 'Unknown Counterparty').strip()
+                party = re.sub(r'\s*\(\s*cash\s*\)', '', party, flags=re.IGNORECASE).strip()
+
+            vch = str(t.get('voucher_no') or t.get('id') or '—')
+            rec_id = t.get('id')
+
+            # Aggregate by person and day
+            key = (party, date)
+            if key not in receipts_by_person_day:
+                receipts_by_person_day[key] = {
+                    "party": party,
+                    "date": date,
+                    "total_amount": 0.0,
+                    "records": [],
+                    "vouchers": [],
+                    "transactions": []
+                }
+            receipts_by_person_day[key]["total_amount"] += amount
+            receipts_by_person_day[key]["records"].append(rec_id)
+            receipts_by_person_day[key]["vouchers"].append(vch)
+            receipts_by_person_day[key]["transactions"].append(t)
+
+        for (party, date), data in receipts_by_person_day.items():
+            tot = data["total_amount"]
+            if tot >= 200000.0 and party.lower() not in ['cash', 'cash account', 'cash in hand', 'bank']:
+                vch_list = data["vouchers"]
+                rec_list = data["records"]
+                is_split = len(rec_list) > 1
+                split_note = f" (aggregated across {len(rec_list)} split cash receipts)" if is_split else ""
+
                 self.findings.append({
                     "finding_code": "DET-TAX-269ST",
                     "category": "Statutory Compliance",
                     "severity": "CRITICAL",
-                    "risk_score": 9.2,
-                    "title": f"Section 269ST Violation: Cash Receipt of ₹{amount:,.2f} from {party}",
-                    "description": f"Receipt of ₹{amount:,.2f} in cash in a single day/transaction violates Section 269ST of the Income Tax Act.",
-                    "affected_records": [t.get('id')],
-                    "expected_value": "Receipts >= ₹2,00,000 through banking channels",
-                    "actual_value": f"Cash Receipt: ₹{amount:,.2f}",
-                    "difference": f"₹{amount:,.2f}",
-                    "reason": "Section 271DA levies a penalty equal to 100% of the amount received in contravention of Section 269ST.",
+                    "risk_score": 9.5 if is_split else 9.2,
+                    "title": f"Section 269ST Breach: Aggregate Cash Receipt of ₹{tot:,.2f} from {party}{split_note}",
+                    "description": f"Aggregate cash receipts from '{party}' on {date} totaled ₹{tot:,.2f}{split_note}, violating Section 269ST of the Income Tax Act, 1961 (threshold ₹2,00,000 per person per day).",
+                    "affected_records": rec_list,
+                    "expected_value": "Receipts >= ₹2,00,000 through banking channels / account payee modes",
+                    "actual_value": f"Total Cash Received: ₹{tot:,.2f}",
+                    "difference": f"₹{tot:,.2f}",
+                    "reason": "Section 271DA levies an unavoidable penalty equal to 100% of the amount received in contravention of Section 269ST.",
                     "evidence": {
-                        "voucher": t.get('voucher_no'),
-                        "date": t.get('date'),
+                        "date": date,
                         "party": party,
-                        "amount": amount
+                        "vouchers": vch_list,
+                        "amount": tot,
+                        "split_receipts_count": len(rec_list),
+                        "is_aggregated": is_split
                     },
                     "rule_used": "Income Tax Act, 1961 - Section 269ST & Penalty Section 271DA",
                     "engine_type": "DETERMINISTIC",

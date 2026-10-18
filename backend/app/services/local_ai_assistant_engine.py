@@ -168,32 +168,74 @@ class LocalAIAssistantEngine:
             res = self._handle_general_query(query)
 
         # Provenance attribution & Local LLM synthesis for audit explanations
-        from backend.app.services.local_ai_provider import LocalAIModelManager
+        from backend.app.services.local_ai_provider import LocalAIModelManager, sanitize_audit_text
+        from backend.app.ai.context_builder import AIContextBoundary
         config = LocalAIModelManager.get_config()
         provider = LocalAIModelManager.get_active_provider()
         
         provenance = "DETERMINISTIC_RULE"
         model_name = config.get("model_name", "builtin-deterministic")
 
-        if config.get("is_enabled", True) and config.get("engine") == "LMStudio":
+        # Refusal & Safety Guard:
+        # Never pass unresolvable-ID responses, missing-record notices, or safety refusals to the LLM
+        # to ensure hallucinated compliance never overwrites a verified audit refusal.
+        deterministic_response = res.get("response", "")
+        is_refusal_or_unresolved = (
+            "could not be resolved" in deterministic_response.lower() or
+            "not found" in deterministic_response.lower() or
+            "no matching" in deterministic_response.lower() or
+            "please verify" in deterministic_response.lower()
+        )
+
+        if not is_refusal_or_unresolved and config.get("is_enabled", True) and config.get("engine") == "LMStudio":
             try:
                 is_avail, _, _ = provider.check_health()
                 if is_avail:
-                    # Grounded prompt incorporating deterministic metrics & evidence
-                    ev_sample = res.get("evidence", [])[:3] if isinstance(res.get("evidence"), list) else []
-                    ev_str = json.dumps(ev_sample, default=str) if ev_sample else "None"
-                    prompt = (
-                        f"Audit Context: Engagement '{self.engagement.get('title')}' | Client '{self.client_info.get('name')}' | FY {self.engagement.get('financial_year')}.\n"
-                        f"Authoritative Facts: {len(self.transactions)} total transactions, {len(self.findings)} findings logged.\n"
-                        f"Corroborating Evidence: {ev_str}\n"
-                        f"Auditor Query: {query}\n"
-                        f"Draft an objective, professional statutory audit explanation strictly adhering to the facts above."
+                    # Grounded prompt incorporating deterministic metrics & complete relevant evidence
+                    calc_metrics = res.get("calculated_metrics", {})
+                    evidence_list = res.get("evidence", [])
+                    source_txs = res.get("source_transactions", [])
+                    
+                    # Build scoped, redacted context through dedicated AIContextBoundary
+                    boundary_data = {
+                        "transactions": source_txs if source_txs else self.transactions[:25],
+                    }
+                    if res.get("intent") == "CREATE_AUDIT_OBSERVATION" and evidence_list:
+                        boundary_data["finding"] = evidence_list[0]
+                    elif res.get("intent") == "EXPLAIN_RECONCILIATION" and calc_metrics:
+                        boundary_data["reconciliation_summary"] = calc_metrics
+
+                    scoped_context, boundary_meta = AIContextBoundary.build_engagement_context(
+                        engagement_id=self.engagement_id,
+                        client_name=self.client_info.get("name", "Client"),
+                        financial_year=self.engagement.get("financial_year", "2024-25"),
+                        task_type=res.get("intent", "AUDIT_QUERY"),
+                        relevant_data=boundary_data,
+                        max_records=25
                     )
+
+                    sanitized_query, _ = sanitize_audit_text(query, client_name=self.client_info.get("name", "Client"))
+                    metrics_str = json.dumps(calc_metrics, default=str) if calc_metrics else "None"
+                    evidence_str = json.dumps(evidence_list[:10], default=str) if evidence_list else "None"
+
+                    prompt = (
+                        f"{scoped_context}\n\n"
+                        f"AUTHORITATIVE DETERMINISTIC AUDIT FINDINGS (CANNOT BE OVERRULED):\n"
+                        f"- Rule-Calculated Metrics: {metrics_str}\n"
+                        f"- Corroborating Evidence: {evidence_str}\n"
+                        f"- Deterministic Analysis:\n{deterministic_response}\n\n"
+                        f"AUDITOR INQUIRY: {sanitized_query}\n\n"
+                        f"INSTRUCTIONS FOR LOCAL AI AUDITOR ASSISTANT:\n"
+                        f"1. Explain the underlying audit issue clearly based strictly on the authoritative facts above.\n"
+                        f"2. DO NOT contradict the deterministic calculations or claim compliance when violations exist.\n"
+                        f"3. Provide actionable statutory audit guidance referencing relevant Indian accounting/tax standards."
+                    )
+
                     gen_res = provider.generate(
                         prompt=prompt,
-                        system_prompt="You are a professional statutory auditor assistant. Keep responses factual, professional, and concise."
+                        system_prompt="You are a professional statutory auditor assistant. Ground your response strictly in the authoritative evidence provided."
                     )
-                    if gen_res and gen_res.get("text"):
+                    if gen_res and gen_res.get("text") and len(gen_res["text"].strip()) > 20:
                         res["response"] = gen_res["text"].strip()
                         provenance = "LOCAL_LLM"
                         model_name = gen_res.get("model", model_name)

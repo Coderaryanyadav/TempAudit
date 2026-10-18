@@ -111,3 +111,30 @@ def test_ai_assistant_provenance_attribution_with_mocked_llm(seeded_ai_engagemen
         res = engine.process_query(query="What is the general accounting status of this engagement?")
         assert res.get("provenance") == "LOCAL_LLM"
         assert "Based on the statutory records" in res.get("response", "")
+
+def test_ai_assistant_refusal_not_overwritten_by_mocked_llm(seeded_ai_engagement):
+    """
+    CRITICAL REPRODUCER TEST:
+    When user requests explanation for nonexistent transaction ID (e.g. 999999),
+    even if an LLM is active and returns hallucinated compliance ('No issues found. Everything is compliant'),
+    the assistant MUST NOT overwrite the deterministic refusal.
+    """
+    data = seeded_ai_engagement
+    engine = LocalAIAssistantEngine(data["eng_id"])
+
+    mock_provider = MagicMock()
+    mock_provider.check_health.return_value = (True, "Running", "qwen2.5-coder")
+    mock_provider.generate.return_value = {
+        "text": "No issues found. Everything is compliant.",
+        "model": "qwen2.5-coder",
+        "provenance": "LOCAL_LLM"
+    }
+
+    with patch("backend.app.services.local_ai_provider.LocalAIModelManager.get_active_provider", return_value=mock_provider), \
+         patch("backend.app.services.local_ai_provider.LocalAIModelManager.get_config", return_value={"is_enabled": True, "engine": "LMStudio", "model_name": "qwen2.5-coder"}):
+        res = engine.process_query(query="Explain this transaction", transaction_id=999999)
+        assert "could not be resolved" in res.get("response", "")
+        assert "999999" in res.get("response", "")
+        assert "Everything is compliant" not in res.get("response", "")
+        assert res.get("provenance") == "DETERMINISTIC_RULE"
+

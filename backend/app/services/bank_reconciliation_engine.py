@@ -92,8 +92,16 @@ def run_bank_reconciliation(
         stmt_rows = conn.execute("""
             SELECT t.* FROM transactions t
             WHERE t.engagement_id = ? AND (
-                t.transaction_type = 'BANK_STATEMENT' OR
-                t.file_id IN (SELECT id FROM uploaded_files WHERE engagement_id = ? AND (file_type = 'BANK_STATEMENT' OR LOWER(file_type) LIKE '%bank%'))
+                UPPER(t.transaction_type) IN ('BANK_STATEMENT', 'BANK STATEMENT', 'BANK') OR
+                t.file_id IN (
+                    SELECT id FROM uploaded_files 
+                    WHERE engagement_id = ? AND (
+                        UPPER(data_category) IN ('BANK STATEMENT', 'BANK_STATEMENT') OR
+                        UPPER(file_type) IN ('BANK_STATEMENT', 'BANK STATEMENT') OR
+                        LOWER(file_name) LIKE '%bank%' OR
+                        LOWER(data_category) LIKE '%bank%'
+                    )
+                )
             )
             ORDER BY t.date ASC, t.id ASC
         """, (engagement_id, engagement_id)).fetchall()

@@ -124,7 +124,21 @@ class BackupService:
                 names = tar.getnames()
                 if "manifest.json" not in names or "finauditpro.db" not in names:
                     return {"valid": False, "error": "Invalid backup archive: missing manifest.json or finauditpro.db"}
-                tar.extractall(path=temp_dir)
+
+                # Path traversal and malicious member validation
+                abs_temp_dir = os.path.abspath(temp_dir)
+                for member in tar.getmembers():
+                    member_path = os.path.abspath(os.path.join(temp_dir, member.name))
+                    if not member_path.startswith(abs_temp_dir + os.sep) and member_path != abs_temp_dir:
+                        return {"valid": False, "error": f"Security violation: Archive member '{member.name}' contains path traversal."}
+                    if member.islnk() or member.issym():
+                        return {"valid": False, "error": f"Security violation: Archive member '{member.name}' contains unsafe link."}
+
+                # Safe extraction with deprecation-free filter on Python 3.12+
+                if hasattr(tarfile, 'data_filter'):
+                    tar.extractall(path=temp_dir, filter='data')
+                else:
+                    tar.extractall(path=temp_dir)
 
             manifest_file = os.path.join(temp_dir, "manifest.json")
             with open(manifest_file, "r", encoding="utf-8") as f:
