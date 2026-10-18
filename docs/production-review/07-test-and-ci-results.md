@@ -107,14 +107,18 @@ node frontend/tests/test_api_client_and_download_tokens.js
 
 ## 4. Continuous Integration (CI) Workflow Evaluation
 
-- **CI Configuration File:** `.github/workflows/ci.yml`
+- **Workflow Definition File:** [`DevOps/ci/ci.yml`](file:///Users/aryan/Desktop/PROJECTS/TempAudit-main/DevOps/ci/ci.yml)
+- **Workflow Activation Helper:** [`scripts/activate_github_ci_workflow.sh`](file:///Users/aryan/Desktop/PROJECTS/TempAudit-main/scripts/activate_github_ci_workflow.sh)
+- **Target GitHub Path:** `.github/workflows/ci.yml`
 - **Workflow Steps Audited:**
   1. `actions/checkout@v4` on `push` and `pull_request` against `main`.
   2. Setup Python 3.12 with pip cache.
-  3. Install backend dependencies from `backend/requirements.txt`.
-  4. Run flake8 / ruff linting checks.
-  5. Execute `pytest backend/tests --cov=backend/app --cov-report=xml`.
-  6. Setup Node.js 20.x.
-  7. Run frontend test scripts.
-  8. Build Docker container image.
-- **Clean Checkout Reproducibility:** Verified. A fresh checkout cloned to a separate directory successfully reproduces all test passes identically.
+  3. Install dependencies from `requirements.txt`.
+  4. Run backend Pytest suite with isolated test DB (`FINAUDIT_DB_PATH=/tmp/test_ci_backend.db`).
+  5. Run frontend session and API regression test scripts.
+  6. Execute 24-step autonomous E2E audit workflow verification.
+- **Discovery & Cloud Execution Status:**
+  - *Current Status:* Workflow file is present in repository at `DevOps/ci/ci.yml`.
+  - *Activation Requirement:* Direct git pushes to `.github/workflows/` were rejected by GitHub API due to the local `gh` token lacking the OAuth `workflow` permission scope (`refusing to allow an OAuth App to create or update workflow without workflow scope`).
+  - *Activation Command:* Run `./scripts/activate_github_ci_workflow.sh` or execute `gh auth refresh -s workflow` to grant workflow permissions and push `.github/workflows/ci.yml`.
+  - *Local Clean-Machine Reproducibility:* Verified 100% PASS across all 237 unit/integration tests, 16 frontend tests, and 24 E2E steps.
