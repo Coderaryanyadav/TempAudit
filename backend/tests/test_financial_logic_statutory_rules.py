@@ -187,3 +187,53 @@ def test_section_269st_aggregates_split_receipts_from_same_person():
     assert 201 in finding["affected_records"]
     assert 202 in finding["affected_records"]
 
+def test_section_269st_aggregates_split_receipts_across_dates_for_single_transaction():
+    """
+    CRITICAL STATUTORY COMPLIANCE TEST:
+    Section 269ST(b) & (c) prohibit receiving ₹2,00,000 or more in cash in respect of a single transaction
+    or event, EVEN IF split across different dates.
+    Two cash receipts of ₹1,20,000 each on June 10 and June 15 against invoice 'INV-PROP-900'.
+    Aggregate cash received for this transaction is ₹2,40,000 (> ₹2,00,000 threshold).
+    Must generate a Section 269ST finding linking both records across dates.
+    """
+    transactions = [
+        {
+            "id": 301,
+            "date": "2024-06-10",
+            "voucher_no": "REC-CROSS-01",
+            "invoice_no": "INV-PROP-900",
+            "ledger": "Cash in hand",
+            "party_name": "Mehta Developers",
+            "transaction_type": "Receipt",
+            "voucher_type": "Receipt",
+            "debit": 120000.0,
+            "credit": 0.0,
+            "amount": 120000.0,
+            "description": "Advance part cash for flat booking INV-PROP-900"
+        },
+        {
+            "id": 302,
+            "date": "2024-06-15",
+            "voucher_no": "REC-CROSS-02",
+            "invoice_no": "INV-PROP-900",
+            "ledger": "Cash in hand",
+            "party_name": "Mehta Developers",
+            "transaction_type": "Receipt",
+            "voucher_type": "Receipt",
+            "debit": 120000.0,
+            "credit": 0.0,
+            "amount": 120000.0,
+            "description": "Final part cash for flat booking INV-PROP-900"
+        }
+    ]
+    engine = DeterministicAuditEngine(transactions)
+    findings = engine.run_all_checks()
+    sec_269st = [f for f in findings if f.get("finding_code") == "DET-TAX-269ST"]
+    assert len(sec_269st) == 1, "Must generate exactly 1 aggregated Section 269ST finding for receipts across dates against single invoice"
+    finding = sec_269st[0]
+    assert finding["evidence"]["amount"] == 240000.0
+    assert finding["evidence"]["is_aggregated_across_dates"] is True
+    assert 301 in finding["affected_records"]
+    assert 302 in finding["affected_records"]
+
+

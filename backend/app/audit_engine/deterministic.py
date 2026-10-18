@@ -196,8 +196,15 @@ class DeterministicAuditEngine:
         (c) In respect of transactions relating to one event or occasion from a person.
         Penalty under Section 271DA equals 100% of sum received.
         """
-        cash_keywords = ['cash', 'petty cash', 'cash in hand']
+        # -------------------------------------------------------------------------
+        # Section 269ST Aggregation Categories:
+        # (a) in aggregate from a person in a day;
+        # (b) in respect of a single transaction (e.g. against the same invoice/voucher reference);
+        # (c) in respect of transactions relating to one event or occasion from a person (e.g. project, contract, event).
+        # -------------------------------------------------------------------------
         receipts_by_person_day: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        receipts_by_ref_trans: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        cash_keywords = ['cash', 'petty cash', 'cash in hand']
 
         for t in self.transactions:
             credit = float(t.get('credit') or 0.0)
@@ -212,9 +219,6 @@ class DeterministicAuditEngine:
             is_cash_tx = is_pure_cash_asset or any(k in desc or k in tx_type or k in voucher_type or k in ledger for k in cash_keywords)
 
             # Determine whether this is a cash receipt:
-            # Case 1: Pure cash asset debited -> cash inflow / receipt
-            # Case 2: Revenue / customer ledger credited with cash keyword (e.g. 'Cash Sales')
-            # Case 3: Explicit receipt transaction type
             is_receipt = False
             amount = 0.0
 
@@ -249,29 +253,57 @@ class DeterministicAuditEngine:
             vch = str(t.get('voucher_no') or t.get('id') or '—')
             rec_id = t.get('id')
 
-            # Aggregate by person and day
-            key = (party, date)
-            if key not in receipts_by_person_day:
-                receipts_by_person_day[key] = {
+            # Reference identification for single transaction / event across dates
+            inv_ref = str(t.get('invoice_no') or t.get('reference_no') or '').strip()
+            if not inv_ref:
+                # Check description for invoice / contract / bill reference pattern
+                match_ref = re.search(r'\b(INV-[A-Za-z0-9_-]+|BILL-[A-Za-z0-9_-]+|CONTR-[A-Za-z0-9_-]+|EVENT-[A-Za-z0-9_-]+)\b', desc, re.IGNORECASE)
+                if match_ref:
+                    inv_ref = match_ref.group(1).upper()
+
+            # 1. Aggregate by person and day (Section 269ST(a))
+            day_key = (party, date)
+            if day_key not in receipts_by_person_day:
+                receipts_by_person_day[day_key] = {
                     "party": party,
                     "date": date,
                     "total_amount": 0.0,
                     "records": [],
-                    "vouchers": [],
-                    "transactions": []
+                    "vouchers": []
                 }
-            receipts_by_person_day[key]["total_amount"] += amount
-            receipts_by_person_day[key]["records"].append(rec_id)
-            receipts_by_person_day[key]["vouchers"].append(vch)
-            receipts_by_person_day[key]["transactions"].append(t)
+            receipts_by_person_day[day_key]["total_amount"] += amount
+            receipts_by_person_day[day_key]["records"].append(rec_id)
+            receipts_by_person_day[day_key]["vouchers"].append(vch)
 
+            # 2. Aggregate by person and transaction/event across different dates (Section 269ST(b) & (c))
+            if inv_ref:
+                ref_key = (party, inv_ref)
+                if ref_key not in receipts_by_ref_trans:
+                    receipts_by_ref_trans[ref_key] = {
+                        "party": party,
+                        "ref": inv_ref,
+                        "dates": set(),
+                        "total_amount": 0.0,
+                        "records": [],
+                        "vouchers": []
+                    }
+                receipts_by_ref_trans[ref_key]["total_amount"] += amount
+                receipts_by_ref_trans[ref_key]["records"].append(rec_id)
+                receipts_by_ref_trans[ref_key]["vouchers"].append(vch)
+                receipts_by_ref_trans[ref_key]["dates"].add(date)
+
+        emitted_record_sets: List[set] = []
+
+        # Evaluate condition (a): Person and Day
         for (party, date), data in receipts_by_person_day.items():
             tot = data["total_amount"]
             if tot >= 200000.0 and party.lower() not in ['cash', 'cash account', 'cash in hand', 'bank']:
                 vch_list = data["vouchers"]
                 rec_list = data["records"]
+                rec_set = set(rec_list)
+                emitted_record_sets.append(rec_set)
                 is_split = len(rec_list) > 1
-                split_note = f" (aggregated across {len(rec_list)} split cash receipts)" if is_split else ""
+                split_note = f" (aggregated across {len(rec_list)} split receipts on {date})" if is_split else ""
 
                 self.findings.append({
                     "finding_code": "DET-TAX-269ST",
@@ -279,7 +311,7 @@ class DeterministicAuditEngine:
                     "severity": "CRITICAL",
                     "risk_score": 9.5 if is_split else 9.2,
                     "title": f"Section 269ST Breach: Aggregate Cash Receipt of ₹{tot:,.2f} from {party}{split_note}",
-                    "description": f"Aggregate cash receipts from '{party}' on {date} totaled ₹{tot:,.2f}{split_note}, violating Section 269ST of the Income Tax Act, 1961 (threshold ₹2,00,000 per person per day).",
+                    "description": f"Aggregate cash receipts from '{party}' on {date} totaled ₹{tot:,.2f}{split_note}, violating Section 269ST(a) of the Income Tax Act, 1961 (threshold ₹2,00,000 per person per day).",
                     "affected_records": rec_list,
                     "expected_value": "Receipts >= ₹2,00,000 through banking channels / account payee modes",
                     "actual_value": f"Total Cash Received: ₹{tot:,.2f}",
@@ -297,6 +329,47 @@ class DeterministicAuditEngine:
                     "engine_type": "DETERMINISTIC",
                     "ai_explanation": "Section 269ST prohibits receiving ₹2,00,000 or more in cash in aggregate from a person in a day, in respect of a single transaction, or relating to one event. A penalty equal to 100% of the sum received is leviable under Section 271DA.",
                     "recommended_action": "Seek immediate management explanation, inspect bank deposit slips, and document in working papers for reporting under Clause 31 of Tax Audit Report 3CD."
+                })
+        # Evaluate condition (b) & (c): Single Transaction or Event/Occasion across different dates
+        for (party, ref), data in receipts_by_ref_trans.items():
+            tot = data["total_amount"]
+            rec_list = data["records"]
+            rec_set = set(rec_list)
+            
+            # Avoid duplicate reporting if already completely covered by a single-day breach
+            if any(rec_set.issubset(s) for s in emitted_record_sets):
+                continue
+
+            if tot >= 200000.0 and party.lower() not in ['cash', 'cash account', 'cash in hand', 'bank']:
+                emitted_record_sets.append(rec_set)
+                dates_str = ", ".join(sorted(data["dates"]))
+                vch_list = data["vouchers"]
+
+                self.findings.append({
+                    "finding_code": "DET-TAX-269ST",
+                    "category": "Statutory Compliance",
+                    "severity": "CRITICAL",
+                    "risk_score": 9.6,
+                    "title": f"Section 269ST Breach: Aggregate Cash Receipt of ₹{tot:,.2f} for Transaction/Event '{ref}' across dates",
+                    "description": f"Aggregate cash receipts from '{party}' relating to single transaction/event reference '{ref}' across dates ({dates_str}) totaled ₹{tot:,.2f}, violating Section 269ST(b)/(c) of the Income Tax Act, 1961 (threshold ₹2,00,000).",
+                    "affected_records": rec_list,
+                    "expected_value": "Receipts >= ₹2,00,000 through banking channels / account payee modes",
+                    "actual_value": f"Total Cash Received: ₹{tot:,.2f}",
+                    "difference": f"₹{tot:,.2f}",
+                    "reason": "Section 271DA levies an unavoidable penalty equal to 100% of the amount received in contravention of Section 269ST (applies to receipts relating to a single transaction or event across multiple dates).",
+                    "evidence": {
+                        "party": party,
+                        "reference": ref,
+                        "dates": list(data["dates"]),
+                        "vouchers": vch_list,
+                        "amount": tot,
+                        "split_receipts_count": len(rec_list),
+                        "is_aggregated_across_dates": True
+                    },
+                    "rule_used": "Income Tax Act, 1961 - Section 269ST(b)/(c) & Penalty Section 271DA",
+                    "engine_type": "DETERMINISTIC",
+                    "ai_explanation": "Section 269ST(b) and (c) prohibit receiving ₹2,00,000 or more in cash in respect of a single transaction or relating to one event/occasion from a person, even if split across different dates. A penalty equal to 100% of the sum received is leviable under Section 271DA.",
+                    "recommended_action": "Seek immediate management explanation, inspect related contract/invoice, and report under Clause 31 of Tax Audit Form 3CD."
                 })
 
     def check_gstin_validity(self):

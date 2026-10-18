@@ -454,15 +454,32 @@ The Hybrid AI Anomaly Engine analyzed **{len(self.transactions):,}** transaction
             reasons.append(f"**{f.get('title')}:** {f.get('reason') or f.get('description')}")
 
         if not reasons:
-            # Deterministic heuristic analysis
-            if "cash" in ledger.lower() and amt > 10000.0:
-                reasons.append(f"**Section 40A(3) Limit:** Cash payment of ₹{amt:,.2f} exceeds statutory threshold of ₹10,000 to a person in a day (Clause 21(d) Form 3CD).")
-            elif "cash" in ledger.lower() and amt >= 200000.0:
-                reasons.append(f"**Section 269ST Limit:** Cash receipt of ₹{amt:,.2f} equals or exceeds statutory threshold of ₹2,00,000 (Clause 31 Form 3CD).")
+            # Evidence-based classification check
+            is_cash_ledger = any(k in ledger.lower() for k in ['cash', 'petty cash', 'cash in hand'])
+            is_cash = is_cash_ledger or any(k in desc.lower() or k in str(target_tx.get('transaction_type', '')).lower() for k in ['cash', 'petty cash'])
+            debit_val = float(target_tx.get('debit') or 0.0)
+            credit_val = float(target_tx.get('credit') or 0.0)
+            tx_type_str = str(target_tx.get('transaction_type') or '').lower()
+
+            is_payment = (
+                (is_cash_ledger and credit_val > 0) or
+                (not is_cash_ledger and debit_val > 0 and 'receipt' not in tx_type_str) or
+                ('payment' in tx_type_str or 'paid' in desc.lower() or 'expense' in desc.lower())
+            )
+            is_receipt = (
+                (is_cash_ledger and debit_val > 0) or
+                (not is_cash_ledger and credit_val > 0 and 'payment' not in tx_type_str) or
+                ('receipt' in tx_type_str or 'received' in desc.lower())
+            )
+
+            if is_cash and is_receipt and amt >= 200000.0:
+                reasons.append(f"**Section 269ST Limit:** High-value cash receipt of ₹{amt:,.2f} equals or exceeds statutory threshold of ₹2,00,000 (Clause 31 Form 3CD).")
+            elif is_cash and is_payment and amt > 10000.0:
+                reasons.append(f"**Section 40A(3) Limit:** Cash expenditure of ₹{amt:,.2f} exceeds statutory payment threshold of ₹10,000 to a person in a day (Clause 21(d) Form 3CD).")
             elif not desc or len(desc.strip()) < 3:
-                reasons.append("**Missing Narration:** High-value voucher lacks documented business narration / substance.")
+                reasons.append("**Missing Narration:** Voucher lacks documented business narration / substance.")
             else:
-                reasons.append("Flagged based on statistical distribution variance and multi-variate outlier modeling.")
+                reasons.append("No active statutory findings or statistical anomaly flags recorded for this transaction in the current audit engagement.")
 
         narrative = f"""### 🔍 Factual Explanation for Voucher {v_no}
 - **Transaction ID:** #{t_id}

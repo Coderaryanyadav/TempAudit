@@ -268,6 +268,24 @@ function translateError(err, contextTitle = "Action Failed") {
   };
 }
 
+function copyDiagnosticText(btn) {
+  try {
+    const codeBlock = btn.parentElement ? btn.parentElement.querySelector("code") : null;
+    const textToCopy = codeBlock ? codeBlock.textContent : "";
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        FinNotify.info("Diagnostic details copied to clipboard");
+      }).catch(() => {
+        FinNotify.info("Diagnostic details copied");
+      });
+    } else {
+      FinNotify.info("Diagnostic details copied");
+    }
+  } catch (e) {
+    FinNotify.error("Could not copy diagnostic text");
+  }
+}
+
 function renderErrorBanner(err, contextTitle = "Action Failed") {
   const translated = translateError(err, contextTitle);
   return `
@@ -286,7 +304,7 @@ function renderErrorBanner(err, contextTitle = "Action Failed") {
         <summary>Technical Details & Diagnostics</summary>
         <div class="error-diagnostic-body">
           <code>${escapeHTML(translated.rawError)}</code>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${escapeHTML(translated.rawError).replace(/'/g, "\\'")}'); FinNotify.info('Diagnostic details copied to clipboard');" style="margin-top: 8px;">
+          <button type="button" class="btn btn-sm btn-secondary copy-diag-btn" onclick="copyDiagnosticText(this)" style="margin-top: 8px;">
             ${ICONS.clipboard} Copy Diagnostic Info
           </button>
         </div>
