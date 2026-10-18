@@ -1987,21 +1987,21 @@ async function renderUserManagement() {
                   <td class="text-center">
                     <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
                       ${u.status === 'INVITED' && u.activation_token ? `
-                        <button class="btn btn-sm btn-outline" onclick="copyActivationCode('${u.activation_token}', '${u.full_name}')" title="Copy Activation Code">
+                        <button class="btn btn-sm btn-outline" data-token="${escapeHTML(u.activation_token)}" data-name="${escapeHTML(u.full_name)}" onclick="copyActivationCode(this.dataset.token, this.dataset.name)" title="Copy Activation Code">
                           Copy Code
                         </button>
-                        <button class="btn btn-sm btn-secondary" onclick="handleReissueActivation(${u.id}, '${u.username}')" title="Re-issue Token">
+                        <button class="btn btn-sm btn-secondary" data-userid="${u.id}" data-username="${escapeHTML(u.username)}" onclick="handleReissueActivation(Number(this.dataset.userid), this.dataset.username)" title="Re-issue Token">
                           ${ICONS.refresh} New Code
                         </button>
                       ` : ''}
                       ${u.id !== state.currentUser.id ? `
-                        <button class="btn btn-sm ${u.is_active ? 'btn-secondary' : 'btn-success'}" onclick="toggleUserStatus(${u.id}, ${u.is_active ? 'false' : 'true'}, '${u.username}')">
+                        <button class="btn btn-sm ${u.is_active ? 'btn-secondary' : 'btn-success'}" data-userid="${u.id}" data-active="${u.is_active ? 'false' : 'true'}" data-username="${escapeHTML(u.username)}" onclick="toggleUserStatus(Number(this.dataset.userid), this.dataset.active, this.dataset.username)">
                           ${u.is_active ? 'Disable' : 'Enable'}
                         </button>
                       ` : `
                         <span style="font-size: 11px; color: var(--text-muted); padding: 4px 6px;">(You)</span>
                       `}
-                      <button class="btn btn-sm btn-secondary" onclick="openAdminResetPasswordModal(${u.id}, '${u.username}')">
+                      <button class="btn btn-sm btn-secondary" data-userid="${u.id}" data-username="${escapeHTML(u.username)}" onclick="openAdminResetPasswordModal(Number(this.dataset.userid), this.dataset.username)">
                         Reset Pwd
                       </button>
                     </div>

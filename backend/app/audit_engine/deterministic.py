@@ -256,10 +256,16 @@ class DeterministicAuditEngine:
             # Reference identification for single transaction / event across dates
             inv_ref = str(t.get('invoice_no') or t.get('reference_no') or '').strip()
             if not inv_ref:
-                # Check description for invoice / contract / bill reference pattern
-                match_ref = re.search(r'\b(INV-[A-Za-z0-9_-]+|BILL-[A-Za-z0-9_-]+|CONTR-[A-Za-z0-9_-]+|EVENT-[A-Za-z0-9_-]+)\b', desc, re.IGNORECASE)
+                # Check description for invoice / contract / bill / receipt / order / event reference pattern
+                match_ref = re.search(r'\b(?:INV|BILL|CONTR|EVENT|ORD|REF|ADV|REC|BOOKING)[-:\s#]*([A-Za-z0-9_-]+)\b', desc, re.IGNORECASE)
                 if match_ref:
-                    inv_ref = match_ref.group(1).upper()
+                    inv_ref = match_ref.group(0).upper().replace(" ", "")
+                elif any(k in desc.lower() for k in ['booking', 'flat', 'plot', 'wedding', 'event', 'catering', 'annual function', 'conference', 'advance']):
+                    # Event/occasion or ongoing transaction cluster detected in narration
+                    for keyword in ['wedding', 'catering', 'conference', 'annual function', 'flat', 'plot', 'booking', 'advance']:
+                        if keyword in desc.lower():
+                            inv_ref = f"EVENT-{keyword.upper().replace(' ', '_')}"
+                            break
 
             # 1. Aggregate by person and day (Section 269ST(a))
             day_key = (party, date)
