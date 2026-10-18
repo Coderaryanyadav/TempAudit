@@ -29,7 +29,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024 # 50 MB maximum upload size limit
 
 def check_engagement_access(conn, engagement_id: int, current_user: dict):
-    """Ensures engagement exists and current user has authorization to access it."""
+    """Ensures engagement exists and current user has strict authorization to access it."""
     eng = conn.execute("""
         SELECT e.*, c.name as client_name
         FROM engagements e
@@ -44,13 +44,14 @@ def check_engagement_access(conn, engagement_id: int, current_user: dict):
     if role in ["Admin", "Auditor"]:
         return eng
     
-    # Audit Staff can access assigned engagements or general firm engagements
+    # Audit Staff must be explicitly assigned as assigned_staff_id or lead_auditor_id
     if role == "Audit Staff":
-        if eng["assigned_staff_id"] and eng["assigned_staff_id"] != current_user.get("id"):
-            raise HTTPException(status_code=403, detail="Access forbidden: You are not assigned to this engagement.")
-        return eng
+        user_id = current_user.get("id")
+        if eng["assigned_staff_id"] == user_id or eng["lead_auditor_id"] == user_id:
+            return eng
+        raise HTTPException(status_code=403, detail="Access forbidden: You are not assigned to this engagement.")
         
-    return eng
+    raise HTTPException(status_code=403, detail="Access forbidden: Insufficient permissions for this engagement.")
 
 @router.get("/categories")
 def get_supported_categories():

@@ -40,46 +40,62 @@ def _ensure_rate_limit_table(conn):
 
 def _check_setup_rate_limit():
     conn = get_db_connection()
-    _ensure_rate_limit_table(conn)
-    now = time.time()
-    cutoff = now - 60
-    conn.execute("DELETE FROM rate_limits WHERE key = 'setup' AND timestamp < ?", (cutoff,))
-    
-    row = conn.execute("SELECT COUNT(*) as count FROM rate_limits WHERE key = 'setup'").fetchone()
-    if row and row["count"] >= 5:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many initial setup attempts. Please wait 60 seconds before retrying."
-        )
-    conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES ('setup', ?)", (now,))
+    try:
+        _ensure_rate_limit_table(conn)
+        now = time.time()
+        cutoff = now - 60
+        conn.execute("DELETE FROM rate_limits WHERE key = 'setup' AND timestamp < ?", (cutoff,))
+        
+        row = conn.execute("SELECT COUNT(*) as count FROM rate_limits WHERE key = 'setup'").fetchone()
+        if row and row["count"] >= 5:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many initial setup attempts. Please wait 60 seconds before retrying."
+            )
+        conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES ('setup', ?)", (now,))
+        conn.commit()
+    finally:
+        conn.close()
 
 def _check_login_rate_limit(key: str):
     conn = get_db_connection()
-    _ensure_rate_limit_table(conn)
-    now = time.time()
-    cutoff = now - 300 # 5 minute window
-    db_key = f"login_{key}"
-    conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp < ?", (db_key, cutoff))
-    
-    row = conn.execute("SELECT COUNT(*) as count FROM rate_limits WHERE key = ? AND timestamp >= ?", (db_key, cutoff)).fetchone()
-    if row and row["count"] >= 10:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many unsuccessful attempts. Please try again later."
-        )
+    try:
+        _ensure_rate_limit_table(conn)
+        now = time.time()
+        cutoff = now - 300 # 5 minute window
+        db_key = f"login_{key}"
+        conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp < ?", (db_key, cutoff))
+        
+        row = conn.execute("SELECT COUNT(*) as count FROM rate_limits WHERE key = ? AND timestamp >= ?", (db_key, cutoff)).fetchone()
+        if row and row["count"] >= 10:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many unsuccessful attempts. Please try again later."
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 def _record_login_failure(key: str):
     conn = get_db_connection()
-    _ensure_rate_limit_table(conn)
-    now = time.time()
-    db_key = f"login_{key}"
-    conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES (?, ?)", (db_key, now))
+    try:
+        _ensure_rate_limit_table(conn)
+        now = time.time()
+        db_key = f"login_{key}"
+        conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES (?, ?)", (db_key, now))
+        conn.commit()
+    finally:
+        conn.close()
 
 def _clear_login_failures(key: str):
     conn = get_db_connection()
-    _ensure_rate_limit_table(conn)
-    db_key = f"login_{key}"
-    conn.execute("DELETE FROM rate_limits WHERE key = ?", (db_key,))
+    try:
+        _ensure_rate_limit_table(conn)
+        db_key = f"login_{key}"
+        conn.execute("DELETE FROM rate_limits WHERE key = ?", (db_key,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ----------------- FIRST-LAUNCH DETECTION & SETUP STATUS -----------------

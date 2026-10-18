@@ -21,6 +21,16 @@ def compute_file_sha256(filepath: str) -> str:
             sha.update(chunk)
     return sha.hexdigest()
 
+def compute_canonical_manifest_checksum(manifest_dict: Dict[str, Any]) -> str:
+    """
+    Computes deterministic SHA-256 over canonical JSON representation of manifest metadata,
+    excluding dynamic wrapper properties (manifest_checksum, bundle_file, bundle_size_kb, bundle_sha256).
+    """
+    excluded_keys = {"manifest_checksum", "bundle_file", "bundle_size_kb", "bundle_sha256"}
+    clean_manifest = {k: v for k, v in manifest_dict.items() if k not in excluded_keys}
+    canonical_bytes = json.dumps(clean_manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical_bytes).hexdigest()
+
 class BackupService:
     """
     Verified Manifest-Driven Backup & Restore Engine.
@@ -63,7 +73,7 @@ class BackupService:
         schema_version = mig_status.get("current_version", "001")
         conn.close()
 
-        # 3. Create Manifest
+        # 3. Create Manifest with Canonical Checksum
         manifest = {
             "backup_version": 1,
             "app_version": "1.0.0",
@@ -74,17 +84,13 @@ class BackupService:
             "engagement_count": eng_count,
             "client_count": client_count,
             "evidence_count": evidence_count,
-            "transaction_count": tx_count,
-            "manifest_checksum": ""
+            "transaction_count": tx_count
         }
+        manifest["manifest_checksum"] = compute_canonical_manifest_checksum(manifest)
 
         manifest_file = os.path.join(temp_dir, "manifest.json")
         with open(manifest_file, "w", encoding="utf-8") as f:
-            json.dump(manifest, f, indent=2)
-
-        manifest["manifest_checksum"] = compute_file_sha256(manifest_file)
-        with open(manifest_file, "w", encoding="utf-8") as f:
-            json.dump(manifest, f, indent=2)
+            json.dump(manifest, f, indent=2, sort_keys=True)
 
         # 4. Pack tar.gz bundle
         with tarfile.open(bundle_path, "w:gz") as tar:
@@ -111,7 +117,7 @@ class BackupService:
     @classmethod
     def validate_bundle(cls, bundle_path: str) -> Dict[str, Any]:
         """
-        Validates backup bundle structure, manifest, and database integrity before restoration.
+        Validates backup bundle structure, canonical manifest checksum, and database integrity before restoration.
         """
         if not os.path.exists(bundle_path):
             return {"valid": False, "error": "Backup bundle file not found."}
@@ -123,16 +129,25 @@ class BackupService:
             with tarfile.open(bundle_path, "r:gz") as tar:
                 names = tar.getnames()
                 if "manifest.json" not in names or "finauditpro.db" not in names:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
                     return {"valid": False, "error": "Invalid backup archive: missing manifest.json or finauditpro.db"}
 
-                # Path traversal and malicious member validation
+                # Path traversal, link, device, and malicious member validation
                 abs_temp_dir = os.path.abspath(temp_dir)
                 for member in tar.getmembers():
                     member_path = os.path.abspath(os.path.join(temp_dir, member.name))
                     if not member_path.startswith(abs_temp_dir + os.sep) and member_path != abs_temp_dir:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
                         return {"valid": False, "error": f"Security violation: Archive member '{member.name}' contains path traversal."}
-                    if member.islnk() or member.issym():
-                        return {"valid": False, "error": f"Security violation: Archive member '{member.name}' contains unsafe link."}
+                    if member.islnk() or member.issym() or member.ischr() or member.isblk() or member.isfifo():
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        return {"valid": False, "error": f"Security violation: Archive member '{member.name}' contains unsafe link or device node."}
+
+                    # Restrict allowed member root paths
+                    top_part = member.name.replace("\\", "/").split("/")[0]
+                    if top_part not in {"manifest.json", "finauditpro.db", "uploaded_files"}:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        return {"valid": False, "error": f"Security violation: Unexpected archive member '{member.name}'."}
 
                 # Safe extraction with deprecation-free filter on Python 3.12+
                 if hasattr(tarfile, 'data_filter'):
@@ -140,20 +155,43 @@ class BackupService:
                 else:
                     tar.extractall(path=temp_dir)
 
+            # 1. Validate manifest.json existence & canonical checksum
             manifest_file = os.path.join(temp_dir, "manifest.json")
+            if not os.path.exists(manifest_file):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return {"valid": False, "error": "manifest.json missing after extraction."}
+
             with open(manifest_file, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
 
-            db_file = os.path.join(temp_dir, "finauditpro.db")
-            actual_db_hash = compute_file_sha256(db_file)
+            recorded_manifest_checksum = manifest.get("manifest_checksum")
+            if not recorded_manifest_checksum:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return {"valid": False, "error": "Manifest verification failed: missing manifest_checksum."}
 
+            expected_manifest_checksum = compute_canonical_manifest_checksum(manifest)
+            if recorded_manifest_checksum != expected_manifest_checksum:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return {
+                    "valid": False,
+                    "error": f"Manifest integrity violation: recorded checksum does not match computed checksum."
+                }
+
+            # 2. Validate database file existence and checksum
+            db_file = os.path.join(temp_dir, "finauditpro.db")
+            if not os.path.exists(db_file):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return {"valid": False, "error": "Database file finauditpro.db missing from extracted backup."}
+
+            actual_db_hash = compute_file_sha256(db_file)
             if actual_db_hash != manifest.get("database_sha256"):
+                shutil.rmtree(temp_dir, ignore_errors=True)
                 return {
                     "valid": False,
                     "error": f"Database checksum mismatch: expected {manifest.get('database_sha256')} got {actual_db_hash}"
                 }
 
-            # Test sqlite connectivity
+            # 3. Test sqlite connectivity
             conn = sqlite3.connect(db_file)
             conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             conn.close()
@@ -162,13 +200,12 @@ class BackupService:
                 "valid": True,
                 "manifest": manifest,
                 "database_sha256": actual_db_hash,
+                "manifest_checksum": recorded_manifest_checksum,
                 "extracted_path": temp_dir
             }
         except Exception as e:
+            shutil.rmtree(temp_dir, ignore_errors=True)
             return {"valid": False, "error": f"Archive extraction / validation failed: {str(e)}"}
-        finally:
-            # Note: caller will clean up temp_dir if used, otherwise remove
-            pass
 
     @classmethod
     def restore_verified_bundle(cls, bundle_path: str, user: Any = None) -> Dict[str, Any]:
@@ -182,54 +219,55 @@ class BackupService:
         extracted = val.get("extracted_path")
         manifest = val.get("manifest")
 
-        # 1. Take safety snapshot of current active DB
-        safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
-        safety_filename = f"pre_restore_safety_{safety_ts}_{uuid.uuid4().hex[:6]}.db"
-        safety_filepath = os.path.join(BACKUP_DIR, safety_filename)
-        current_db_path = get_db_path()
-        if os.path.exists(current_db_path):
-            src_conn = sqlite3.connect(current_db_path)
-            snap_conn = sqlite3.connect(safety_filepath)
-            try:
-                src_conn.backup(snap_conn)
-            finally:
-                snap_conn.close()
-                src_conn.close()
-
-        # 2. Restore DB using Online Backup API
-        restored_db = os.path.join(extracted, "finauditpro.db")
-        backup_src = sqlite3.connect(restored_db)
-        active_target = sqlite3.connect(current_db_path)
         try:
-            backup_src.backup(active_target)
+            # 1. Take safety snapshot of current active DB
+            safety_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
+            safety_filename = f"pre_restore_safety_{safety_ts}_{uuid.uuid4().hex[:6]}.db"
+            safety_filepath = os.path.join(BACKUP_DIR, safety_filename)
+            current_db_path = get_db_path()
+            if os.path.exists(current_db_path):
+                src_conn = sqlite3.connect(current_db_path)
+                snap_conn = sqlite3.connect(safety_filepath)
+                try:
+                    src_conn.backup(snap_conn)
+                finally:
+                    snap_conn.close()
+                    src_conn.close()
+
+            # 2. Restore DB using Online Backup API
+            restored_db = os.path.join(extracted, "finauditpro.db")
+            backup_src = sqlite3.connect(restored_db)
+            active_target = sqlite3.connect(current_db_path)
+            try:
+                backup_src.backup(active_target)
+            finally:
+                active_target.close()
+                backup_src.close()
+
+            # 3. Restore uploaded_files if present in archive
+            extracted_uploads = os.path.join(extracted, "uploaded_files")
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            target_uploads = os.path.join(base_dir, "uploaded_files")
+            if os.path.exists(extracted_uploads):
+                os.makedirs(target_uploads, exist_ok=True)
+                for item in os.listdir(extracted_uploads):
+                    s = os.path.join(extracted_uploads, item)
+                    d = os.path.join(target_uploads, item)
+                    if os.path.isdir(s):
+                        shutil.copytree(s, d, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(s, d)
+
+            # 4. Run migrations/init_db to verify schema consistency
+            from backend.app.database import init_db
+            init_db()
+
+            return {
+                "status": "SUCCESS",
+                "restored_manifest": manifest,
+                "safety_snapshot": safety_filename,
+                "message": "Database and evidence restored successfully with verified integrity."
+            }
         finally:
-            active_target.close()
-            backup_src.close()
-
-        # 3. Restore uploaded_files if present in archive
-        extracted_uploads = os.path.join(extracted, "uploaded_files")
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        target_uploads = os.path.join(base_dir, "uploaded_files")
-        if os.path.exists(extracted_uploads):
-            os.makedirs(target_uploads, exist_ok=True)
-            for item in os.listdir(extracted_uploads):
-                s = os.path.join(extracted_uploads, item)
-                d = os.path.join(target_uploads, item)
-                if os.path.isdir(s):
-                    shutil.copytree(s, d, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(s, d)
-
-        # 4. Clean up temp extraction
-        shutil.rmtree(extracted, ignore_errors=True)
-
-        # 5. Run migrations/init_db to verify schema consistency
-        from backend.app.database import init_db
-        init_db()
-
-        return {
-            "status": "SUCCESS",
-            "restored_manifest": manifest,
-            "safety_snapshot": safety_filename,
-            "message": "Database and evidence restored successfully with verified integrity."
-        }
+            # Clean up temp extraction directory in all cases
+            shutil.rmtree(extracted, ignore_errors=True)

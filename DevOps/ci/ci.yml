@@ -1,14 +1,14 @@
-name: TempAudit CI & Production Readiness Tests
+name: FinAuditPro CI & Verification Pipeline
 
 on:
   push:
-    branches: [ main, repair/* ]
+    branches: [ main, "repair/*" ]
   pull_request:
     branches: [ main ]
 
 jobs:
   test:
-    name: Backend & Frontend Automated Verification
+    name: Backend, Frontend & E2E Acceptance Verification
     runs-on: ubuntu-latest
 
     steps:
@@ -32,9 +32,9 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install pytest pytest-cov anyio pytest-mock httpx
 
-      - name: Run Backend Pytest Suite
+      - name: Run Backend Pytest Suite (Isolated Test DB)
         env:
-          FINAUDIT_DB_PATH: /tmp/test_ci_db.db
+          FINAUDIT_DB_PATH: /tmp/test_ci_backend.db
           FINAUDIT_SECRET_KEY: test_secret_key_for_ci_pipeline_only_1234567890
           FINAUDIT_ENV: testing
         run: |
@@ -47,7 +47,7 @@ jobs:
 
       - name: Run 24-Step End-to-End Audit Workflow Verification
         env:
-          FINAUDIT_DB_PATH: /tmp/test_ci_e2e_db.db
+          FINAUDIT_DB_PATH: /tmp/test_ci_e2e.db
           FINAUDIT_SECRET_KEY: test_secret_key_for_ci_pipeline_only_1234567890
           FINAUDIT_ENV: testing
         run: |

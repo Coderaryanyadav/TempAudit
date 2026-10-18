@@ -13,9 +13,19 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from fastapi.testclient import TestClient
+import tempfile
+import shutil
+import atexit
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Isolate database for E2E execution if not explicitly overridden by CI environment
+if "FINAUDIT_DB_PATH" not in os.environ:
+    _temp_e2e_dir = tempfile.mkdtemp(prefix="finaudit_e2e_")
+    _temp_e2e_db = os.path.join(_temp_e2e_dir, "finauditpro_e2e.db")
+    os.environ["FINAUDIT_DB_PATH"] = _temp_e2e_db
+    atexit.register(lambda: shutil.rmtree(_temp_e2e_dir, ignore_errors=True))
 
 from backend.app.main import app
 from backend.app.database import get_db_connection, init_db
