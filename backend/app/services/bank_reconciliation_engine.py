@@ -61,8 +61,22 @@ def run_bank_reconciliation(
     conn = get_db_connection()
 
     # 1. Fetch Book Transactions (Cash Book / Bank Ledger)
-    book_query = "SELECT * FROM transactions WHERE engagement_id = ?"
-    book_params = [engagement_id]
+    # Strictly exclude bank statement records so book side never overlaps with bank statement side
+    book_query = """
+        SELECT * FROM transactions 
+        WHERE engagement_id = ? 
+          AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'BANK')
+          AND (file_id IS NULL OR file_id NOT IN (
+              SELECT id FROM uploaded_files 
+              WHERE engagement_id = ? AND (
+                  UPPER(COALESCE(data_category, '')) IN ('BANK STATEMENT', 'BANK_STATEMENT') OR
+                  UPPER(COALESCE(file_type, '')) IN ('BANK_STATEMENT', 'BANK STATEMENT') OR
+                  LOWER(file_name) LIKE '%bank%statement%' OR
+                  LOWER(file_name) LIKE '%bank_statement%'
+              )
+          ))
+    """
+    book_params = [engagement_id, engagement_id]
     
     # If bank ledger specified, filter, else find any ledger containing bank or cash
     if bank_ledger_name and bank_ledger_name != "All":
