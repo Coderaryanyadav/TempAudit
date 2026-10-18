@@ -65,17 +65,28 @@ echo [OK] Data directories created: backups, uploaded_files, reports_generated, 
 
 :: 6. Initialize Clean Production Database
 echo.
-echo [6/7] Initializing clean production database and admin security...
+echo [6/8] Initializing clean production database and admin security...
 python -m backend.app.database
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Database initialization failed.
     exit /b 1
 )
-echo [OK] Clean database initialized at backend\finauditpro.db (0 demo records).
+echo [OK] Clean database initialized at backend\finauditpro.db.
 
-:: 7. Detect LM Studio Local Server
+:: 7. Administrator Account Setup
 echo.
-echo [7/7] Checking LM Studio Local AI Server status (http://localhost:1234)...
+echo [7/8] Administrator Account Setup
+echo Would you like to create an Administrator account now? (Y/N)
+set /p CREATE_ADM="> "
+if /i "%CREATE_ADM%"=="Y" (
+    python scripts\create_admin.py
+) else (
+    echo [NOTICE] You can create the administrator later via the First-Run Setup Wizard at http://127.0.0.1:8000
+)
+
+:: 8. Detect LM Studio Local Server
+echo.
+echo [8/8] Checking LM Studio Local AI Server status (http://localhost:1234)...
 powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:1234/v1/models' -TimeoutSec 2 -UseBasicParsing; Write-Host '[OK] LM Studio local server is active at http://localhost:1234' } catch { Write-Host '[NOTICE] LM Studio is not currently running. FinAuditPro will run in 100%% offline deterministic audit mode.' }"
 
 echo.
@@ -83,10 +94,10 @@ echo ===========================================================================
 echo   SUCCESS: FinAuditPro Installation Completed Successfully!
 echo ==============================================================================
 echo.
-echo   To launch the application, run:
+echo   To launch the application:
 echo     start.bat   OR   python run.py
+echo     (Cross-platform scripts available in the .\initialize\ folder)
 echo   First-Run Setup:
-echo     Open http://127.0.0.1:8000 in your browser to complete the
-echo     First-Run Administrator Setup Wizard and create your master credentials.
+echo     Open http://127.0.0.1:8000 in your browser.
 echo.
 pause
