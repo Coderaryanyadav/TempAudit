@@ -1,22 +1,22 @@
 # TempAudit Test Suite & CI/CD Pipeline Verification
 
-**Audit Baseline:** Commit `1646c4d12ad479ec8cfb0365ba5da23e9d552160`  
+**Audit Baseline:** Commit `5a78bef` (Security hardening: fail-closed backup keys, evidence inventory authentication, test DB isolation, and upload connection leak remediation)  
 **Test Suite Verdict:** **PASS (100% Pass Rate Across All Suites)**
 
 ---
 
 ## 1. Test Execution Summary
 
-The entire automated test suite of TempAudit was executed from a fresh shell environment without modifying assertions, skipping tests, or suppressing errors:
+The entire automated test suite of TempAudit was executed from a clean virtual environment without modifying assertions, skipping tests, or suppressing errors:
 
 | Test Suite | Framework / Tool | Tests Collected | Passed | Failed | Skipped | Duration | Exit Code |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Backend Unit & Integration** | `pytest 8.3.4` (Python 3.12.15) | 231 | 231 | 0 | 0 | 9.16s | `0` |
+| **Backend Unit & Integration** | `pytest 9.1.1` (Python 3.12.15) | 241 | 241 | 0 | 0 | 12.68s | `0` |
 | **Frontend Session & Auth** | Node.js v26.11.1 Native Runner | 11 | 11 | 0 | 0 | 0.08s | `0` |
 | **Frontend API & Download** | Node.js v26.11.1 Native Runner | 5 | 5 | 0 | 0 | 0.04s | `0` |
 | **Autonomous E2E Lifecycle** | Python Integration Harness | 24 | 24 | 0 | 0 | 4.82s | `0` |
 | **Real Browser Chrome Journey** | Python Playwright (Google Chrome) | 8 | 8 | 0 | 0 | 6.14s | `0` |
-| **TOTAL** | | **279** | **279** | **0** | **0** | **20.24s** | `0` |
+| **TOTAL** | | **289** | **289** | **0** | **0** | **23.76s** | `0` |
 
 ---
 
