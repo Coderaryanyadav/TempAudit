@@ -10,7 +10,16 @@ official test companies (Aryan Fintech Pvt. Ltd. and Hitansh Fintech Pvt. Ltd.).
 import os
 import pytest
 
-TEST_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_audit_db.db")
+# Determine isolated test database path
+configured_path = os.environ.get("FINAUDIT_DB_PATH")
+default_test_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_audit_db.db")
+
+# Strict safeguard: Never allow tests to execute against the production database
+if configured_path and os.path.basename(os.path.abspath(configured_path)) == "finauditpro.db":
+    TEST_DB_PATH = default_test_path
+else:
+    TEST_DB_PATH = configured_path or default_test_path
+
 os.environ["FINAUDIT_DB_PATH"] = TEST_DB_PATH
 
 from backend.app.database import init_db

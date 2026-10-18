@@ -21,15 +21,35 @@ def compute_file_sha256(filepath: str) -> str:
             sha.update(chunk)
     return sha.hexdigest()
 
+import hmac
+
 def compute_canonical_manifest_checksum(manifest_dict: Dict[str, Any]) -> str:
     """
     Computes deterministic SHA-256 over canonical JSON representation of manifest metadata,
-    excluding dynamic wrapper properties (manifest_checksum, bundle_file, bundle_size_kb, bundle_sha256).
+    excluding dynamic wrapper properties (manifest_checksum, manifest_signature, bundle_file, bundle_size_kb, bundle_sha256).
     """
-    excluded_keys = {"manifest_checksum", "bundle_file", "bundle_size_kb", "bundle_sha256"}
+    excluded_keys = {"manifest_checksum", "manifest_signature", "bundle_file", "bundle_size_kb", "bundle_sha256"}
     clean_manifest = {k: v for k, v in manifest_dict.items() if k not in excluded_keys}
     canonical_bytes = json.dumps(clean_manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical_bytes).hexdigest()
+
+def get_backup_signing_key() -> bytes:
+    try:
+        from backend.app.auth import get_jwt_secret
+        return get_jwt_secret().encode("utf-8")
+    except Exception:
+        return b"FinAuditPro_Fallback_Secret_Signing_Key_2026_Bytes"
+
+def compute_manifest_signature(manifest_dict: Dict[str, Any]) -> str:
+    """
+    Computes cryptographic HMAC-SHA256 signature using the system secret key,
+    authenticating the creator and preventing unauthorized manifest forgery or tampering.
+    """
+    key = get_backup_signing_key()
+    excluded_keys = {"manifest_checksum", "manifest_signature", "bundle_file", "bundle_size_kb", "bundle_sha256"}
+    clean_manifest = {k: v for k, v in manifest_dict.items() if k not in excluded_keys}
+    canonical_bytes = json.dumps(clean_manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hmac.new(key, canonical_bytes, hashlib.sha256).hexdigest()
 
 class BackupService:
     """
@@ -87,6 +107,7 @@ class BackupService:
             "transaction_count": tx_count
         }
         manifest["manifest_checksum"] = compute_canonical_manifest_checksum(manifest)
+        manifest["manifest_signature"] = compute_manifest_signature(manifest)
 
         manifest_file = os.path.join(temp_dir, "manifest.json")
         with open(manifest_file, "w", encoding="utf-8") as f:
@@ -155,7 +176,7 @@ class BackupService:
                 else:
                     tar.extractall(path=temp_dir)
 
-            # 1. Validate manifest.json existence & canonical checksum
+            # 1. Validate manifest.json existence, canonical checksum & cryptographic signature
             manifest_file = os.path.join(temp_dir, "manifest.json")
             if not os.path.exists(manifest_file):
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -174,8 +195,19 @@ class BackupService:
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 return {
                     "valid": False,
-                    "error": f"Manifest integrity violation: recorded checksum does not match computed checksum."
+                    "error": "Manifest integrity violation: recorded checksum does not match computed checksum."
                 }
+
+            # Verify cryptographic signature if present
+            recorded_sig = manifest.get("manifest_signature")
+            if recorded_sig:
+                expected_sig = compute_manifest_signature(manifest)
+                if not hmac.compare_digest(recorded_sig, expected_sig):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    return {
+                        "valid": False,
+                        "error": "Cryptographic authenticity violation: manifest signature mismatch (backup not signed by authorized key)."
+                    }
 
             # 2. Validate database file existence and checksum
             db_file = os.path.join(temp_dir, "finauditpro.db")

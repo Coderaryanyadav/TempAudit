@@ -79,8 +79,10 @@ async def upload_file(
         )
 
     conn = get_db_connection()
-    eng = check_engagement_access(conn, engagement_id, current_user)
-    conn.close()
+    try:
+        eng = check_engagement_access(conn, engagement_id, current_user)
+    finally:
+        conn.close()
 
     # Enforce upload size limit and use secure UUID filenames
     unique_id = uuid.uuid4().hex

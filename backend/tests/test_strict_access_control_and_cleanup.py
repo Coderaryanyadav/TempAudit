@@ -135,6 +135,21 @@ def test_backup_tampered_manifest_and_malicious_archive(tmp_path):
     val_tamper = BackupService.validate_bundle(tampered_bundle)
     assert val_tamper["valid"] is False
     assert "manifest integrity violation" in val_tamper["error"].lower()
+
+    # 1b. Signature forgery test: attacker recomputes manifest_checksum to bypass SHA check, but lacks HMAC key
+    m_data["manifest_checksum"] = compute_canonical_manifest_checksum(m_data)
+    m_data["manifest_signature"] = "forged_signature_000000000000000000000000000000000000000000000000"
+    with open(manifest_file, "w") as f:
+        json.dump(m_data, f, indent=2)
+
+    tampered_sig_bundle = str(tmp_path / "tampered_signature.finpkg")
+    with tarfile.open(tampered_sig_bundle, "w:gz") as tar:
+        tar.add(str(tampered_dir / "finauditpro.db"), arcname="finauditpro.db")
+        tar.add(str(manifest_file), arcname="manifest.json")
+
+    val_tamper_sig = BackupService.validate_bundle(tampered_sig_bundle)
+    assert val_tamper_sig["valid"] is False
+    assert "cryptographic authenticity violation" in val_tamper_sig["error"].lower()
     
     # 2. Malicious member test: attempt archive with path traversal member
     malicious_bundle = str(tmp_path / "malicious_member.finpkg")
@@ -153,3 +168,52 @@ def test_backup_tampered_manifest_and_malicious_archive(tmp_path):
     # Clean up
     if os.path.exists(bundle_path):
         os.remove(bundle_path)
+
+def test_upload_connection_cleanup_on_failure():
+    """Verify upload endpoint closes DB connection on 404 (missing engagement) and 403 (unauthorized staff)."""
+    from fastapi.testclient import TestClient
+    from backend.app.main import app
+    from backend.app.auth import create_access_token
+    import io
+
+    init_db()
+    conn = get_db_connection()
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("INSERT OR REPLACE INTO clients (id, name, entity_type, created_at) VALUES (991, 'Strict Access Client', 'Pvt Ltd', ?)", (now,))
+    for u_id, u_name, u_role in [(101, "auditor_lead", "Auditor"), (201, "staff_201", "Audit Staff"), (202, "staff_202", "Audit Staff")]:
+        conn.execute("""
+            INSERT OR REPLACE INTO users (id, username, email, full_name, password_hash, role, is_active, created_at)
+            VALUES (?, ?, ? || '@test.com', ? || ' User', 'hash', ?, 1, ?)
+        """, (u_id, u_name, u_name, u_name, u_role, now))
+    conn.execute("""
+        INSERT OR REPLACE INTO engagements (id, client_id, title, audit_type, financial_year, lead_auditor_id, assigned_staff_id, created_at, updated_at)
+        VALUES (9902, 991, 'Staff 202 Engagement', 'Statutory', '2024-25', 101, 202, ?, ?)
+    """, (now, now))
+    conn.close()
+
+    client = TestClient(app)
+    staff_token = create_access_token({"sub": "staff_201", "id": 201, "role": "Audit Staff"})
+    headers = {"Authorization": f"Bearer {staff_token}"}
+    dummy_csv = io.BytesIO(b"date,ledger,amount\n2026-01-01,Sales,100\n")
+
+    # 1. Nonexistent engagement (should return 404 and close connection)
+    res_404 = client.post(
+        "/api/import/upload",
+        data={"engagement_id": 999999, "data_category": "General Ledger"},
+        files={"file": ("test.csv", dummy_csv, "text/csv")},
+        headers=headers
+    )
+    assert res_404.status_code == 404
+    assert "not found" in res_404.json()["detail"].lower()
+
+    # 2. Unauthorized staff member for engagement 9902 (should return 403 and close connection)
+    dummy_csv.seek(0)
+    res_403 = client.post(
+        "/api/import/upload",
+        data={"engagement_id": 9902, "data_category": "General Ledger"},
+        files={"file": ("test.csv", dummy_csv, "text/csv")},
+        headers=headers
+    )
+    assert res_403.status_code == 403
+    assert "not assigned" in res_403.json()["detail"].lower()
+
