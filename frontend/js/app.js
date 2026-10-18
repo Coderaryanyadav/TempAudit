@@ -2726,13 +2726,13 @@ async function openClientHistoryDrawer(clientId) {
     const header = document.getElementById("drawer-title");
     const body = document.getElementById("drawer-content");
 
-    header.innerHTML = `Multi-Year Audit History: ${client.name}`;
+    header.innerHTML = `Multi-Year Audit History: ${escapeHTML(client.name || '')}`;
 
     body.innerHTML = `
       <div style="margin-bottom: 18px; padding: 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md);">
-        <div style="font-weight: 700; font-size: 14px; color: var(--text-main);">${client.name}</div>
+        <div style="font-weight: 700; font-size: 14px; color: var(--text-main);">${escapeHTML(client.name || '')}</div>
         <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">
-          Entity: ${getEntityBadge(client.entity_type)} • PAN: <span class="font-mono font-bold">${client.pan || '—'}</span> • Industry: ${client.industry || 'General'}
+          Entity: ${getEntityBadge(client.entity_type)} • PAN: <span class="font-mono font-bold">${escapeHTML(client.pan || '—')}</span> • Industry: ${escapeHTML(client.industry || 'General')}
         </div>
       </div>
 
