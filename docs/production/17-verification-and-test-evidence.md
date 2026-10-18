@@ -108,3 +108,53 @@ TOTAL ASSERTIONS EXECUTED                                                PASSED 
   🏁 WORKFLOW SUMMARY: 24/24 STEPS PASSED (0 FAILED)
   ```
 - **Exit Code**: `0`
+
+---
+
+### Check 5: Real Browser Deep Input & Interactive Workflow
+- **Command**: `./venv/bin/python scripts/test_real_browser_deep_input.py`
+- **Output**:
+  ```
+  ================================================================================
+  🌐 REAL BROWSER DEEP INTERACTION & DATA INPUT TEST
+  ================================================================================
+
+  [Step 01] Navigating to http://127.0.0.1:8000...
+    -> Welcome splash detected. Clicking 'Sign In'...
+    -> Submitting login credentials for 'admin'...
+    [PASS] Logged in successfully. Token acquired.
+
+  [Step 02] Navigating to Clients and inputting client data...
+    -> Filling Client Form: Name='Zenith Dynamics Ltd 3667', PAN='AAACZ3667K', GSTIN='27AAACZ3667K1Z4'...
+    [PASS] Client 'Zenith Dynamics Ltd 3667' successfully created and saved.
+
+  [Step 03] Navigating to Engagements and creating new engagement...
+    -> Creating Engagement: Title='Statutory Financial Audit FY 2024-25 (3667)', Year='2024-25'...
+    [PASS] Engagement created and activated in top-bar: 'Zenith Dynamics Ltd 3592 (2024-25) — Statutory Financial Audit FY 2024-25 (3592)'.
+
+  [Step 04] Navigating to Data Import and uploading general ledger CSV...
+    [PASS] Uploaded general ledger and executed column mapping.
+
+  [Step 05] Navigating to Risk & Findings and running audit engine...
+    [PASS] Findings workbench loaded.
+
+  [Step 06] Navigating to Audit Assistant and inputting query...
+    -> Typing prompt in assistant input: 'Explain statutory cash limits under Section 40A(3) and Section 269ST.'...
+    [PASS] Audit Assistant answered query in chat stream (3 items visible).
+
+  [Step 07] Navigating to Audit Reports (PDF)...
+    -> Clicking 'Generate Master Report (PDF)'...
+    [PASS] PDF generated through browser UI.
+
+  [Step 08] Performing hard page refresh (F5/Reload)...
+    [PASS] Hard reload verified: User remains authenticated. Token preserved: eyJhbGciOiJIUzI...
+
+  [Step 09] Testing logout via top-bar profile menu...
+    [PASS] Sign Out completed. Local token erased, login modal displayed.
+
+  ================================================================================
+  🏁 REAL BROWSER DEEP INPUT WORKFLOW: 100% VERIFIED PASS
+  ================================================================================
+  ```
+- **Exit Code**: `0`
+

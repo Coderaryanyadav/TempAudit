@@ -6,20 +6,18 @@ audit seniors, and audit practitioners in India.
 
 ---
 
-## 📚 Complete Documentation Suite
+## 📚 Complete Production Documentation Suite
 
-| Document                             | Purpose                                                 | File Link                                                                         |
-| :----------------------------------- | :------------------------------------------------------ | :-------------------------------------------------------------------------------- |
-| **1. Installation Instructions**     | System requirements, offline prerequisites, setup steps | [01_INSTALLATION_INSTRUCTIONS.md](docs/01_INSTALLATION_INSTRUCTIONS.md)           |
-| **2. User Manual**                   | Complete 16-step auditor workflow and module guide      | [02_USER_MANUAL.md](docs/02_USER_MANUAL.md)                                       |
-| **3. Developer Documentation**       | Codebase architecture, service extensions, AI interface | [03_DEVELOPER_DOCUMENTATION.md](docs/03_DEVELOPER_DOCUMENTATION.md)               |
-| **4. Database Schema Documentation** | Complete SQLite table specifications & triggers         | [04_DATABASE_SCHEMA.md](docs/04_DATABASE_SCHEMA.md)                               |
-| **5. Architecture Diagram**          | Mermaid architecture of frontend, backend, AI & DB      | [05_ARCHITECTURE_DIAGRAM.md](docs/05_ARCHITECTURE_DIAGRAM.md)                     |
-| **6. API Documentation**             | Full REST API endpoints, methods, and descriptions      | [06_API_DOCUMENTATION.md](docs/06_API_DOCUMENTATION.md)                           |
-| **7. Test Report**                   | 118 unit tests report and intentional exceptions matrix | [07_TEST_REPORT.md](docs/07_TEST_REPORT.md)                                       |
-| **8. Sample Datasets Guide**         | Details of all 4 sample test files in `sample_files/`   | [08_SAMPLE_DATASETS_GUIDE.md](docs/08_SAMPLE_DATASETS_GUIDE.md)                   |
-| **9. Offline AI Setup**              | Ollama, llama.cpp, GGUF setup and Built-in engine       | [09_OFFLINE_AI_SETUP.md](docs/09_OFFLINE_AI_SETUP.md)                             |
-| **10. Demonstration Workflow**       | 10-step statutory audit demo script for stakeholders    | [10_PROJECT_DEMONSTRATION_WORKFLOW.md](docs/10_PROJECT_DEMONSTRATION_WORKFLOW.md) |
+| Document | Purpose | File Link |
+| :--- | :--- | :--- |
+| **00. Repository Inventory** | Full file inventory, classification, routes, and security scan | [00-repository-inventory.md](docs/production/00-repository-inventory.md) |
+| **01. Gap Analysis** | Pre-production gap analysis, missing modules, remediation | [01-documentation-gap-analysis.md](docs/production/01-documentation-gap-analysis.md) |
+| **02. Product Overview** | Executive summary, value proposition, ICAI alignment | [02-product-overview.md](docs/production/02-product-overview.md) |
+| **03. User Manual** | 16-module end-to-end auditor workflow & desktop manual | [03-user-manual.md](docs/production/03-user-manual.md) |
+| **05. Technical Architecture** | System topology, DB schema, security model, offline AI | [05-technical-architecture.md](docs/production/05-technical-architecture.md) |
+| **08. Statutory Rules** | Indian Income Tax & GST statutory algorithms and formulas | [08-audit-rules-and-calculations.md](docs/production/08-audit-rules-and-calculations.md) |
+| **17. Test & Evidence** | Real-browser automated test results, Playwright logs, and unit suites | [17-verification-and-test-evidence.md](docs/production/17-verification-and-test-evidence.md) |
+| **18. Release Readiness** | Production sign-off checklist and deployment matrix | [18-release-readiness-matrix.md](docs/production/18-release-readiness-matrix.md) |
 
 ---
 
