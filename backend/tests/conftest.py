@@ -8,7 +8,14 @@ official test companies (Aryan Fintech Pvt. Ltd. and Hitansh Fintech Pvt. Ltd.).
 """
 
 import os
+import sys
+from pathlib import Path
 import pytest
+
+# Ensure repository root is on sys.path for IDEs and direct pytest runs
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 # Determine isolated test database path
 configured_path = os.environ.get("FINAUDIT_DB_PATH")

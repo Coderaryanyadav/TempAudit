@@ -24,5 +24,8 @@ backend/reports_generated/*
 .DS_Store
 backend/backups/*
 !backend/backups/.gitkeep
+*.egg-info/
+build/
+dist/
 
 
