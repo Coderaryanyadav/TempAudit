@@ -26,8 +26,14 @@ def get_session_timeout_minutes() -> int:
 def get_jwt_secret() -> str:
     """Retrieves secret key from environment or persisted database settings (Refusing hardcoded fallbacks)."""
     env_secret = os.environ.get("FINAUDIT_SECRET_KEY")
-    if env_secret:
-        return env_secret
+    KNOWN_INSECURE_SECRETS = {
+        "c9d79e627e7813a37c8440ddc4d27f5a455c14243828a1c8f15499f1702d4e68",
+        "secret", "change_me", "default_secret", "admin123", "password"
+    }
+    if env_secret and env_secret.strip():
+        if env_secret.strip() in KNOWN_INSECURE_SECRETS:
+            raise RuntimeError("Insecure default or placeholder FINAUDIT_SECRET_KEY detected; refusing to start.")
+        return env_secret.strip()
     
     try:
         conn = get_db_connection()

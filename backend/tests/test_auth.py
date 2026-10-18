@@ -135,5 +135,71 @@ class TestUserManagementAndAuth(unittest.TestCase):
         }, headers=headers)
         self.assertEqual(self_disable.status_code, 400)
 
+    def test_activation_token_lifecycle_and_expiry(self):
+        """Verifies expired, malformed, valid, and reused activation tokens."""
+        from datetime import datetime, timedelta
+        from backend.app.database import get_db_connection
+        conn = get_db_connection()
+        now = datetime.now()
+        expired_ts = (now - timedelta(hours=2)).isoformat()
+        future_ts = (now + timedelta(hours=24)).isoformat()
+
+        # 1. User with expired activation token
+        conn.execute("""
+            INSERT INTO users (username, email, full_name, role, password_hash, status, is_active, activation_token, activation_expires_at, created_at)
+            VALUES ('expired_user', 'expired@audit.com', 'Expired User', 'Auditor', 'temp_hash', 'INVITED', 0, 'TOKEN_EXPIRED_123', ?, ?)
+        """, (expired_ts, now.isoformat()))
+
+        # 2. User with malformed expiry timestamp
+        conn.execute("""
+            INSERT INTO users (username, email, full_name, role, password_hash, status, is_active, activation_token, activation_expires_at, created_at)
+            VALUES ('malformed_user', 'malformed@audit.com', 'Malformed User', 'Auditor', 'temp_hash', 'INVITED', 0, 'TOKEN_MALFORMED_456', 'NOT_AN_ISO_DATE', ?)
+        """, (now.isoformat(),))
+
+        # 3. User with valid activation token
+        conn.execute("""
+            INSERT INTO users (username, email, full_name, role, password_hash, status, is_active, activation_token, activation_expires_at, created_at)
+            VALUES ('valid_user', 'valid@audit.com', 'Valid User', 'Auditor', 'temp_hash', 'INVITED', 0, 'TOKEN_VALID_789', ?, ?)
+        """, (future_ts, now.isoformat()))
+        conn.commit()
+        conn.close()
+
+        # Test A: Verify endpoint recognizes expired token
+        v_exp = self.client.get("/api/auth/activation-info/TOKEN_EXPIRED_123")
+        self.assertEqual(v_exp.status_code, 200)
+        self.assertTrue(v_exp.json()["expired"])
+        self.assertFalse(v_exp.json()["is_valid"])
+
+        # Test B: Activate with expired token must be rejected with 400
+        act_exp = self.client.post("/api/auth/activate-user", json={
+            "activation_token": "TOKEN_EXPIRED_123",
+            "password": "ValidPassword123!"
+        })
+        self.assertEqual(act_exp.status_code, 400)
+        self.assertIn("Activation token has expired", act_exp.json()["detail"])
+
+        # Test C: Activate with malformed expiry must be rejected with 400
+        act_mal = self.client.post("/api/auth/activate-user", json={
+            "activation_token": "TOKEN_MALFORMED_456",
+            "password": "ValidPassword123!"
+        })
+        self.assertEqual(act_mal.status_code, 400)
+        self.assertIn("invalid expiry metadata", act_mal.json()["detail"])
+
+        # Test D: Activate with valid token must succeed
+        act_valid = self.client.post("/api/auth/activate-user", json={
+            "activation_token": "TOKEN_VALID_789",
+            "password": "ValidPassword123!"
+        })
+        self.assertEqual(act_valid.status_code, 200)
+        self.assertIn("access_token", act_valid.json())
+
+        # Test E: Reusing the token must fail with 404 (token invalidated)
+        act_reuse = self.client.post("/api/auth/activate-user", json={
+            "activation_token": "TOKEN_VALID_789",
+            "password": "ValidPassword123!"
+        })
+        self.assertEqual(act_reuse.status_code, 404)
+
 if __name__ == "__main__":
     unittest.main()

@@ -25,8 +25,12 @@ def query_assistant(req: AssistantQuery, current_user: dict = Depends(get_curren
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Assistant Error: {str(e)}")
+        import logging
+        logging.getLogger("uvicorn.error").error(f"AI Assistant Query Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An error occurred while processing the audit assistant query. Please check server logs.")
 
 @router.get("/summary/{engagement_id}")
 def get_ai_summary(engagement_id: int, current_user: dict = Depends(get_current_user)):

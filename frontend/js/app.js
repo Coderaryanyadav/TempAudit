@@ -9003,12 +9003,20 @@ async function submitChatMessage() {
   if (!query) return;
 
   const chatMessages = document.getElementById("chat-messages");
-  chatMessages.innerHTML += `<div class="chat-bubble user">${query}</div>`;
+  
+  // Render user bubble safely via textContent to prevent XSS
+  const userBubble = document.createElement("div");
+  userBubble.className = "chat-bubble user";
+  userBubble.textContent = query;
+  chatMessages.appendChild(userBubble);
+
   input.value = "";
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
-  const loadingId = "bot-loading-" + Date.now();
-  chatMessages.innerHTML += `<div class="chat-bubble bot" id="${loadingId}">Analyzing local financial records...</div>`;
+  const loadingElem = document.createElement("div");
+  loadingElem.className = "chat-bubble bot";
+  loadingElem.textContent = "Analyzing local financial records...";
+  chatMessages.appendChild(loadingElem);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
   try {
@@ -9017,31 +9025,60 @@ async function submitChatMessage() {
       query: query
     });
 
-    const loadingElem = document.getElementById(loadingId);
-    let botHtml = `<div>${res.response.replace(/\n/g, '<br/>')}</div>`;
+    loadingElem.innerHTML = "";
+
+    // Provenance badge
+    if (res.provenance) {
+      const provBadge = document.createElement("span");
+      provBadge.className = `badge ${res.provenance === 'LOCAL_LLM' ? 'badge-high' : 'badge-low'}`;
+      provBadge.style.fontSize = "10px";
+      provBadge.style.marginBottom = "6px";
+      provBadge.style.display = "inline-block";
+      provBadge.textContent = res.provenance === "LOCAL_LLM" 
+        ? `🤖 Local LLM (${res.model_name || "Active Model"})` 
+        : `📐 Deterministic Rule Engine`;
+      loadingElem.appendChild(provBadge);
+    }
+
+    const textContainer = document.createElement("div");
+    const rawText = res.response || "";
+    // Pre-escape all untrusted characters before formatting safe formatting tags
+    const safeHtml = escapeHTML(rawText)
+      .replace(/\n\n/g, "<br/><br/>")
+      .replace(/\n/g, "<br/>")
+      .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, "<code style='background:var(--bg-app);padding:1px 4px;border-radius:3px;'>$1</code>");
+    textContainer.innerHTML = safeHtml;
+    loadingElem.appendChild(textContainer);
 
     if (res.evidence && res.evidence.length > 0) {
-      botHtml += `
-        <div style="margin-top: 10px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11.5px;">
-          <b>Attached Audit Evidence:</b>
-          <div style="margin-top: 4px;">
-            ${res.evidence.map(e => `
-              <div style="padding: 2px 0; font-family: monospace;">• ${JSON.stringify(e)}</div>
-            `).join("")}
-          </div>
-        </div>
-      `;
+      const evidenceBox = document.createElement("div");
+      evidenceBox.style.cssText = "margin-top: 10px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11.5px;";
+
+      const evidenceTitle = document.createElement("b");
+      evidenceTitle.textContent = "Attached Audit Evidence:";
+      evidenceBox.appendChild(evidenceTitle);
+
+      const evidenceList = document.createElement("div");
+      evidenceList.style.marginTop = "4px";
+
+      res.evidence.forEach(e => {
+        const itemElem = document.createElement("div");
+        itemElem.style.cssText = "padding: 2px 0; font-family: monospace;";
+        itemElem.textContent = `• ${typeof e === 'object' ? JSON.stringify(e) : String(e)}`;
+        evidenceList.appendChild(itemElem);
+      });
+      evidenceBox.appendChild(evidenceList);
+      loadingElem.appendChild(evidenceBox);
     }
 
-    if (loadingElem) {
-      loadingElem.innerHTML = botHtml;
-    }
     chatMessages.scrollTop = chatMessages.scrollHeight;
   } catch (err) {
-    const loadingElem = document.getElementById(loadingId);
-    if (loadingElem) {
-      loadingElem.innerHTML = `<span style="color: #dc2626;">Error: ${escapeHTML(err.message)}</span>`;
-    }
+    loadingElem.innerHTML = "";
+    const errSpan = document.createElement("span");
+    errSpan.style.color = "#dc2626";
+    errSpan.textContent = `Error: ${err.message}`;
+    loadingElem.appendChild(errSpan);
   }
 }
 

@@ -12,6 +12,8 @@ Zero-Hallucination Constraint:
 """
 
 import re
+import json
+import logging
 from typing import Dict, Any, List, Optional
 from backend.app.database import get_db_connection
 from backend.app.services.yoy_comparison_engine import run_yoy_comparison
@@ -165,7 +167,7 @@ class LocalAIAssistantEngine:
         else:
             res = self._handle_general_query(query)
 
-        # Provenance attribution & optional Local LLM enhancement for freeform questions
+        # Provenance attribution & Local LLM synthesis for audit explanations
         from backend.app.services.local_ai_provider import LocalAIModelManager
         config = LocalAIModelManager.get_config()
         provider = LocalAIModelManager.get_active_provider()
@@ -173,23 +175,30 @@ class LocalAIAssistantEngine:
         provenance = "DETERMINISTIC_RULE"
         model_name = config.get("model_name", "builtin-deterministic")
 
-        # If user asks an open-ended general query and LM Studio is active, attempt local model inference
-        if intent == "GENERAL_AUDIT_QUERY" and config.get("is_enabled", True) and config.get("engine") == "LMStudio":
+        if config.get("is_enabled", True) and config.get("engine") == "LMStudio":
             try:
                 is_avail, _, _ = provider.check_health()
                 if is_avail:
+                    # Grounded prompt incorporating deterministic metrics & evidence
+                    ev_sample = res.get("evidence", [])[:3] if isinstance(res.get("evidence"), list) else []
+                    ev_str = json.dumps(ev_sample, default=str) if ev_sample else "None"
                     prompt = (
-                        f"Context: Audit engagement '{self.engagement.get('title')}' for client '{self.client_info.get('name')}'.\n"
-                        f"Summary: {len(self.transactions)} transactions, {len(self.findings)} findings logged.\n"
-                        f"Question: {query}\n"
-                        f"Provide a concise, professional audit answer based strictly on this engagement."
+                        f"Audit Context: Engagement '{self.engagement.get('title')}' | Client '{self.client_info.get('name')}' | FY {self.engagement.get('financial_year')}.\n"
+                        f"Authoritative Facts: {len(self.transactions)} total transactions, {len(self.findings)} findings logged.\n"
+                        f"Corroborating Evidence: {ev_str}\n"
+                        f"Auditor Query: {query}\n"
+                        f"Draft an objective, professional statutory audit explanation strictly adhering to the facts above."
                     )
-                    gen_res = provider.generate(prompt=prompt, system_prompt="You are a professional statutory auditor assistant. Keep responses factual and concise.")
-                    if gen_res.get("text"):
+                    gen_res = provider.generate(
+                        prompt=prompt,
+                        system_prompt="You are a professional statutory auditor assistant. Keep responses factual, professional, and concise."
+                    )
+                    if gen_res and gen_res.get("text"):
                         res["response"] = gen_res["text"].strip()
                         provenance = "LOCAL_LLM"
                         model_name = gen_res.get("model", model_name)
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Local LLM synthesis fallback triggered: %s", e)
                 # Retain deterministic response as fallback
                 provenance = "FALLBACK"
 

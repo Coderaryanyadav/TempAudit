@@ -150,11 +150,13 @@ class LMStudioProvider(BaseLocalAIProvider):
                 lat = round((time.time() - start) * 1000, 1)
                 if resp.status == 200:
                     data = json.loads(resp.read().decode('utf-8'))
-                    model_list = [m.get("id", "") for m in data.get("data", [])]
-                    if model_list:
-                        active_m = self.model_name if self.model_name in model_list else model_list[0]
-                        return True, f"LM Studio Connected — Loaded model: {active_m}", lat
-                    return True, "LM Studio Server Connected (Ready for inference)", lat
+                    model_list = [m.get("id", "") for m in data.get("data", []) if m.get("id")]
+                    if not model_list:
+                        return False, f"LM Studio is connected at {self.endpoint}, but no AI model is currently loaded.", lat
+                    if self.model_name and self.model_name not in ["local-model", "default", ""] and self.model_name not in model_list:
+                        return False, f"LM Studio is connected, but configured model '{self.model_name}' is not loaded. Available models: {', '.join(model_list)}.", lat
+                    active_m = self.model_name if (self.model_name and self.model_name in model_list) else model_list[0]
+                    return True, f"LM Studio Connected — Loaded model: {active_m}", lat
         except Exception as e:
             lat = round((time.time() - start) * 1000, 1)
             return False, f"LM Studio is not connected at {self.endpoint}. AI assistance is unavailable, but audit calculations and analysis remain available.", lat
