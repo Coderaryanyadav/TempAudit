@@ -29,6 +29,9 @@ else:
 
 os.environ["FINAUDIT_DB_PATH"] = TEST_DB_PATH
 
+if not os.environ.get("FINAUDIT_SECRET_KEY") and not os.environ.get("FINAUDIT_BACKUP_SIGNING_KEY"):
+    os.environ["FINAUDIT_SECRET_KEY"] = "test_suite_secret_key_for_testing_purposes_only_1234567890"
+
 from backend.app.database import init_db
 from test_data.seed import seed_test_database
 

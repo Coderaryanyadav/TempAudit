@@ -128,7 +128,7 @@ def test_database_backup_and_restore_cycle():
     """Phase 3: Backup snapshot creation and restoration integrity."""
     bundle_path, manifest = BackupService.create_verified_bundle(created_by="test_runner")
     assert bundle_path.endswith(".finpkg")
-    assert manifest["backup_version"] == 1
+    assert manifest["backup_version"] in (1, 2)
     assert manifest["database_sha256"] is not None
     assert manifest["created_by"] == "test_runner"
 

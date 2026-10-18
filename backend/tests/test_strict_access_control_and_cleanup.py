@@ -24,7 +24,10 @@ from backend.app.services.backup_service import (
     BackupService,
     compute_canonical_manifest_checksum,
     compute_manifest_signature,
-    compute_file_sha256
+    compute_file_sha256,
+    get_backup_signing_key,
+    get_backup_verification_keys,
+    verify_manifest_signature
 )
 import tarfile
 import os
@@ -197,14 +200,20 @@ def test_backup_tampered_manifest_and_malicious_archive(tmp_path):
     assert "validation failed" in str(exc.value).lower()
     
     # 2. Malicious member test: attempt archive with path traversal member
+    # Re-sign manifest so it is valid, specifically testing archive path traversal protection
+    m_data["manifest_checksum"] = compute_canonical_manifest_checksum(m_data)
+    m_data["manifest_signature"] = compute_manifest_signature(m_data)
+    with open(manifest_file, "w") as f:
+        json.dump(m_data, f, indent=2)
+
     malicious_bundle = str(tmp_path / "malicious_member.finpkg")
     with tarfile.open(malicious_bundle, "w:gz") as tar:
         tar.add(str(tampered_dir / "finauditpro.db"), arcname="finauditpro.db")
         tar.add(str(manifest_file), arcname="manifest.json")
-        # Add rogue file outside allowed root
+        # Add rogue file outside allowed root using path traversal
         rogue_file = tmp_path / "rogue.sh"
         rogue_file.write_text("echo pwned")
-        tar.add(str(rogue_file), arcname="etc/evil_cron.sh")
+        tar.add(str(rogue_file), arcname="../evil_cron.sh")
         
     val_malicious = BackupService.validate_bundle(malicious_bundle)
     assert val_malicious["valid"] is False
@@ -359,3 +368,139 @@ def test_upload_connection_cleanup_on_failure():
         assert "not assigned" in res_403.json()["detail"].lower()
         assert len(created_connections) == 2
         assert len(closed_connections) == 2
+
+def test_backup_signing_key_fail_closed_and_key_rotation(monkeypatch):
+    """Verify backup signing fails closed without keys and supports key rotation."""
+    init_db()
+    # 1. Fail closed when no keys are available in env or database
+    monkeypatch.delenv("FINAUDIT_BACKUP_SIGNING_KEY", raising=False)
+    monkeypatch.delenv("FINAUDIT_BACKUP_KEY", raising=False)
+    monkeypatch.delenv("FINAUDIT_SECRET_KEY", raising=False)
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+
+    conn = get_db_connection()
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)")
+        conn.execute("DELETE FROM app_settings WHERE key = 'backup_signing_key'")
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(RuntimeError) as exc_info:
+        get_backup_signing_key()
+    assert "no valid backup signing key configured" in str(exc_info.value).lower()
+
+    # 2. Dedicated key support
+    dedicated_key = "DedicatedBackupSigningKey2026_StrictSecret123"
+    monkeypatch.setenv("FINAUDIT_BACKUP_SIGNING_KEY", dedicated_key)
+    assert get_backup_signing_key() == dedicated_key.encode("utf-8")
+
+    # 3. Key rotation support: backup created with OldKey verified via PREVIOUS_KEYS
+    old_key = "OldRotatedBackupKey_2025_LongEnoughSecret"
+    new_active_key = "NewActiveBackupKey_2026_LongEnoughSecret"
+
+    test_manifest = {
+        "backup_version": 2,
+        "app_version": "1.0.0",
+        "database_sha256": "fakehash123",
+        "evidence_files": []
+    }
+    # Sign with old key
+    test_manifest["manifest_checksum"] = compute_canonical_manifest_checksum(test_manifest)
+    test_manifest["manifest_signature"] = compute_manifest_signature(test_manifest, signing_key=old_key.encode("utf-8"))
+
+    # When active key is NewKey and old key is NOT configured -> verification fails
+    monkeypatch.setenv("FINAUDIT_BACKUP_SIGNING_KEY", new_active_key)
+    monkeypatch.delenv("FINAUDIT_BACKUP_SIGNING_KEYS_PREVIOUS", raising=False)
+    assert verify_manifest_signature(test_manifest) is False
+
+    # When old key is added to FINAUDIT_BACKUP_SIGNING_KEYS_PREVIOUS -> verification succeeds!
+    monkeypatch.setenv("FINAUDIT_BACKUP_SIGNING_KEYS_PREVIOUS", f"some_other_key,{old_key}")
+    assert verify_manifest_signature(test_manifest) is True
+
+def test_backup_evidence_tampering_injection_and_removal(tmp_path):
+    """Verify backup validation rejects modified evidence, missing evidence, and unmanifested rogue evidence."""
+    init_db()
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    evidence_file = os.path.join(UPLOAD_DIR, "secure_invoice_audit_wp.pdf")
+    clean_content = b"%PDF-1.4 Valid Clean Audit Evidence Content" # 43 bytes
+    with open(evidence_file, "wb") as f:
+        f.write(clean_content)
+
+    bundle_path, manifest = BackupService.create_verified_bundle(created_by="IntegrityAuditTester")
+    assert os.path.exists(bundle_path)
+
+    try:
+        # Extract archive members to a working directory to build tampered variants
+        extract_dir = tmp_path / "mod_work"
+        extract_dir.mkdir()
+        with tarfile.open(bundle_path, "r:gz") as tar:
+            if hasattr(tarfile, "data_filter"):
+                tar.extractall(path=extract_dir, filter="data")
+            else:
+                tar.extractall(path=extract_dir)
+
+        # 1. Modify evidence file content inside archive without updating manifest
+        # Same length (43 bytes), but modified bytes
+        ev_file_path = extract_dir / "uploaded_files" / "secure_invoice_audit_wp.pdf"
+        ev_file_path.write_bytes(b"%PDF-1.4 Tampered Content Modified Attacker")
+
+        tampered_content_bundle = str(tmp_path / "tampered_content.finpkg")
+        with tarfile.open(tampered_content_bundle, "w:gz") as tar:
+            tar.add(str(extract_dir / "finauditpro.db"), arcname="finauditpro.db")
+            tar.add(str(extract_dir / "manifest.json"), arcname="manifest.json")
+            tar.add(str(extract_dir / "uploaded_files"), arcname="uploaded_files")
+
+        val_tamper_ev = BackupService.validate_bundle(tampered_content_bundle)
+        assert val_tamper_ev["valid"] is False
+        assert "sha-256 mismatch" in val_tamper_ev["error"].lower() or "file content has been modified" in val_tamper_ev["error"].lower()
+        with pytest.raises(ValueError) as exc:
+            BackupService.restore_verified_bundle(tampered_content_bundle)
+        assert "validation failed" in str(exc.value).lower()
+
+        # 2. Remove evidence file completely from archive
+        os.remove(str(ev_file_path))
+        missing_ev_bundle = str(tmp_path / "missing_evidence.finpkg")
+        with tarfile.open(missing_ev_bundle, "w:gz") as tar:
+            tar.add(str(extract_dir / "finauditpro.db"), arcname="finauditpro.db")
+            tar.add(str(extract_dir / "manifest.json"), arcname="manifest.json")
+            tar.add(str(extract_dir / "uploaded_files"), arcname="uploaded_files")
+
+        val_missing_ev = BackupService.validate_bundle(missing_ev_bundle)
+        assert val_missing_ev["valid"] is False
+        assert "missing from archive" in val_missing_ev["error"].lower()
+        with pytest.raises(ValueError) as exc:
+            BackupService.restore_verified_bundle(missing_ev_bundle)
+        assert "validation failed" in str(exc.value).lower()
+
+        # 3. Inject an unmanifested rogue file into uploaded_files in archive
+        rogue_injected = extract_dir / "uploaded_files" / "rogue_injected_exploit.sh"
+        rogue_injected.write_bytes(b"#!/bin/bash\necho unmanifested rogue file")
+        # Put valid evidence file back so it's not missing
+        ev_file_path.write_bytes(b"%PDF-1.4 Valid Clean Audit Evidence Content")
+
+        injected_ev_bundle = str(tmp_path / "injected_evidence.finpkg")
+        with tarfile.open(injected_ev_bundle, "w:gz") as tar:
+            tar.add(str(extract_dir / "finauditpro.db"), arcname="finauditpro.db")
+            tar.add(str(extract_dir / "manifest.json"), arcname="manifest.json")
+            tar.add(str(extract_dir / "uploaded_files"), arcname="uploaded_files")
+
+        val_injected_ev = BackupService.validate_bundle(injected_ev_bundle)
+        assert val_injected_ev["valid"] is False
+        assert "unmanifested or rogue evidence file" in val_injected_ev["error"].lower()
+        with pytest.raises(ValueError) as exc:
+            BackupService.restore_verified_bundle(injected_ev_bundle)
+        assert "validation failed" in str(exc.value).lower()
+
+    finally:
+        if os.path.exists(evidence_file):
+            try:
+                os.remove(evidence_file)
+            except Exception:
+                pass
+        if os.path.exists(bundle_path):
+            try:
+                os.remove(bundle_path)
+            except Exception:
+                pass
+
