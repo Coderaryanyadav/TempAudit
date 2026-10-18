@@ -22,6 +22,13 @@ class FinAuditAPI {
     } catch (e) {}
   }
 
+  static attachAuthToken(url) {
+    const token = this.getToken();
+    if (!token) return url;
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}token=${encodeURIComponent(token)}`;
+  }
+
   static async request(endpoint, options = {}) {
     const token = this.getToken();
     const defaultHeaders = {
@@ -358,7 +365,7 @@ class FinAuditAPI {
   }
 
   static getErrorReportDownloadUrl(fileId) {
-    return `/api/import/errors/${fileId}/download`;
+    return this.attachAuthToken(`/api/import/errors/${fileId}/download`);
   }
 
   // --- Data Cleaning & Normalization ---
@@ -418,7 +425,7 @@ class FinAuditAPI {
       }
     }
     const query = new URLSearchParams(cleanParams).toString();
-    return `/api/transactions/report/${engagementId}/download${query ? `?${query}` : ""}`;
+    return this.attachAuthToken(`/api/transactions/report/${engagementId}/download${query ? `?${query}` : ""}`);
   }
 
   // --- Trial Balance ---
@@ -442,7 +449,7 @@ class FinAuditAPI {
   }
 
   static getTrialBalanceReportDownloadUrl(engagementId) {
-    return `/api/trial-balance/${engagementId}/report/download`;
+    return this.attachAuthToken(`/api/trial-balance/${engagementId}/report/download`);
   }
 
   // --- Financial Statements ---
@@ -458,7 +465,7 @@ class FinAuditAPI {
   }
 
   static getFSReportDownloadUrl(engagementId) {
-    return `/api/financial-statements/${engagementId}/report/download`;
+    return this.attachAuthToken(`/api/financial-statements/${engagementId}/report/download`);
   }
 
   // --- Year-on-Year Financial Comparison ---
@@ -495,7 +502,7 @@ class FinAuditAPI {
       }
     }
     const query = new URLSearchParams(cleanParams).toString();
-    return `/api/yoy-comparison/${engagementId}/report/download${query ? `?${query}` : ""}`;
+    return this.attachAuthToken(`/api/yoy-comparison/${engagementId}/report/download${query ? `?${query}` : ""}`);
   }
 
   // --- Duplicate & Missing Transaction Detection ---
@@ -518,7 +525,7 @@ class FinAuditAPI {
   }
 
   static getDuplicatesAndGapsReportDownloadUrl(engagementId) {
-    return `/api/duplicates-and-gaps/${engagementId}/report/download`;
+    return this.attachAuthToken(`/api/duplicates-and-gaps/${engagementId}/report/download`);
   }
 
   // --- Reconciliation & Bank BRS ---
@@ -572,7 +579,7 @@ class FinAuditAPI {
   }
 
   static getBRSReportDownloadUrl(reconId) {
-    return `/api/reconciliation/${reconId}/report/download`;
+    return this.attachAuthToken(`/api/reconciliation/${reconId}/report/download`);
   }
 
   // --- Sales & Purchase Reconciliation ---
@@ -602,7 +609,7 @@ class FinAuditAPI {
   }
 
   static getSalesPurchaseReportDownloadUrl(reconId) {
-    return `/api/reconciliation/sales-purchase/${reconId}/report/download`;
+    return this.attachAuthToken(`/api/reconciliation/sales-purchase/${reconId}/report/download`);
   }
 
   // --- GST Reconciliation & Configurable Rule Framework ---
@@ -649,7 +656,7 @@ class FinAuditAPI {
   }
 
   static getGSTReportDownloadUrl(reconId) {
-    return `/api/gst-reconciliation/${reconId}/report/download`;
+    return this.attachAuthToken(`/api/gst-reconciliation/${reconId}/report/download`);
   }
 
   // --- AI-Assisted Anomaly Detection Engine ---
@@ -684,7 +691,7 @@ class FinAuditAPI {
   }
 
   static getAnomalyReportDownloadUrl(engagementId) {
-    return `/api/anomalies/${engagementId}/report/download`;
+    return this.attachAuthToken(`/api/anomalies/${engagementId}/report/download`);
   }
 
   // --- Findings & Anomaly Engine ---
@@ -891,7 +898,7 @@ class FinAuditAPI {
   }
 
   static getWorkingPaperDocumentDownloadUrl(wpId, docId) {
-    return `/api/working-papers/download-file/${wpId}/${docId}`;
+    return this.attachAuthToken(`/api/working-papers/download-file/${wpId}/${docId}`);
   }
 
   static addWorkingPaperComment(wpId, data) {
@@ -954,7 +961,7 @@ class FinAuditAPI {
   }
 
   static getReportDownloadUrl(reportId) {
-    return `/api/reports/download/${reportId}`;
+    return this.attachAuthToken(`/api/reports/download/${reportId}`);
   }
 
 
@@ -1010,7 +1017,7 @@ class FinAuditAPI {
   }
 
   static getBackupDownloadUrl(filename) {
-    return `/api/audit-trail/backup/download/${encodeURIComponent(filename)}`;
+    return this.attachAuthToken(`/api/audit-trail/backup/download/${encodeURIComponent(filename)}`);
   }
 
   static restoreDatabaseBackup(filename) {

@@ -3512,7 +3512,7 @@ async function renderImportData() {
                     <td class="text-center">
                       <div style="display: flex; gap: 6px; justify-content: center;">
                         ${(f.failed_rows > 0 || f.warning_count > 0) ? `
-                          <a href="/api/import/errors/${f.id}/download" target="_blank" class="btn btn-sm btn-secondary" title="Download CSV Error Log">
+                          <a href="${FinAuditAPI.getErrorReportDownloadUrl(f.id)}" target="_blank" class="btn btn-sm btn-secondary" title="Download CSV Error Log">
                             ${ICONS.download} Error Log
                           </a>
                         ` : ''}
@@ -3830,7 +3830,7 @@ async function handleConfirmImport(fileId, dataCategory) {
 
             <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
               ${(res.failed_rows > 0 || res.warning_count > 0) ? `
-                <a href="/api/import/errors/${fileId}/download" target="_blank" class="btn btn-secondary" style="flex: 1; text-align: center;">
+                <a href="${FinAuditAPI.getErrorReportDownloadUrl(fileId)}" target="_blank" class="btn btn-secondary" style="flex: 1; text-align: center;">
                   ${ICONS.download} Download Errors (CSV)
                 </a>
               ` : ''}
