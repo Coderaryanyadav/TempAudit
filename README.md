@@ -55,7 +55,7 @@ FinAuditPro implements a 3-tier hybrid audit architecture:
                ┌─────────────────────────┼─────────────────────────┐
                │                         │                         │
 ┌──────────────▼──────────────┐ ┌────────▼──────────────┐ ┌────────▼──────────────┐
-│ 1. Deterministic Rule Engine│ │2. Statistical / ML    │ │3. Local AI Assistant   │
+│ 1. Deterministic Rule Engine│ │2. Statistical / ML    │ │3. Local AI Assistant  │
 ├─────────────────────────────┤ ├───────────────────────┤ ├───────────────────────┤
 │• Debit = Credit check       │ │• Benford's Law (1-9)  │ │• Natural Language Q&A │
 │• Section 40A(3) (₹10k cash) │ │• Scikit-Learn         │ │• Evidence Explanation │
