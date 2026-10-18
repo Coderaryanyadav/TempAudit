@@ -8,7 +8,7 @@
     app_dir: /opt/tempaudit
     data_dir: /var/lib/tempaudit
     repo_url: https://github.com/Coderaryanyadav/TempAudit.git
-    app_branch: main
+    app_branch: "{{ lookup('env', 'DEPLOY_BRANCH') | default('repair/presentation-reliability-audit', true) }}"
     python_packages:
       - python3
       - python3-venv

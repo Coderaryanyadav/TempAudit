@@ -105,13 +105,31 @@ class DeterministicAuditEngine:
         for t in self.transactions:
             ledger = str(t.get('ledger') or '').lower()
             desc = str(t.get('description') or '').lower()
-            payment_type = str(t.get('transaction_type') or '').lower()
-            is_cash = any(k in ledger or k in desc or k in payment_type for k in cash_keywords)
+            tx_type = str(t.get('transaction_type') or '').lower()
+            voucher_type = str(t.get('voucher_type') or '').lower()
 
+            # Ensure this is a cash transaction
+            is_cash = any(k in ledger or k in desc or k in tx_type or k in voucher_type for k in cash_keywords)
+
+            # Determine direction: 40A(3) applies strictly to expenditures / payments / debits
             debit = float(t.get('debit') or 0.0)
-            amount = float(t.get('amount') or debit)
+            credit = float(t.get('credit') or 0.0)
+            raw_amt = float(t.get('amount') or 0.0)
 
-            if is_cash and amount > 0:
+            is_payment = (
+                debit > 0 or
+                'payment' in tx_type or 'payment' in voucher_type or
+                'expenditure' in desc or 'expense' in desc or 'purchase' in desc or
+                (raw_amt > 0 and credit == 0 and 'receipt' not in tx_type and 'receipt' not in voucher_type)
+            )
+
+            # A pure receipt/credit must not trigger payment disallowance
+            if credit > 0 and debit == 0 and ('receipt' in tx_type or 'receipt' in voucher_type):
+                is_payment = False
+
+            amount = debit if debit > 0 else raw_amt
+
+            if is_cash and is_payment and amount > 0:
                 date = str(t.get('date') or '').split('T')[0]
                 party = str(t.get('party_name') or t.get('ledger') or 'Unknown Party').strip()
                 key = (date, party)
@@ -153,12 +171,30 @@ class DeterministicAuditEngine:
         cash_keywords = ['cash', 'petty cash', 'cash in hand']
         for t in self.transactions:
             credit = float(t.get('credit') or 0.0)
-            amount = float(t.get('amount') or credit)
+            debit = float(t.get('debit') or 0.0)
+            raw_amt = float(t.get('amount') or 0.0)
             ledger = str(t.get('ledger') or '').lower()
             desc = str(t.get('description') or '').lower()
-            is_cash = any(k in ledger or k in desc for k in cash_keywords)
+            tx_type = str(t.get('transaction_type') or '').lower()
+            voucher_type = str(t.get('voucher_type') or '').lower()
 
-            if is_cash and amount >= 200000.0:
+            is_cash = any(k in ledger or k in desc or k in tx_type or k in voucher_type for k in cash_keywords)
+
+            # Strictly verify receipt direction: credits, receipts, or raw amount when not a debit payment
+            is_receipt = (
+                credit > 0 or
+                'receipt' in tx_type or 'receipt' in voucher_type or
+                'received' in desc or 'receipt' in desc or
+                (raw_amt > 0 and debit == 0 and 'payment' not in tx_type and 'payment' not in voucher_type)
+            )
+
+            # Explicit payment/debit must never be classified as a receipt violation
+            if debit > 0 and credit == 0 and ('payment' in tx_type or 'payment' in voucher_type or 'expense' in desc or 'purchase' in desc):
+                is_receipt = False
+
+            amount = credit if credit > 0 else (raw_amt if is_receipt else 0.0)
+
+            if is_cash and is_receipt and amount >= 200000.0:
                 party = t.get('party_name') or t.get('ledger') or 'Unknown'
                 self.findings.append({
                     "finding_code": "DET-TAX-269ST",

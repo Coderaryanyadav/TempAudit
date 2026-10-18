@@ -4,7 +4,7 @@ import hmac
 import jwt
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from backend.app.database import get_db_connection
 import secrets
@@ -26,8 +26,14 @@ def get_session_timeout_minutes() -> int:
 def get_jwt_secret() -> str:
     """Retrieves secret key from environment or persisted database settings (Refusing hardcoded fallbacks)."""
     env_secret = os.environ.get("FINAUDIT_SECRET_KEY")
-    if env_secret:
-        return env_secret
+    KNOWN_INSECURE_SECRETS = {
+        "c9d79e627e7813a37c8440ddc4d27f5a455c14243828a1c8f15499f1702d4e68",
+        "secret", "change_me", "default_secret", "admin123", "password"
+    }
+    if env_secret and env_secret.strip():
+        if env_secret.strip() in KNOWN_INSECURE_SECRETS:
+            raise RuntimeError("Insecure default or placeholder FINAUDIT_SECRET_KEY detected; refusing to start.")
+        return env_secret.strip()
     
     try:
         conn = get_db_connection()
@@ -137,15 +143,23 @@ def invalidate_user_sessions(user_id: int):
     finally:
         conn.close()
 
-def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
-    if not credentials or not credentials.credentials:
+def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    request: Request = None
+) -> dict:
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    elif request and request.query_params.get("token"):
+        token = request.query_params.get("token")
+
+    if not token:
         raise HTTPException(
             status_code=401,
             detail="Authentication required. Please provide a valid Bearer token.",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    token = credentials.credentials
     secret = get_jwt_secret()
     try:
         payload = jwt.decode(

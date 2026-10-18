@@ -1428,7 +1428,7 @@ function setupSidebarControls() {
   const mobileToggle = document.getElementById("mobile-sidebar-toggle");
   const backdrop = document.getElementById("mobile-sidebar-backdrop");
   const sidebar = document.getElementById("sidebar");
-  const mainContent = document.getElementById("main-content");
+  const mainContent = document.getElementById("main-wrapper") || document.getElementById("main-content");
   const topBar = document.getElementById("top-bar");
 
   if (collapseToggle && sidebar) {
@@ -3512,7 +3512,7 @@ async function renderImportData() {
                     <td class="text-center">
                       <div style="display: flex; gap: 6px; justify-content: center;">
                         ${(f.failed_rows > 0 || f.warning_count > 0) ? `
-                          <a href="/api/import/errors/${f.id}/download" target="_blank" class="btn btn-sm btn-secondary" title="Download CSV Error Log">
+                          <a href="${FinAuditAPI.getErrorReportDownloadUrl(f.id)}" target="_blank" class="btn btn-sm btn-secondary" title="Download CSV Error Log">
                             ${ICONS.download} Error Log
                           </a>
                         ` : ''}
@@ -3830,7 +3830,7 @@ async function handleConfirmImport(fileId, dataCategory) {
 
             <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
               ${(res.failed_rows > 0 || res.warning_count > 0) ? `
-                <a href="/api/import/errors/${fileId}/download" target="_blank" class="btn btn-secondary" style="flex: 1; text-align: center;">
+                <a href="${FinAuditAPI.getErrorReportDownloadUrl(fileId)}" target="_blank" class="btn btn-secondary" style="flex: 1; text-align: center;">
                   ${ICONS.download} Download Errors (CSV)
                 </a>
               ` : ''}
@@ -9003,12 +9003,20 @@ async function submitChatMessage() {
   if (!query) return;
 
   const chatMessages = document.getElementById("chat-messages");
-  chatMessages.innerHTML += `<div class="chat-bubble user">${query}</div>`;
+  
+  // Render user bubble safely via textContent to prevent XSS
+  const userBubble = document.createElement("div");
+  userBubble.className = "chat-bubble user";
+  userBubble.textContent = query;
+  chatMessages.appendChild(userBubble);
+
   input.value = "";
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
-  const loadingId = "bot-loading-" + Date.now();
-  chatMessages.innerHTML += `<div class="chat-bubble bot" id="${loadingId}">Analyzing local financial records...</div>`;
+  const loadingElem = document.createElement("div");
+  loadingElem.className = "chat-bubble bot";
+  loadingElem.textContent = "Analyzing local financial records...";
+  chatMessages.appendChild(loadingElem);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
   try {
@@ -9017,36 +9025,65 @@ async function submitChatMessage() {
       query: query
     });
 
-    const loadingElem = document.getElementById(loadingId);
-    let botHtml = `<div>${res.response.replace(/\n/g, '<br/>')}</div>`;
+    loadingElem.innerHTML = "";
+
+    // Provenance badge
+    if (res.provenance) {
+      const provBadge = document.createElement("span");
+      provBadge.className = `badge ${res.provenance === 'LOCAL_LLM' ? 'badge-high' : 'badge-low'}`;
+      provBadge.style.fontSize = "10px";
+      provBadge.style.marginBottom = "6px";
+      provBadge.style.display = "inline-block";
+      provBadge.textContent = res.provenance === "LOCAL_LLM" 
+        ? `🤖 Local LLM (${res.model_name || "Active Model"})` 
+        : `📐 Deterministic Rule Engine`;
+      loadingElem.appendChild(provBadge);
+    }
+
+    const textContainer = document.createElement("div");
+    const rawText = res.response || "";
+    // Pre-escape all untrusted characters before formatting safe formatting tags
+    const safeHtml = escapeHTML(rawText)
+      .replace(/\n\n/g, "<br/><br/>")
+      .replace(/\n/g, "<br/>")
+      .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, "<code style='background:var(--bg-app);padding:1px 4px;border-radius:3px;'>$1</code>");
+    textContainer.innerHTML = safeHtml;
+    loadingElem.appendChild(textContainer);
 
     if (res.evidence && res.evidence.length > 0) {
-      botHtml += `
-        <div style="margin-top: 10px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11.5px;">
-          <b>Attached Audit Evidence:</b>
-          <div style="margin-top: 4px;">
-            ${res.evidence.map(e => `
-              <div style="padding: 2px 0; font-family: monospace;">• ${JSON.stringify(e)}</div>
-            `).join("")}
-          </div>
-        </div>
-      `;
+      const evidenceBox = document.createElement("div");
+      evidenceBox.style.cssText = "margin-top: 10px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11.5px;";
+
+      const evidenceTitle = document.createElement("b");
+      evidenceTitle.textContent = "Attached Audit Evidence:";
+      evidenceBox.appendChild(evidenceTitle);
+
+      const evidenceList = document.createElement("div");
+      evidenceList.style.marginTop = "4px";
+
+      res.evidence.forEach(e => {
+        const itemElem = document.createElement("div");
+        itemElem.style.cssText = "padding: 2px 0; font-family: monospace;";
+        itemElem.textContent = `• ${typeof e === 'object' ? JSON.stringify(e) : String(e)}`;
+        evidenceList.appendChild(itemElem);
+      });
+      evidenceBox.appendChild(evidenceList);
+      loadingElem.appendChild(evidenceBox);
     }
 
-    if (loadingElem) {
-      loadingElem.innerHTML = botHtml;
-    }
     chatMessages.scrollTop = chatMessages.scrollHeight;
   } catch (err) {
-    const loadingElem = document.getElementById(loadingId);
-    if (loadingElem) {
-      loadingElem.innerHTML = `<span style="color: #dc2626;">Error: ${escapeHTML(err.message)}</span>`;
-    }
+    loadingElem.innerHTML = "";
+    const errSpan = document.createElement("span");
+    errSpan.style.color = "#dc2626";
+    errSpan.textContent = `Error: ${err.message}`;
+    loadingElem.appendChild(errSpan);
   }
 }
 
-// Data Import View
-function renderImportData() {
+// Legacy stub replaced by canonical renderImportData at line 3389
+function deprecatedLegacyRenderImportData() {
   const container = document.getElementById("content-container");
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -11641,10 +11678,10 @@ async function renderReports() {
                       </div>
                     </td>
                     <td style="text-align: right;">
-                      <a href="/api/reports/download/${rep.id}" class="btn btn-sm btn-primary" target="_blank" download="${escapeHtml(rep.report_title)}" title="Download PDF Report">
+                      <button onclick="downloadReport(${rep.id}, '${escapeHtml(rep.report_title).replace(/'/g, "\\'")}')" class="btn btn-sm btn-primary" title="Download PDF Report">
                         <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                         Download PDF
-                      </a>
+                      </button>
                     </td>
                   </tr>
                 `).join("")}
@@ -11664,6 +11701,17 @@ async function renderReports() {
   }
 }
 
+async function downloadReport(reportId, reportTitle) {
+  const filename = reportTitle.endsWith(".pdf") ? reportTitle : `${reportTitle}.pdf`;
+  try {
+    await FinAuditAPI.downloadFile(`/api/reports/download/${reportId}`, filename);
+  } catch (err) {
+    // Fallback with token in query param
+    const token = FinAuditAPI.getToken();
+    window.open(`/api/reports/download/${reportId}?token=${encodeURIComponent(token || "")}`, "_blank");
+  }
+}
+
 async function triggerGeneratePDFReport(reportType = "complete_audit_analysis") {
   const btn = document.getElementById(`btn-gen-${reportType}`);
   if (btn) {
@@ -11675,9 +11723,13 @@ async function triggerGeneratePDFReport(reportType = "complete_audit_analysis") 
     const res = await FinAuditAPI.generatePDFReport(state.currentEngagementId, reportType);
     notifySuccess(`Success! Generated PDF Report: ${res.report_title || res.filename}`);
     await renderReports();
-    // Prompt download
-    if (res.download_url) {
-      window.open(res.download_url, "_blank");
+    // Prompt download via authenticated download
+    if (res.report_id) {
+      await downloadReport(res.report_id, res.report_title || "Audit_Report.pdf");
+    } else if (res.download_url) {
+      const parts = res.download_url.split("/");
+      const id = parts[parts.length - 1];
+      await downloadReport(id, res.report_title || "Audit_Report.pdf");
     }
   } catch (e) {
     notifyError("Failed to generate PDF report: " + e.message);
@@ -14847,7 +14899,7 @@ function handleYoYSearchDebounced(e) {
 
 function openYoYCommentModal(itemKey, category, accountName, currentStatus, currentComment) {
   const modalHtml = `
-    < div class="modal-overlay" id = "yoy-comment-modal" >
+    <div class="modal-overlay" id="yoy-comment-modal">
       <div class="modal-card" style="max-width: 520px;">
         <div class="modal-header">
           <div class="modal-title">YoY Working Paper: ${accountName}</div>
@@ -14909,7 +14961,7 @@ async function triggerYoYFactualAI(itemKey) {
       threshold_pct: state.yoyConfig.threshold_pct
     });
     const modalHtml = `
-    < div class="modal-overlay" id = "yoy-ai-modal" >
+    <div class="modal-overlay" id="yoy-ai-modal">
       <div class="modal-card" style="max-width: 600px;">
         <div class="modal-header">
           <div class="modal-title">Movement Analysis: ${res.account_name}</div>
@@ -14947,7 +14999,7 @@ async function renderAIAssistant() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
     container.innerHTML = `
-    < div class="card" style = "padding: 40px; text-align: center; color: var(--text-secondary);" >
+    <div class="card" style="padding: 40px; text-align: center; color: var(--text-secondary);">
         <h3>No Engagement Selected</h3>
         <p style="margin-top: 8px;">Please select an audit engagement to converse with the Local AI Assistant.</p>
       </div >
@@ -14994,18 +15046,18 @@ I evaluate your imported ledger records deterministically and synthesize explain
           (p.icon === 'document' || p.icon === 'pencil') ? ICONS.fileText :
             ICONS.search;
     return `
-      < button class="assistant-prompt-chip" onclick = "fillAssistantPrompt('${p.query.replace(/'/g, "\\'")}') ">
-        < span > ${iconSvg}</span >
-          <span>${p.title}</span>
-      </button >
+      <button class="assistant-prompt-chip" onclick="fillAssistantPrompt('${p.query.replace(/'/g, "\\'")}')">
+        <span>${iconSvg}</span>
+        <span>${p.title}</span>
+      </button>
     `;
   }).join("");
 
   const messagesHtml = state.assistantState.messages.map((m, idx) => renderAssistantMessageItem(m, idx)).join("");
 
   container.innerHTML = `
-    < div style = "display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 120px); max-height: calc(100vh - 120px);" >
-      < !--Header -->
+    <div style="display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 120px); max-height: calc(100vh - 120px);">
+      <!-- Header -->
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
@@ -15027,7 +15079,7 @@ I evaluate your imported ledger records deterministically and synthesize explain
         </div>
       </div>
 
-      <!--Mandatory Disclaimer Alert-- >
+      <!-- Mandatory Disclaimer Alert -->
       <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #b45309;">
         <span class="status-indicator-dot" style="background: #d97706;"></span>
         <div>
@@ -15035,12 +15087,12 @@ I evaluate your imported ledger records deterministically and synthesize explain
         </div>
       </div>
 
-      <!--Prompt Chips Carousel-- >
+      <!-- Prompt Chips Carousel -->
       <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin;">
         ${promptChipsHtml}
       </div>
 
-      <!--Chat Messages Container-- >
+      <!-- Chat Messages Container -->
       <div id="assistant-chat-stream" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 12px 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md);">
         ${messagesHtml}
         ${state.assistantState.isLoading ? `
@@ -15054,7 +15106,7 @@ I evaluate your imported ledger records deterministically and synthesize explain
         ` : ''}
       </div>
 
-      <!--Input Bar-- >
+      <!-- Input Bar -->
     <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; display: flex; gap: 8px; align-items: center;">
       <input
         type="text"
@@ -15092,7 +15144,7 @@ function renderAssistantMessageItem(msg, idx) {
 
   if (isUser) {
     return `
-    < div style = "display: flex; justify-content: flex-end; gap: 10px; margin-left: 60px;" >
+    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-left: 60px;">
         <div style="background: #4f46e5; color: #ffffff; padding: 12px 16px; border-radius: 12px 12px 2px 12px; font-size: 13.5px; ">
           ${escapeHtml(msg.content)}
           <div style="font-size: 10.5px; color: rgba(255,255,255,0.7); text-align: right; margin-top: 4px;">${msg.timestamp}</div>
@@ -15109,7 +15161,7 @@ function renderAssistantMessageItem(msg, idx) {
   let evidenceHtml = "";
   if (msg.evidence && msg.evidence.length > 0) {
     const rows = msg.evidence.map(e => `
-    < tr style = "font-size: 12px; border-bottom: 1px solid var(--border);" >
+    <tr style="font-size: 12px; border-bottom: 1px solid var(--border);">
         <td style="padding: 6px 10px; font-family: monospace;">${e.date || e.doc_date || '—'}</td>
         <td style="padding: 6px 10px; font-weight: 600; color: #4f46e5;">${e.voucher_no || e.invoice_no || e.item_key || '—'}</td>
         <td style="padding: 6px 10px;">${e.ledger || e.account_name || '—'}</td>
@@ -15127,7 +15179,7 @@ function renderAssistantMessageItem(msg, idx) {
     `).join("");
 
     evidenceHtml = `
-    < div style = "margin-top: 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;" >
+    <div style="margin-top: 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Supporting Evidence & Source Records (${msg.evidence.length} items)</span>
           <span style="font-size: 11px; color: var(--text-secondary);">Click 'Inspect' to review full audit attributes</span>
@@ -15158,7 +15210,7 @@ function renderAssistantMessageItem(msg, idx) {
   let actionsHtml = "";
   if (msg.suggested_actions && msg.suggested_actions.length > 0) {
     actionsHtml = `
-    < div style = "margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;" >
+    <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;">
       ${msg.suggested_actions.map(act => `
           <span style="font-size: 11.5px; background: rgba(99, 102, 241, 0.08); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 14px; padding: 3px 10px;">
             ${escapeHtml(act)}
@@ -15170,7 +15222,7 @@ function renderAssistantMessageItem(msg, idx) {
   }
 
   return `
-    < div style = "display: flex; gap: 12px; align-items: flex-start; margin-right: 40px;" >
+    <div style="display: flex; gap: 12px; align-items: flex-start; margin-right: 40px;">
       <div style="width: 34px; height: 34px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; ">AI</div>
       <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: 2px 12px 12px 12px; flex: 1; ">
         <div style="font-size: 13.5px; color: var(--text-primary); line-height: 1.6;">
@@ -16379,7 +16431,12 @@ function exportAuditTrailData(format) {
     ? FinAuditAPI.getAuditTrailExportJsonUrl(params)
     : FinAuditAPI.getAuditTrailExportCsvUrl(params);
 
-  window.open(url, "_blank");
+  const filename = format === "json" ? "audit_trail_export.json" : "audit_trail_export.csv";
+  FinAuditAPI.downloadFile(url, filename).catch(() => {
+    const token = FinAuditAPI.getToken();
+    const sep = url.includes("?") ? "&" : "?";
+    window.open(`${url}${sep}token=${encodeURIComponent(token || "")}`, "_blank");
+  });
 }
 
 function openAuditDiffModal(logId) {

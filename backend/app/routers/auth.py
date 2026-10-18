@@ -553,14 +553,19 @@ def get_activation_info(token: str):
         if exp_str:
             try:
                 exp_dt = datetime.fromisoformat(exp_str)
-                if datetime.now() > exp_dt:
+                now_dt = datetime.now(exp_dt.tzinfo) if exp_dt.tzinfo else datetime.now()
+                if now_dt > exp_dt:
                     return {
                         "is_valid": False,
                         "expired": True,
                         "message": "This activation token has expired. Please ask your administrator to issue a new one."
                     }
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                return {
+                    "is_valid": False,
+                    "expired": True,
+                    "message": "This activation token contains invalid expiry metadata."
+                }
 
         return {
             "is_valid": True,
@@ -597,10 +602,13 @@ def activate_user(req: UserActivationSubmit):
         if exp_str:
             try:
                 exp_dt = datetime.fromisoformat(exp_str)
-                if datetime.now() > exp_dt:
+                now_dt = datetime.now(exp_dt.tzinfo) if exp_dt.tzinfo else datetime.now()
+                if now_dt > exp_dt:
                     raise HTTPException(status_code=400, detail="Activation token has expired. Request a new token from your administrator.")
-            except Exception:
-                pass
+            except HTTPException:
+                raise
+            except (ValueError, TypeError) as parse_err:
+                raise HTTPException(status_code=400, detail="Activation token contains invalid expiry metadata. Request a new token.") from parse_err
 
         new_hash = hash_password(req.password)
         now_str = datetime.now().isoformat()

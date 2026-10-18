@@ -24,32 +24,58 @@ from backend.app.database import get_db_connection, get_db_path, init_db
 
 def perform_clean_room_reset(confirm: bool = False):
     print("=" * 80)
-    print("FINAUDITPRO - PRODUCTION CLEAN-ROOM RESET UTILITY")
+    print("FINAUDITPRO - SANDBOX CLEAN-ROOM RESET UTILITY (DEVELOPMENT ONLY)")
     print("=" * 80)
 
+    # Safety Guard: Refuse to execute in production environment
+    env = os.environ.get("FINAUDIT_ENV", os.environ.get("ENVIRONMENT", "development")).lower()
+    if env == "production":
+        print("\n[!] FATAL: Clean-room reset is strictly prohibited in production environment.")
+        print("Refusing to execute on a live production deployment.")
+        sys.exit(1)
+
     if not confirm:
-        print("\n[!] WARNING: This will reset the local database and remove temporary upload artifacts.")
+        print("\n[!] WARNING: This will archive and reset the sandbox database and temporary upload artifacts.")
         print("To proceed, re-run with --confirm-reset")
         sys.exit(1)
 
-    # 1. Archive existing DB if present
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = os.path.join(PROJECT_ROOT, "backend", "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # 1. Archive full bundle (DB snapshot via SQLite backup API + all uploaded files and reports)
     db_path = get_db_path()
-    if os.path.exists(db_path):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_dir = os.path.join(PROJECT_ROOT, "backend", "backups")
-        os.makedirs(backup_dir, exist_ok=True)
-        archive_path = os.path.join(backup_dir, f"pre_clean_reset_backup_{timestamp}.db")
-        shutil.copy2(db_path, archive_path)
-        print(f"[OK] Archived existing database to: {archive_path}")
-
-        # Remove active DB
-        os.remove(db_path)
-        print(f"[OK] Removed existing database: {db_path}")
-
-    # 2. Clean temporary upload and generated report directories
     uploads_dir = os.path.join(PROJECT_ROOT, "backend", "uploaded_files")
     reports_dir = os.path.join(PROJECT_ROOT, "backend", "reports_generated")
 
+    if os.path.exists(db_path):
+        archive_db_path = os.path.join(backup_dir, f"pre_clean_reset_{timestamp}.db")
+        # Consistent SQLite WAL-mode snapshot using online backup API
+        src_conn = sqlite3.connect(db_path)
+        dst_conn = sqlite3.connect(archive_db_path)
+        try:
+            src_conn.backup(dst_conn)
+            print(f"[OK] Consistent WAL-mode database snapshot created at: {archive_db_path}")
+        finally:
+            dst_conn.close()
+            src_conn.close()
+
+        # Archive uploads and reports before wiping
+        import tarfile
+        full_archive_path = os.path.join(backup_dir, f"pre_clean_reset_full_archive_{timestamp}.tar.gz")
+        with tarfile.open(full_archive_path, "w:gz") as tar:
+            tar.add(archive_db_path, arcname="finauditpro.db")
+            if os.path.exists(uploads_dir):
+                tar.add(uploads_dir, arcname="uploaded_files")
+            if os.path.exists(reports_dir):
+                tar.add(reports_dir, arcname="reports_generated")
+        print(f"[OK] Complete verified safety archive (DB + uploads + reports) saved to: {full_archive_path}")
+
+        # Remove active DB
+        os.remove(db_path)
+        print(f"[OK] Reset active sandbox database: {db_path}")
+
+    # 2. Clean temporary upload and generated report directories
     for target_dir in [uploads_dir, reports_dir]:
         if os.path.exists(target_dir):
             for fname in os.listdir(target_dir):

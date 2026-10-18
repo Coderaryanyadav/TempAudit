@@ -1,0 +1,115 @@
+"""
+Regression tests for Phase 2: Financial Logic, Statutory Rules, and Audit Evidence
+"""
+import pytest
+from backend.app.audit_engine.deterministic import DeterministicAuditEngine
+
+def test_section_40a3_strictly_payment_only():
+    """A cash receipt of ₹15,000 must NOT trigger Section 40A(3) expenditure disallowance."""
+    transactions = [
+        {
+            "id": 1,
+            "date": "2024-05-10",
+            "voucher_no": "REC-001",
+            "ledger": "Cash Account",
+            "party_name": "Customer Ramesh",
+            "transaction_type": "Receipt",
+            "voucher_type": "Receipt",
+            "debit": 0.0,
+            "credit": 15000.0,
+            "amount": 15000.0,
+            "description": "Cash receipt against sales invoice"
+        }
+    ]
+    engine = DeterministicAuditEngine(transactions)
+    findings = engine.run_all_checks()
+    sec_40a3_findings = [f for f in findings if f.get("finding_code") == "DET-TAX-40A3"]
+    assert len(sec_40a3_findings) == 0, "Receipt must not trigger 40A(3) expenditure rule"
+
+def test_section_40a3_triggers_on_cash_payment_above_10000():
+    """A cash payment of ₹15,000 must trigger Section 40A(3)."""
+    transactions = [
+        {
+            "id": 2,
+            "date": "2024-05-10",
+            "voucher_no": "PAY-001",
+            "ledger": "Cash Account",
+            "party_name": "Supplier Sharma",
+            "transaction_type": "Payment",
+            "voucher_type": "Payment",
+            "debit": 15000.0,
+            "credit": 0.0,
+            "amount": 15000.0,
+            "description": "Cash payment for office repairs"
+        }
+    ]
+    engine = DeterministicAuditEngine(transactions)
+    findings = engine.run_all_checks()
+    sec_40a3_findings = [f for f in findings if f.get("finding_code") == "DET-TAX-40A3"]
+    assert len(sec_40a3_findings) == 1
+    assert sec_40a3_findings[0]["evidence"]["total_cash"] == 15000.0
+
+def test_section_269st_strictly_receipt_only():
+    """A cash payment/debit of ₹2,50,000 must NOT trigger Section 269ST cash receipt violation."""
+    transactions = [
+        {
+            "id": 3,
+            "date": "2024-06-15",
+            "voucher_no": "PAY-002",
+            "ledger": "Cash Account",
+            "party_name": "Machinery Vendor",
+            "transaction_type": "Payment",
+            "voucher_type": "Payment",
+            "debit": 250000.0,
+            "credit": 0.0,
+            "amount": 250000.0,
+            "description": "Payment for workshop tools"
+        }
+    ]
+    engine = DeterministicAuditEngine(transactions)
+    findings = engine.run_all_checks()
+    sec_269st_findings = [f for f in findings if f.get("finding_code") == "DET-TAX-269ST"]
+    assert len(sec_269st_findings) == 0, "Payment must not trigger Section 269ST receipt rule"
+
+def test_section_269st_triggers_on_cash_receipt_above_200000():
+    """A cash credit/receipt of ₹2,50,000 must trigger Section 269ST."""
+    transactions = [
+        {
+            "id": 4,
+            "date": "2024-06-15",
+            "voucher_no": "REC-002",
+            "ledger": "Cash Account",
+            "party_name": "Property Buyer",
+            "transaction_type": "Receipt",
+            "voucher_type": "Receipt",
+            "debit": 0.0,
+            "credit": 250000.0,
+            "amount": 250000.0,
+            "description": "Advance received in cash"
+        }
+    ]
+    engine = DeterministicAuditEngine(transactions)
+    findings = engine.run_all_checks()
+    sec_269st_findings = [f for f in findings if f.get("finding_code") == "DET-TAX-269ST"]
+    assert len(sec_269st_findings) == 1
+    assert sec_269st_findings[0]["evidence"]["amount"] == 250000.0
+
+def test_threshold_boundaries():
+    """Transactions at ₹10,000 or below do NOT trigger 40A(3)."""
+    transactions = [
+        {
+            "id": 5,
+            "date": "2024-07-01",
+            "voucher_no": "PAY-003",
+            "ledger": "Cash in hand",
+            "party_name": "Stationery Shop",
+            "debit": 10000.0,
+            "credit": 0.0,
+            "amount": 10000.0,
+            "transaction_type": "Payment"
+        }
+    ]
+    engine = DeterministicAuditEngine(transactions)
+    findings = engine.run_all_checks()
+    sec_40a3 = [f for f in findings if f.get("finding_code") == "DET-TAX-40A3"]
+    assert len(sec_40a3) == 0, "Payment exactly at ₹10,000 is permitted under Section 40A(3)"
