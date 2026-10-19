@@ -15181,10 +15181,10 @@ function renderAssistantMessageItem(msg, idx) {
     const rows = msg.evidence.map(e => `
     <tr style="font-size: 12px; border-bottom: 1px solid var(--border);">
         <td style="padding: 6px 10px; font-family: monospace;">${e.date || e.doc_date || '—'}</td>
-        <td style="padding: 6px 10px; font-weight: 600; color: #4f46e5;">${e.voucher_no || e.invoice_no || e.item_key || '—'}</td>
-        <td style="padding: 6px 10px;">${e.ledger || e.account_name || '—'}</td>
-        <td style="padding: 6px 10px; color: var(--text-secondary);">${e.party_name || e.vendor_name || '—'}</td>
-        <td style="padding: 6px 10px; text-align: right; font-weight: 600;">${e.amount_formatted || (e.amount ? formatINR(e.amount) : (e.current_year !== undefined ? formatINR(e.current_year) : '—'))}</td>
+        <td style="padding: 6px 10px; font-weight: 600; color: #4f46e5;">${e.voucher_no || e.invoice_no || e.finding_code || e.item_key || '—'}</td>
+        <td style="padding: 6px 10px;">${e.ledger || e.account_name || e.title || 'General Ledger'}</td>
+        <td style="padding: 6px 10px; color: var(--text-secondary);">${e.party_name || e.vendor_name || e.rule || '—'}</td>
+        <td style="padding: 6px 10px; text-align: right; font-weight: 600;">${e.amount_formatted || (e.amount ? formatINR(e.amount) : (e.difference || (e.current_year !== undefined ? formatINR(e.current_year) : '—')))}</td>
         <td style="padding: 6px 10px; text-align: center;">
           ${e.severity ? getSeverityBadge(e.severity) : (e.risk ? `<span class="badge badge-${e.risk.toLowerCase()}">${e.risk}</span>` : '<span class="badge badge-low">Normal</span>')}
         </td>
@@ -15372,15 +15372,15 @@ function inspectAssistantTransaction(item) {
         </div>
         <div class="modal-body">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; background: var(--bg-app); border: 1px solid var(--border); padding: 14px; border-radius: 6px; font-size: 12.5px;">
-            <div><strong>Transaction ID:</strong> #${item.id || item.transaction_id || 'N/A'}</div>
-            <div><strong>Posting Date:</strong> ${item.date || item.doc_date || '—'}</div>
-            <div><strong>Voucher Number:</strong> <span style="font-family: monospace; font-weight: 600; color: #4f46e5;">${item.voucher_no || item.invoice_no || '—'}</span></div>
-            <div><strong>Invoice Number:</strong> ${item.invoice_no || '—'}</div>
-            <div><strong>Ledger Head:</strong> ${item.ledger || item.account_name || '—'}</div>
-            <div><strong>Account Group:</strong> ${item.group || item.account_group || 'General'}</div>
-            <div><strong>Counterparty Name:</strong> ${item.party_name || item.vendor_name || 'Direct'}</div>
-            <div><strong>GSTIN:</strong> ${item.gstin || '—'}</div>
-            <div><strong>Transaction Amount:</strong> <span style="font-weight: 700; color: var(--text-main);">${item.amount_formatted || (item.amount ? formatINR(item.amount) : '—')}</span></div>
+            <div><strong>Item / Ref ID:</strong> #${item.id || item.transaction_id || item.finding_code || 'N/A'}</div>
+            <div><strong>Posting / Audit Date:</strong> ${item.date || item.doc_date || '—'}</div>
+            <div><strong>Voucher / Ref Number:</strong> <span style="font-family: monospace; font-weight: 600; color: #4f46e5;">${item.voucher_no || item.invoice_no || item.finding_code || '—'}</span></div>
+            <div><strong>Finding / Invoice:</strong> ${item.invoice_no || item.title || '—'}</div>
+            <div><strong>Ledger Head / Module:</strong> ${item.ledger || item.account_name || 'General Ledger / Trial Balance'}</div>
+            <div><strong>Account Group / Framework:</strong> ${item.group || item.account_group || item.rule || 'General'}</div>
+            <div><strong>Counterparty / Focus:</strong> ${item.party_name || item.vendor_name || 'Double-Entry Balance'}</div>
+            <div><strong>GSTIN / Identifier:</strong> ${item.gstin || item.finding_code || '—'}</div>
+            <div><strong>Amount / Variance:</strong> <span style="font-weight: 700; color: var(--text-main);">${item.amount_formatted || (item.amount ? formatINR(item.amount) : (item.difference || '—'))}</span></div>
             <div><strong>Severity Assessment:</strong> ${item.severity ? getSeverityBadge(item.severity) : '<span class="badge badge-low">LOW</span>'}</div>
           </div>
 

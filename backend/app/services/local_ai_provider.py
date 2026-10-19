@@ -183,8 +183,19 @@ class LMStudioProvider(BaseLocalAIProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        model_to_use = self.model_name
+        if not model_to_use or model_to_use == "local-model":
+            avail = self.get_available_models()
+            chat_models = [m for m in avail if "embed" not in m.lower()]
+            if chat_models:
+                model_to_use = chat_models[0]
+            elif avail:
+                model_to_use = avail[0]
+            else:
+                model_to_use = "local-model"
+
         payload = {
-            "model": self.model_name or "local-model",
+            "model": model_to_use,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
@@ -197,7 +208,7 @@ class LMStudioProvider(BaseLocalAIProvider):
                 data=json.dumps(payload).encode('utf-8'),
                 headers={"Content-Type": "application/json", "User-Agent": "FinAuditPro/1.0"}
             )
-            with urllib.request.urlopen(req, timeout=45.0) as resp:
+            with urllib.request.urlopen(req, timeout=60.0) as resp:
                 res_data = json.loads(resp.read().decode('utf-8'))
                 lat = round((time.time() - start) * 1000, 1)
                 choices = res_data.get("choices", [])

@@ -218,6 +218,22 @@ class LocalAIAssistantEngine:
                     metrics_str = json.dumps(calc_metrics, default=str) if calc_metrics else "None"
                     evidence_str = json.dumps(evidence_list[:10], default=str) if evidence_list else "None"
 
+                    if res.get("intent") == "CREATE_AUDIT_OBSERVATION":
+                        instructions = (
+                            "INSTRUCTIONS FOR LOCAL AI AUDITOR ASSISTANT:\n"
+                            "1. Synthesize an expert Chartered Accountant advisory review of this specific statutory audit observation.\n"
+                            "2. Formulate 3-4 precise, technical management inquiry questions to address to the client's finance head / CFO.\n"
+                            "3. Detail specific substantive working paper testing procedures required under the cited ICAI SAs to verify and close this finding.\n"
+                            "4. Strictly maintain the authoritative numbers, standards, and statutes without contradiction."
+                        )
+                    else:
+                        instructions = (
+                            "INSTRUCTIONS FOR LOCAL AI AUDITOR ASSISTANT:\n"
+                            "1. Explain the underlying audit issue clearly based strictly on the authoritative facts above.\n"
+                            "2. DO NOT contradict the deterministic calculations or claim compliance when violations exist.\n"
+                            "3. Provide actionable statutory audit guidance referencing relevant Indian accounting/tax standards."
+                        )
+
                     prompt = (
                         f"{scoped_context}\n\n"
                         f"AUTHORITATIVE DETERMINISTIC AUDIT FINDINGS (CANNOT BE OVERRULED):\n"
@@ -225,15 +241,13 @@ class LocalAIAssistantEngine:
                         f"- Corroborating Evidence: {evidence_str}\n"
                         f"- Deterministic Analysis:\n{deterministic_response}\n\n"
                         f"AUDITOR INQUIRY: {sanitized_query}\n\n"
-                        f"INSTRUCTIONS FOR LOCAL AI AUDITOR ASSISTANT:\n"
-                        f"1. Explain the underlying audit issue clearly based strictly on the authoritative facts above.\n"
-                        f"2. DO NOT contradict the deterministic calculations or claim compliance when violations exist.\n"
-                        f"3. Provide actionable statutory audit guidance referencing relevant Indian accounting/tax standards."
+                        f"{instructions}"
                     )
 
                     gen_res = provider.generate(
                         prompt=prompt,
-                        system_prompt="You are a professional statutory auditor assistant. Ground your response strictly in the authoritative evidence provided."
+                        system_prompt="You are a professional statutory auditor assistant. Ground your response strictly in the authoritative evidence provided.",
+                        max_tokens=1024
                     )
                     gen_text = gen_res.get("text", "").strip() if gen_res else ""
                     if gen_text and len(gen_text) > 20:
@@ -263,7 +277,7 @@ class LocalAIAssistantEngine:
             except Exception as e:
                 logging.getLogger(__name__).warning("Local LLM synthesis fallback triggered: %s", e)
                 # Retain deterministic response as fallback
-                provenance = "FALLBACK"
+                provenance = "DETERMINISTIC_RULE"
 
         res["provenance"] = provenance
         res["model_name"] = model_name
@@ -974,6 +988,127 @@ The audit engine identified **{len(ledger_risk_map)}** ledger account(s) that re
     # ----------------------------------------------------------------------
     # INTENT HANDLER 8: Create Audit Observation / Memo
     # ----------------------------------------------------------------------
+    @staticmethod
+    def _map_finding_statutory_framework(target_finding: Dict[str, Any]) -> Dict[str, str]:
+        """
+        Dynamically maps audit findings to their exact statutory provisions, ICAI Standards on Auditing,
+        reporting disclosure obligations (CARO 2020 / Form 3CD / Companies Act), root causes, and substantive procedures.
+        """
+        code = (target_finding.get("finding_code") or "").upper()
+        category = (target_finding.get("category") or "").upper()
+        title = (target_finding.get("title") or "").upper()
+        rule = target_finding.get("rule_used") or ""
+        desc = target_finding.get("description") or target_finding.get("reason") or ""
+        rec = target_finding.get("recommended_action") or ""
+
+        # 1. Trial Balance / Double Entry Imbalance
+        if "DET-001" in code or "TRIAL BALANCE" in title or ("DEBIT" in title and "CREDIT" in title) or "DOUBLE-ENTRY" in rule.upper():
+            return {
+                "standard": rule or "Ind AS 1 / AS 1: Presentation of Financial Statements & Double-Entry Equality",
+                "statute": "Section 128(1) & Section 129 of Companies Act 2013 (Books of Account & True and Fair View)",
+                "icai_sas": "SA 200 (Overall Objectives of Auditor), SA 315 (Material Misstatement Risk), SA 500 (Audit Evidence), SA 705 (Modifications to Audit Opinion)",
+                "statutory_disclosure": "Section 143(3)(b) & Section 143(3)(h) of Companies Act 2013 (Proper books maintained / Qualification remarks); CARO 2020 Clause 3(xiv) / Internal Financial Controls over Financial Reporting (IFCoFR)",
+                "cause": "Omission of one-sided ledger entries, corrupted data migration from source accounting software, unposted year-end adjusting journal vouchers, or unreconciled suspense accounts.",
+                "effect": "Fundamental violation of the double-entry accounting framework preventing generation of balanced Financial Statements under Schedule III; severe audit risk warranting modification or qualification of the statutory audit opinion under SA 705.",
+                "recommendation": rec or "Extract full General Ledger journal listing; verify debit/credit aggregates by ledger; review suspense account entries; require management to pass rectifying journal entries prior to signing financial statements."
+            }
+
+        # 2. Section 40A(3) Cash Payment
+        elif "40A3" in code or "40A(3)" in title or "10,000" in desc or "CASH PAYMENT" in title:
+            return {
+                "standard": "Section 40A(3) of the Income Tax Act 1961 read with Rule 6DD of Income Tax Rules 1962",
+                "statute": "Income Tax Act 1961 - Expenditure Incurred in Cash Exceeding Statutory Limit",
+                "icai_sas": "SA 250 (Consideration of Laws and Regulations in an Audit of Financial Statements), SA 500 (Audit Evidence)",
+                "statutory_disclosure": "Mandatory reporting under Clause 21(d)(A) & 21(d)(B) of Tax Audit Form 3CD",
+                "cause": "Absence of strict petty cash ceilings or failure to enforce mandatory payments via banking channels (account payee cheque/draft/ECS/prescribed electronic modes).",
+                "effect": "100% statutory disallowance of violating expenditure under Section 40A(3), resulting in an artificial addition to taxable business income, increased tax demand, and penal interest under Sections 234B and 234C.",
+                "recommendation": rec or "Verify payment cash vouchers; examine whether the payment falls under exceptions enumerated in Rule 6DD; report unexempted payments in Form 3CD Clause 21(d) and obtain written management representation."
+            }
+
+        # 3. Section 269ST Cash Receipt
+        elif "269ST" in code or "269ST" in title or "2,00,000" in desc or "CASH RECEIPT" in title:
+            return {
+                "standard": "Section 269ST of the Income Tax Act 1961 (Restriction on Cash Transactions of ₹2 Lakhs or More)",
+                "statute": "Income Tax Act 1961 - High-Value Cash Receipt Prohibition",
+                "icai_sas": "SA 250 (Consideration of Laws and Regulations in an Audit of Financial Statements), SA 240 (Fraud & Regulatory Risk)",
+                "statutory_disclosure": "Mandatory reporting under Clause 31(ba), 31(bb), 31(bc) and 31(bd) of Tax Audit Form 3CD",
+                "cause": "Acceptance of customer settlements in cash exceeding ₹2,00,000 without treasury controls or billing threshold validations.",
+                "effect": "Strict statutory penalty under Section 271DA of the Income Tax Act 1961 equal to 100% of the cash received, levied directly upon the recipient company.",
+                "recommendation": rec or "Inspect cash receipt vouchers and bank deposit records; verify whether receipts relate to a single transaction, single day, or single occasion; prepare Form 3CD Clause 31 disclosure and obtain management explanation."
+            }
+
+        # 4. Duplicate Transactions
+        elif "DUP" in code or "DUPLICATE" in title or "DUPLICATE" in category:
+            return {
+                "standard": "Ind AS 1 / AS 1: Accrual Basis of Accounting & True and Fair View",
+                "statute": "Section 129(1) of Companies Act 2013 (Financial Statements shall give a true and fair view)",
+                "icai_sas": "SA 240 (Auditor's Responsibilities Relating to Fraud in an Audit of Financial Statements), SA 500 (Audit Evidence), SA 520 (Analytical Procedures)",
+                "statutory_disclosure": "Schedule III disclosure adjustments for overstated expenses / trade payables; CARO 2020 Clause 3(xi) if intentional duplicate invoicing is detected",
+                "cause": "Breakdown of three-way matching controls (Purchase Order vs Goods Receipt Note vs Vendor Invoice), dual entry by accounts staff, or automated ERP sync retries.",
+                "effect": "Overstatement of operational expenses and inflated trade liabilities, leading to understated profitability, unauthorized duplicate cash disbursements, and material misstatement risk.",
+                "recommendation": rec or "Cross-reference duplicate vouchers with physical third-party invoices, delivery challans, and e-Way bills; reverse redundant entry and request vendor statement confirmation."
+            }
+
+        # 5. GST / GSTIN Non-Compliance
+        elif "GST" in code or "GSTIN" in title or "GST" in category:
+            return {
+                "standard": "Central Goods and Services Tax (CGST) Act 2017 - Section 16(2) (Conditions for Availing Input Tax Credit) & Section 31 (Tax Invoice)",
+                "statute": "CGST Act 2017 & State GST Acts - Statutory ITC Eligibility and Matching Framework",
+                "icai_sas": "SA 250 (Consideration of Laws and Regulations in an Audit of Financial Statements), SA 500 (Audit Evidence)",
+                "statutory_disclosure": "Tax Audit Form 3CD Clause 44 (Break-up of expenditure with GST registered/unregistered entities); GSTR-9C Table 12 (ITC Reconciliation)",
+                "cause": "Master vendor data creation without active GSTIN verification; transacting with non-compliant or cancelled GST vendors while claiming input tax credit.",
+                "effect": "Disallowance of Input Tax Credit (ITC) under Section 16(2) of CGST Act, demand for tax recovery along with mandatory 18% interest under Section 50, and penal liabilities under Section 122.",
+                "recommendation": rec or "Validate vendor GSTIN status on GST common portal; reconcile purchase register against GSTR-2B; reverse ineligible or unreflected ITC in the subsequent GSTR-3B return."
+            }
+
+        # 6. Negative Ledger Balance
+        elif "BAL" in code or "NEGATIVE" in title or "NEGATIVE" in desc:
+            return {
+                "standard": "ICAI Technical Guide on Internal Audit & Guidance Note on Tax Audit",
+                "statute": "Section 69A of Income Tax Act 1961 (Unexplained Money / Cash Deficits)",
+                "icai_sas": "SA 500 (Audit Evidence), SA 240 (Auditor's Responsibilities Relating to Fraud), SA 315",
+                "statutory_disclosure": "CARO 2020 Clause 3(xiv) / Internal Financial Controls; Form 3CD observations on cash book discrepancies",
+                "cause": "Failure to record cash sales/receipts in chronological sequence; unrecorded collections; timing lag in journalizing banking transfers.",
+                "effect": "Physical impossibility of negative cash in hand; high risk of tax department treating negative balances as unexplained cash credits/money under Section 68/69A taxed at peak rate under Section 115BBE (60% + 25% surcharge).",
+                "recommendation": rec or "Perform daily chronological cash book reconstruction; identify omitted receipts; conduct immediate surprise physical cash count and obtain management confirmation."
+            }
+
+        # 7. Date Inconsistencies / Future Dates / Prior Period
+        elif "DATE" in code or "FUTURE" in title or "CUT-OFF" in title:
+            return {
+                "standard": "AS 5 / Ind AS 8: Net Profit or Loss for the Period, Prior Period Items & Accounting Changes",
+                "statute": "Section 128(1) of Companies Act 2013 (Books of Account maintained for every financial year)",
+                "icai_sas": "SA 500 (Audit Evidence - Completeness and Cut-off Assertions), SA 700",
+                "statutory_disclosure": "Tax Audit Form 3CD Clause 27(b) (Prior period expenses/income); Schedule III disclosure notes",
+                "cause": "Lack of period-lock controls in ERP software, post-dated voucher entry errors, or manual override of voucher dates.",
+                "effect": "Cut-off assertion violation; distortion of revenue/expense matching across financial periods; misstatement of financial year operating margins.",
+                "recommendation": rec or "Perform substantive cut-off testing on vouchers recorded 15 days before and after year-end; reclassify prior period items into appropriate Schedule III disclosure."
+            }
+
+        # 8. Round Number Spikes / Suspicious Narrations
+        elif "ROUND" in code or "NARR" in code or "ROUND" in title or "NARRATION" in title:
+            return {
+                "standard": "SA 240: Auditor's Responsibilities Relating to Fraud in an Audit of Financial Statements",
+                "statute": "Section 37(1) of Income Tax Act 1961 (General Deductions for Business Purposes)",
+                "icai_sas": "SA 240 (Journal Entry Testing & Management Override of Controls), SA 315, SA 330 (Responses to Assessed Risks)",
+                "statutory_disclosure": "Tax Audit Form 3CD Clause 21(a) (Non-business or personal expenses); CARO 2020 Clause 3(xi)",
+                "cause": "Management manual journal entries posted without third-party supporting vouchers or standardized documentation workflows.",
+                "effect": "Risk of booking fictitious or non-business expenditures; exposure to disallowance under Section 37(1) and underreporting penalties under Section 270A.",
+                "recommendation": rec or "Inspect underlying third-party vendor contracts, approved purchase requisitions, and proof of receipt; confirm genuine commercial purpose of the expenditure."
+            }
+
+        # 9. Default Statutory Framework
+        else:
+            return {
+                "standard": rule or "Applicable Accounting Standards (AS / Ind AS) & ICAI Guidance Notes",
+                "statute": "Companies Act 2013 & Income Tax Act 1961 Statutory Audit Framework",
+                "icai_sas": "SA 200 (Overall Objectives), SA 315 (Assessing Risks), SA 500 (Audit Evidence)",
+                "statutory_disclosure": "CARO 2020 / Form 3CD disclosure framework as applicable to the finding category",
+                "cause": "Inadequate preventative internal financial controls over transaction authorization and record keeping.",
+                "effect": "Risk of statutory non-compliance, financial statement distortion, and potential audit qualification.",
+                "recommendation": rec or "Obtain corroborating documentation, verify supporting vouchers, and seek written management representation."
+            }
+
     def _handle_audit_observation(self, query: str, finding_id: Optional[int] = None) -> Dict[str, Any]:
         target_finding = None
         if finding_id:
@@ -989,11 +1124,25 @@ The audit engine identified **{len(ledger_risk_map)}** ledger account(s) that re
                     "evidence": [],
                     "source_transactions": []
                 }
-            # Match finding by code or query
-            match = re.search(r'\b(F-\d+|FIND-\d+|\d+)\b', query, re.IGNORECASE)
+            # Match finding by exact code or identifier in query
+            match = re.search(r'\b(DET-[A-Za-z0-9_-]+|FIND-\d+|F-\d+|\d+)\b', query, re.IGNORECASE)
             if match:
-                cand = match.group(1)
-                target_finding = next((f for f in self.findings if str(f.get("id")) == cand or (f.get("finding_code") or "").upper() == cand.upper()), None)
+                cand = match.group(1).upper()
+                target_finding = next((f for f in self.findings if str(f.get("id")) == cand or (f.get("finding_code") or "").upper() == cand), None)
+
+        # Contextual topic matching
+        if not target_finding:
+            q_lower = query.lower()
+            if "trial balance" in q_lower or "det-001" in q_lower:
+                target_finding = next((f for f in self.findings if "DET-001" in (f.get("finding_code") or "").upper() or "TRIAL BALANCE" in (f.get("title") or "").upper()), None)
+            elif "40a" in q_lower:
+                target_finding = next((f for f in self.findings if "40A3" in (f.get("finding_code") or "").upper() or "40A" in (f.get("title") or "").upper()), None)
+            elif "269st" in q_lower:
+                target_finding = next((f for f in self.findings if "269ST" in (f.get("finding_code") or "").upper()), None)
+            elif "duplicate" in q_lower:
+                target_finding = next((f for f in self.findings if "DUP" in (f.get("finding_code") or "").upper()), None)
+            elif "gst" in q_lower:
+                target_finding = next((f for f in self.findings if "GST" in (f.get("finding_code") or "").upper()), None)
 
         if not target_finding and self.findings and not finding_id:
             # Pick highest severity finding only if no specific finding was requested
@@ -1019,10 +1168,12 @@ The audit engine identified **{len(ledger_risk_map)}** ledger account(s) that re
         desc = target_finding.get("description") or target_finding.get("reason") or "Audit discrepancy noted during substantive testing."
         rec = target_finding.get("recommended_action") or "Obtain supporting invoices and management representation."
 
+        fw = self._map_finding_statutory_framework(target_finding)
+
         memo = f"""### 📝 STATUTORY AUDIT WORKING PAPER MEMORANDUM
-**Working Paper Reference:** `WP-{code.replace('-', '_')}`
-**Client:** {self.client_info.get('name')} | **FY:** {self.engagement.get('financial_year')}
-**Finding Reference:** `{code}` | **Severity:** **{sev}**
+**Working Paper Reference:** `WP-{code.replace('-', '_')}`  
+**Client:** {self.client_info.get('name', 'Audit Client')} | **Financial Year:** {self.engagement.get('financial_year', '2024-25')}  
+**Finding Reference:** `{code}` | **Severity:** **{sev}** | **Module:** {target_finding.get('module', 'General')}
 
 ---
 
@@ -1031,36 +1182,78 @@ The audit engine identified **{len(ledger_risk_map)}** ledger account(s) that re
 - **Expected Accounting / Statutory Treatment:** {expected}
 - **Actual Condition Identified in Records:** {actual}
 
-#### 2. Criteria (Regulatory / Accounting Standards Framework):
-- **Governing Standard / Statute:** {rule}
-- **ICAI Standards on Auditing:** SA 240 (Auditor's Responsibilities Relating to Fraud), SA 315, SA 500 (Audit Evidence).
-- **Statutory Disclosure Requirement:** Clause 21(d) / Clause 31 of Tax Audit Form 3CD & CARO 2020 reporting obligations.
+#### 2. Criteria (Regulatory & Statutory Framework):
+- **Governing Standard / Rule:** {fw['standard']}
+- **Applicable Statute:** {fw['statute']}
+- **ICAI Standards on Auditing (SAs):** {fw['icai_sas']}
+- **Statutory Disclosure Requirement:** {fw['statutory_disclosure']}
 
-#### 3. Cause (Control Breakdown):
-Inadequate preventative internal financial controls over transaction authorization and documentation compliance.
+#### 3. Cause (Internal Control Breakdown):
+{fw['cause']}
 
-#### 4. Effect (Audit Risk & Financial Impact):
-Potential tax disallowance under the Income Tax Act 1961, penalty exposure, and risk of material misstatement in financial statements.
+#### 4. Effect (Audit Risk & Financial Statement Impact):
+{fw['effect']}
 
-#### 5. Recommendation (Substantive Auditor Procedure):
-{rec}
-- **Auditor Verification Status:** `Requires Management Response`
+#### 5. Recommendation (Substantive Auditor Procedures):
+{fw['recommendation']}
+- **Auditor Verification Status:** `Requires Management Response & Corroborating Evidence`
 - **Lead Auditor Sign-off:** ______________________
 """
 
-        evidence_item = {
-            "finding_id": target_finding.get("id"),
-            "finding_code": code,
-            "title": title,
-            "severity": sev,
-            "rule": rule,
-            "expected_value": expected,
-            "actual_value": actual,
-            "recommendation": rec
-        }
+        # Resolve associated transactions from affected_records
+        aff_ids = []
+        try:
+            if target_finding.get("affected_records_json"):
+                aff_ids = json.loads(target_finding["affected_records_json"])
+            elif target_finding.get("affected_records"):
+                aff_ids = target_finding["affected_records"]
+        except Exception:
+            pass
+        
+        matched_txs = [t for t in self.transactions if t.get("id") in aff_ids] if aff_ids else []
+        if not matched_txs:
+            matched_txs = [t for t in self.transactions if code in str(t.get("voucher_no", "")) or str(target_finding.get("id")) in str(t.get("id", ""))]
 
-        # Find matching transaction
-        txs = [t for t in self.transactions if code in str(t.get("voucher_no", "")) or str(target_finding.get("id")) in str(t.get("id", ""))]
+        if matched_txs:
+            evidence_list = []
+            for tx in matched_txs[:10]:
+                tx_copy = dict(tx)
+                tx_copy["finding_id"] = target_finding.get("id")
+                tx_copy["finding_code"] = code
+                tx_copy["severity"] = sev
+                evidence_list.append(tx_copy)
+        else:
+            diff_str = target_finding.get("difference") or ""
+            if not diff_str:
+                act_str = str(target_finding.get("actual_value") or "")
+                num_match = re.search(r'[\d,]+(?:\.\d+)?', act_str)
+                if num_match:
+                    try:
+                        val = float(num_match.group(0).replace(',', ''))
+                        diff_str = f"₹{val:,.2f}"
+                    except Exception:
+                        diff_str = act_str
+                else:
+                    diff_str = act_str if act_str else "—"
+            evidence_item = {
+                "id": target_finding.get("id"),
+                "finding_id": target_finding.get("id"),
+                "finding_code": code,
+                "date": f"FY {self.engagement.get('financial_year', '2024-25')}",
+                "voucher_no": code,
+                "ledger": target_finding.get("module") or "General Ledger (Trial Balance)",
+                "party_name": "Double-Entry Balance Variance" if "DET-001" in code else (target_finding.get("category") or "Statutory Compliance"),
+                "amount_formatted": diff_str,
+                "severity": sev,
+                "title": title,
+                "description": desc,
+                "reason": target_finding.get("reason") or desc,
+                "recommended_action": rec,
+                "rule": rule,
+                "expected_value": expected,
+                "actual_value": actual
+            }
+            evidence_list = [evidence_item]
 
         return {
             "query": query,
@@ -1070,10 +1263,12 @@ Potential tax disallowance under the Income Tax Act 1961, penalty exposure, and 
             "calculated_metrics": {
                 "finding_id": target_finding.get("id"),
                 "wp_reference": f"WP-{code.replace('-', '_')}",
-                "severity": sev
+                "severity": sev,
+                "statutory_statute": fw["statute"],
+                "statutory_disclosure": fw["statutory_disclosure"]
             },
-            "evidence": [evidence_item],
-            "source_transactions": txs or self.transactions[:5],
+            "evidence": evidence_list,
+            "source_transactions": matched_txs or self.transactions[:5],
             "suggested_actions": [
                 "Insert memorandum into Working Papers module",
                 "Copy to Management Representation Letter draft",
