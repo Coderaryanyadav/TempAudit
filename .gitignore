@@ -1,31 +1,55 @@
+# Bytecode & Python Caching
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+
+# Testing & Coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Databases & Local Storage
 *.db
 *.sqlite3
-*.log
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Local Environment & Secrets
 .env
 .venv/
 env/
 venv/
+ENV/
+
+# Editor & OS Artifacts
+.DS_Store
+**/.DS_Store
 .idea/
 .vscode/
+*.swp
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Build & Distribution Artifacts
+*.egg-info/
+build/
+dist/
+node_modules/
+
+# Application Runtime Directories (keep directories via .gitkeep)
 backend/uploaded_files/*
 !backend/uploaded_files/.gitkeep
 backend/reports_generated/*
 !backend/reports_generated/.gitkeep
-*.db-shm
-*.db-wal
-*.db-journal
-1.md
-.DS_Store
 backend/backups/*
 !backend/backups/.gitkeep
-*.egg-info/
-build/
-dist/
-
-
+backend/logs/*
+!backend/logs/.gitkeep
+uploaded_files/

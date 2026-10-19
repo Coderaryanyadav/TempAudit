@@ -18,6 +18,12 @@ audit seniors, and audit practitioners in India.
 | **08. Statutory Rules** | Indian Income Tax & GST statutory algorithms and formulas | [08-audit-rules-and-calculations.md](docs/production/08-audit-rules-and-calculations.md) |
 | **17. Test & Evidence** | Real-browser automated test results, Playwright logs, and unit suites | [17-verification-and-test-evidence.md](docs/production/17-verification-and-test-evidence.md) |
 | **18. Release Readiness** | Production sign-off checklist and deployment matrix | [18-release-readiness-matrix.md](docs/production/18-release-readiness-matrix.md) |
+| **Repository Structure** | Official target filesystem taxonomy and architecture | [repository-structure.md](docs/maintenance/repository-structure.md) |
+| **Repository Audit** | Itemized inventory, classification & disposable files analysis | [repository-audit.md](docs/maintenance/repository-audit.md) |
+| **Cleanup Report** | Audit log of cleanup, reorganization, and verification | [cleanup-report.md](docs/maintenance/cleanup-report.md) |
+| **Developer Setup** | Environment configuration, prerequisites, and startup | [setup.md](docs/development/setup.md) |
+| **Testing Guide** | Unit, integration, E2E, and regression test commands | [testing.md](docs/development/testing.md) |
+| **Deployment Guide** | Standalone production operations and packaging | [deployment.md](docs/deployment/deployment.md) |
 
 ---
 
@@ -946,6 +952,71 @@ The test suite contains over 118 unit tests verifying:
 - **Local Storage:** SQLite database stored locally in `finauditpro.db`.
 - **Role-Based Access:** Admin, Auditor, and Staff permission tiers.
 - **Audit Trail:** Immutable activity logs per MCA / Companies Act Rule 11(g).
-- **One-Click Backup:** Export/import full encrypted/timestamped database dumps.
+- **One-Click Backup:** Export/import full encrypted/timestamped database dumps with HMAC integrity.
 
-# 
+---
+
+## 🗂️ Project Repository Tree
+
+```
+TempAudit/
+├── .github/workflows/          # CI/CD automation (GitHub Actions)
+├── backend/                    # FastAPI application & business logic
+│   ├── app/                    # Modular routers, services, models, & AI engine
+│   ├── backups/                # Local encrypted/signed database backups
+│   ├── logs/                   # Application operational logs
+│   ├── reports_generated/      # PDF working paper & statutory audit outputs
+│   ├── tests/                  # Pytest unit, integration, and security suites
+│   ├── uploaded_files/         # Local client evidence & data imports
+│   └── finauditpro.db          # Canonical offline SQLite database
+├── frontend/                   # Client-side desktop user interface
+│   ├── assets/                 # Brand assets, icons, fonts
+│   ├── css/                    # Modular vanilla styling & design system
+│   ├── js/                     # Component controllers & reactive state store
+│   └── index.html              # Single-page application entry point
+├── docs/                       # Technical & regulatory documentation suite
+│   ├── deployment/             # Standalone & enterprise deployment guides
+│   ├── development/            # Environment setup & test guides
+│   ├── maintenance/            # Repository audit, structure, and cleanup logs
+│   └── production/             # Comprehensive 18-volume production specifications
+├── scripts/                    # Safe maintenance & operational scripts
+│   ├── cleanup_generated.sh    # Safe dry-run cleanup automation
+│   └── README.md               # Script usage & safety constraints
+├── test_data/                  # Synthetic test fixtures & client trial balances
+├── initialize/                 # Platform launcher scripts
+│   ├── start_mac.sh            # macOS launcher (starts LM Studio & FastAPI)
+│   └── start_windows.bat       # Windows launcher
+├── .env.example                # Configuration template
+├── .gitignore                  # Git exclusion rules
+├── package.json                # Frontend test dependencies
+├── requirements.txt            # Python production dependencies
+└── README.md                   # Primary system handbook
+```
+
+---
+
+## ⚠️ Known Limitations & Boundaries
+
+1. **Standalone/Local Architecture:** Designed specifically as a single-node or local desktop/intranet application. It is not designed as a multi-tenant public SaaS platform.
+2. **Deterministic Primacy:** Deterministic rule calculations (Section 40A(3), Section 269ST, Double-entry equality) have absolute precedence over AI recommendations.
+3. **No Automatic Completion:** In compliance with SA 200/230, checklist items and risk findings are never automatically marked "Completed" by automated algorithms without human auditor sign-off.
+4. **Local Hardware Constraints for AI:** Local LLM execution requires sufficient memory (Apple Silicon Unified Memory or discrete NVIDIA GPU recommended for 14B parameter models).
+
+---
+
+## 🚀 Quickstart
+
+```bash
+# 1. Clone repository
+git clone https://github.com/Coderaryadav/TempAudit.git
+cd TempAudit
+
+# 2. Setup Virtual Environment
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Launch Platform
+./initialize/start_mac.sh
+# Accessible at http://127.0.0.1:8000
+```
