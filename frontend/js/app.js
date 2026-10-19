@@ -439,17 +439,15 @@ async function checkAuthSession() {
   }
 
   _authSessionPromise = (async () => {
+    let setupStatus = null;
     try {
-      const status = await FinAuditAPI.getSetupStatus();
-      if (status.state === "UNINITIALIZED" || status.user_count === 0) {
+      setupStatus = await FinAuditAPI.getSetupStatus();
+      if (setupStatus && (setupStatus.state === "UNINITIALIZED" || setupStatus.user_count === 0)) {
         FinAuditAPI.setToken(null);
         showWelcomeSplash();
         return;
-      } else if (status.state === "SETUP_REQUIRED" && !status.wizard_completed) {
-        showSetupWizard(status.user_count > 0 ? 2 : 1);
-        return;
-      } else if (status.state === "DATABASE_ERROR") {
-        showSystemDatabaseError(status.error);
+      } else if (setupStatus && setupStatus.state === "DATABASE_ERROR") {
+        showSystemDatabaseError(setupStatus.error);
         return;
       }
     } catch (e) {
@@ -458,6 +456,10 @@ async function checkAuthSession() {
 
     const token = FinAuditAPI.getToken();
     if (!token) {
+      if (setupStatus && setupStatus.state === "SETUP_REQUIRED" && !setupStatus.wizard_completed) {
+        showSetupWizard(setupStatus.user_count > 0 ? 2 : 1);
+        return;
+      }
       showLoginScreen();
       return;
     }
@@ -468,6 +470,10 @@ async function checkAuthSession() {
     } catch (err) {
       console.warn("Auth check failed:", err.message);
       FinAuditAPI.setToken(null);
+      if (setupStatus && setupStatus.state === "SETUP_REQUIRED" && !setupStatus.wizard_completed) {
+        showSetupWizard(setupStatus.user_count > 0 ? 2 : 1);
+        return;
+      }
       showLoginScreen(err.message && err.message.includes("disabled") ? err.message : null);
       return;
     }
@@ -753,11 +759,17 @@ function showSetupWizard(step = 1, errorMsg = null) {
             </div>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
-            <button type="button" class="btn btn-secondary" onclick="showSetupWizard(1)">← Back</button>
-            <button type="submit" id="wz-step2-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
-              Save & Continue to Security →
-            </button>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="showSetupWizard(1)">← Back</button>
+              <button type="button" class="btn btn-outline" onclick="showLoginScreen()">Sign In</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="handleFinishSetupAndOpen()">Skip & Open Workspace →</button>
+              <button type="submit" id="wz-step2-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
+                Save & Continue to Security →
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -796,11 +808,17 @@ function showSetupWizard(step = 1, errorMsg = null) {
             </label>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
-            <button type="button" class="btn btn-secondary" onclick="showSetupWizard(2)">← Back</button>
-            <button type="submit" id="wz-step3-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
-              Save & Continue to Backup →
-            </button>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="showSetupWizard(2)">← Back</button>
+              <button type="button" class="btn btn-outline" onclick="showLoginScreen()">Sign In</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="handleFinishSetupAndOpen()">Skip & Open Workspace →</button>
+              <button type="submit" id="wz-step3-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
+                Save & Continue to Backup →
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -831,10 +849,13 @@ function showSetupWizard(step = 1, errorMsg = null) {
             <div style="font-size: 12px; color: var(--text-muted);">Snapshots will be automatically retained locally for 30 days.</div>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
-            <button type="button" class="btn btn-secondary" onclick="showSetupWizard(3)">← Back</button>
-            <div style="display: flex; gap: 10px;">
-              <button type="button" class="btn btn-outline" onclick="skipWizardStep4()">Skip for now</button>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="showSetupWizard(3)">← Back</button>
+              <button type="button" class="btn btn-outline" onclick="showLoginScreen()">Sign In</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="handleFinishSetupAndOpen()">Skip & Open Workspace →</button>
               <button type="submit" id="wz-step4-btn" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
                 Finish Configuration →
               </button>
@@ -9021,7 +9042,7 @@ async function submitChatMessage() {
   if (!query) return;
 
   const chatMessages = document.getElementById("chat-messages");
-  
+
   // Render user bubble safely via textContent to prevent XSS
   const userBubble = document.createElement("div");
   userBubble.className = "chat-bubble user";
@@ -9052,8 +9073,8 @@ async function submitChatMessage() {
       provBadge.style.fontSize = "10px";
       provBadge.style.marginBottom = "6px";
       provBadge.style.display = "inline-block";
-      provBadge.textContent = res.provenance === "LOCAL_LLM" 
-        ? `🤖 Local LLM (${res.model_name || "Active Model"})` 
+      provBadge.textContent = res.provenance === "LOCAL_LLM"
+        ? `🤖 Local LLM (${res.model_name || "Active Model"})`
         : `📐 Deterministic Rule Engine`;
       loadingElem.appendChild(provBadge);
     }

@@ -46,8 +46,24 @@ if __name__ == "__main__":
     from backend.app.database import init_db
     init_db()
 
+    # Ensure Master Administrator account is verified and ready
+    try:
+        from backend.app.database import get_db_connection
+        conn = get_db_connection()
+        admin_row = conn.execute("SELECT id, username FROM users WHERE role = 'Admin' LIMIT 1").fetchone()
+        if not admin_row:
+            from scripts.create_admin import create_admin_user
+            create_admin_user("admin", "admin123", "admin@finauditpro.local", "Master Administrator (FCA)")
+            print("  [Auth] Initialized Master Administrator: admin (Password: admin123)")
+        else:
+            print(f"  [Auth] Master Administrator ready: '{admin_row['username']}'")
+        conn.close()
+    except Exception as e:
+        print(f"  [Auth Note] {e}")
+
     # Launch browser in separate thread
     threading.Thread(target=open_browser, daemon=True).start()
 
     # Run FastAPI server
     uvicorn.run("backend.app.main:app", host="127.0.0.1", port=8000, reload=False)
+

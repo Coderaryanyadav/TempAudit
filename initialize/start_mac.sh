@@ -18,11 +18,30 @@ elif [ -f "../0 - BACKUP/FinAuditPro/.venv/bin/activate" ]; then
     source "../0 - BACKUP/FinAuditPro/.venv/bin/activate"
 fi
 
-# 2. Ensure database exists
+# 2. Ensure database exists and schema is initialized
 if [ ! -f "backend/finauditpro.db" ]; then
     echo "Initializing database schema..."
     python -m backend.app.database
 fi
+
+# 2b. Ensure Master Administrator is verified and ready
+python -c "
+try:
+    from backend.app.database import get_db_connection, init_db
+    init_db()
+    conn = get_db_connection()
+    admin = conn.execute(\"SELECT id, username FROM users WHERE role = 'Admin' LIMIT 1\").fetchone()
+    if not admin:
+        from scripts.create_admin import create_admin_user
+        create_admin_user('admin', 'admin123', 'admin@finauditpro.local', 'Master Administrator (FCA)')
+        print('[Auth Setup] Initialized Master Administrator: admin (Password: admin123)')
+    else:
+        print(f'[Auth Status] Master Administrator verified: {admin[\"username\"]}')
+    conn.close()
+except Exception as e:
+    print(f'[Auth Note] {e}')
+" || true
+
 
 # 3. Start LM Studio Local AI Server & Load Model
 echo "[AI Setup] Initializing Local AI engine..."
@@ -117,5 +136,12 @@ fi
 
 # 4. Launch Application
 echo ""
+echo "=============================================================================="
+echo "  FinAuditPro Desktop Platform Ready"
+echo "  Access URL: http://127.0.0.1:8000"
+echo "  Default Administrator: admin (Password: admin123)"
+echo "=============================================================================="
+echo ""
 echo "Launching standalone server and opening default browser..."
 python run.py
+

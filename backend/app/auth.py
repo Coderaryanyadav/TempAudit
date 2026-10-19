@@ -101,7 +101,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     if "token_version" not in to_encode:
         try:
             conn = get_db_connection()
-            user = conn.execute("SELECT token_version FROM users WHERE username = ?", (data.get("sub"),)).fetchone()
+            user = conn.execute("SELECT token_version FROM users WHERE LOWER(username) = LOWER(?)", (data.get("sub"),)).fetchone()
             conn.close()
             to_encode["token_version"] = user["token_version"] if user and user["token_version"] else 1
         except Exception:
@@ -187,7 +187,7 @@ def get_current_user(
             if revoked:
                 raise HTTPException(status_code=401, detail="Token has been revoked. Please log in again.")
 
-        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,)).fetchone()
     finally:
         conn.close()
     
