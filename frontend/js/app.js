@@ -6004,7 +6004,7 @@ async function renderTrialBalance() {
       `}
 
       <!-- 6 Executive Summary & Risk Cards -->
-      <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px;">
         <div class="kpi-card" style="border-left: 4px solid var(--primary);">
           <div class="kpi-label">TOTAL DEBIT</div>
           <div class="kpi-value font-mono" style="font-size: 15px; color: var(--primary);">${formatINR(tb.grand_total_debit)}</div>
@@ -6474,7 +6474,7 @@ async function renderGeneralLedger() {
       </div>
 
       <!-- Executive KPI Summary Cards -->
-      <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px;">
         <div class="kpi-card" style="border-left: 4px solid var(--primary);">
           <div class="kpi-label">TOTAL TRANSACTIONS</div>
           <div class="kpi-value">${glData.total_transactions}</div>
@@ -7453,7 +7453,7 @@ async function viewGSTReconciliationDetails(reconId) {
       </div>
 
       <!-- Executive KPI Cards -->
-      <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 20px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px;">
         <div class="kpi-card" style="border-left: 4px solid #2563eb;">
           <div class="kpi-label">SOURCE A (PORTAL)</div>
           <div class="kpi-value">${details.total_bank_tx || 0}</div>
@@ -8074,7 +8074,7 @@ async function viewSalesPurchaseReconDetails(reconId) {
       </div>
 
       <!-- Executive KPI Cards -->
-      <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px;">
         <div class="kpi-card" style="border-left: 4px solid var(--primary);">
           <div class="kpi-label">REGISTER INVOICES</div>
           <div class="kpi-value">${details.total_bank_tx || 0}</div>
@@ -8506,7 +8506,7 @@ async function viewReconciliationDetails(reconId) {
       </div>
 
       <!-- Executive KPI Cards -->
-      <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px;">
         <div class="kpi-card" style="border-left: 4px solid var(--primary);">
           <div class="kpi-label">TOTAL BANK TX</div>
           <div class="kpi-value">${details.total_bank_tx || 0}</div>
@@ -14666,18 +14666,18 @@ function renderYoYComparisonUI(data) {
         <div style="font-size: 11px; color: #b45309; margin-top: 4px;">Exceeding ${data.configured_threshold_pct}% threshold</div>
       </div>
 
-      <div class="card" style="padding: 16px; border-left: 4px solid ${s.revenue_growth_pct >= 0 ? '#059669' : '#dc2626'};">
+      <div class="card" style="padding: 16px; border-left: 4px solid ${(s.revenue_growth_pct || 0) >= 0 ? '#059669' : '#dc2626'};">
         <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Revenue Shift</div>
-        <div style="font-size: 24px; font-weight: 800; color: ${s.revenue_growth_pct >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">
-          ${s.revenue_growth_pct >= 0 ? '+' : ''}${s.revenue_growth_pct.toFixed(1)}%
+        <div style="font-size: 24px; font-weight: 800; color: ${(s.revenue_growth_pct || 0) >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">
+          ${s.revenue_growth_pct != null && !isNaN(s.revenue_growth_pct) ? `${s.revenue_growth_pct >= 0 ? '+' : ''}${Number(s.revenue_growth_pct).toFixed(1)}%` : '—'}
         </div>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Revenue from Operations</div>
       </div>
 
-      <div class="card" style="padding: 16px; border-left: 4px solid ${s.net_profit_growth_pct >= 0 ? '#059669' : '#dc2626'};">
+      <div class="card" style="padding: 16px; border-left: 4px solid ${(s.net_profit_growth_pct || 0) >= 0 ? '#059669' : '#dc2626'};">
         <div style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Net Profit Shift</div>
-        <div style="font-size: 24px; font-weight: 800; color: ${s.net_profit_growth_pct >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">
-          ${s.net_profit_growth_pct >= 0 ? '+' : ''}${s.net_profit_growth_pct.toFixed(1)}%
+        <div style="font-size: 24px; font-weight: 800; color: ${(s.net_profit_growth_pct || 0) >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">
+          ${s.net_profit_growth_pct != null && !isNaN(s.net_profit_growth_pct) ? `${s.net_profit_growth_pct >= 0 ? '+' : ''}${Number(s.net_profit_growth_pct).toFixed(1)}%` : '—'}
         </div>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Net Profit After Tax</div>
       </div>
@@ -14864,7 +14864,7 @@ function renderYoYTableRow(row, idx) {
         ${absD > 0 ? '+' : ''}₹${Number(absD || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
       </td>
       <td style="padding: 10px 14px; text-align: right; font-family: monospace; font-weight: 800; color: ${pct > 0 ? '#059669' : (pct < 0 ? '#dc2626' : '#64748b')};">
-        ${pct > 0 ? '+' : ''}${pct.toFixed(1)}%
+        ${pct != null && !isNaN(pct) ? `${pct > 0 ? '+' : ''}${Number(pct).toFixed(1)}%` : '—'}
       </td>
       <td style="padding: 10px 14px; text-align: center;">
         ${dirBadge}
@@ -15497,7 +15497,7 @@ async function renderFindings() {
       </div>
 
       <!-- Dashboard Metric Stat Cards (6 Cards) -->
-      <div class="stat-grid" style="grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 22px;">
+      <div class="stat-grid">
         <div class="stat-card" style="border-left: 4px solid #3b82f6;">
           <div class="stat-label">Total Findings</div>
           <div class="stat-value" style="color: #1e293b;">${summary.total_findings || 0}</div>

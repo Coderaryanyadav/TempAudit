@@ -2967,3 +2967,104 @@ body {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-light);
 }
+
+/* ==========================================================================
+   KPI & Stat Card Component System (Trial Balance, GL, Findings, Reconciliations)
+   ========================================================================== */
+.stat-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 14px !important;
+  margin-bottom: 22px !important;
+  width: 100% !important;
+}
+
+@media (min-width: 1200px) {
+  .stat-grid {
+    grid-template-columns: repeat(6, 1fr) !important;
+  }
+}
+
+.stat-card {
+  background: var(--bg-surface, #ffffff) !important;
+  border: 1px solid var(--border, #e2e8f0) !important;
+  border-radius: 8px !important;
+  padding: 14px 16px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  min-height: 85px !important;
+  box-sizing: border-box !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.stat-card:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+.stat-label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  color: var(--text-muted, #64748b) !important;
+  margin-bottom: 6px !important;
+  line-height: 1.2 !important;
+}
+
+.stat-value {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  margin-bottom: 4px !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* KPI Cards across Trial Balance, General Ledger, Reconciliations */
+.kpi-card {
+  background: var(--bg-surface, #ffffff) !important;
+  border: 1px solid var(--border, #e2e8f0) !important;
+  border-radius: 8px !important;
+  padding: 14px 16px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  min-height: 90px !important;
+  box-sizing: border-box !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.kpi-card:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+.kpi-label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: var(--text-muted, #64748b) !important;
+  margin-bottom: 6px !important;
+  line-height: 1.3 !important;
+}
+
+.kpi-value {
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: var(--text-main, #0f172a) !important;
+  line-height: 1.3 !important;
+  margin-bottom: 4px !important;
+  word-break: break-word !important;
+}
+
+.kpi-subtext {
+  font-size: 11px !important;
+  color: var(--text-muted, #94a3b8) !important;
+  line-height: 1.3 !important;
+  margin-top: auto !important;
+}
+
