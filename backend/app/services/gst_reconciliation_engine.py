@@ -92,9 +92,19 @@ def run_gst_reconciliation(
     # 2. Extract Source A (e.g. GST Portal / GSTR-2B / GSTR-1 Dataset)
     source_a_txs = []
     if source_a_file_id:
-        chk_a = conn.execute("SELECT id FROM uploaded_files WHERE id = ? AND engagement_id = ?", (source_a_file_id, engagement_id)).fetchone()
+        chk_a = conn.execute(
+            "SELECT id, data_category, file_type, file_name FROM uploaded_files WHERE id = ? AND engagement_id = ?",
+            (source_a_file_id, engagement_id)
+        ).fetchone()
         if not chk_a:
             raise ValueError(f"Source A file ID {source_a_file_id} does not belong to engagement {engagement_id}.")
+        cat_a = (chk_a["data_category"] or "").strip().upper()
+        fname_a = (chk_a["file_name"] or "").lower()
+        valid_gst_categories = {"GST DATA", "GSTR-2B", "GSTR-2A", "GSTR-1", "GSTR-3B", "GST PORTAL", "GST"}
+        if cat_a not in valid_gst_categories and "gst" not in fname_a and "gstr" not in fname_a:
+            raise ValueError(
+                f"Source A file ID {source_a_file_id} has category '{chk_a['data_category']}', which is not a valid GST Portal dataset."
+            )
         rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? AND engagement_id = ? ORDER BY date ASC, id ASC", (source_a_file_id, engagement_id)).fetchall()
         if rows:
             source_a_txs = [dict(r) for r in rows]
@@ -114,9 +124,19 @@ def run_gst_reconciliation(
     # 3. Extract Source B (e.g. Purchase/Sales Register or Books)
     source_b_txs = []
     if source_b_file_id:
-        chk_b = conn.execute("SELECT id FROM uploaded_files WHERE id = ? AND engagement_id = ?", (source_b_file_id, engagement_id)).fetchone()
+        chk_b = conn.execute(
+            "SELECT id, data_category, file_type, file_name FROM uploaded_files WHERE id = ? AND engagement_id = ?",
+            (source_b_file_id, engagement_id)
+        ).fetchone()
         if not chk_b:
             raise ValueError(f"Source B file ID {source_b_file_id} does not belong to engagement {engagement_id}.")
+        cat_b = (chk_b["data_category"] or "").strip().upper()
+        fname_b = (chk_b["file_name"] or "").lower()
+        valid_book_categories = {"PURCHASE REGISTER", "SALES REGISTER", "GENERAL LEDGER", "LEDGER", "TRIAL BALANCE", "BOOKS", "ACCOUNTING DATA"}
+        if cat_b not in valid_book_categories and not any(term in fname_b for term in ["purchase", "sale", "ledger", "book"]):
+            raise ValueError(
+                f"Source B file ID {source_b_file_id} has category '{chk_b['data_category']}', which is not a valid Books / Register dataset."
+            )
         rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? AND engagement_id = ? ORDER BY date ASC, id ASC", (source_b_file_id, engagement_id)).fetchall()
         if rows:
             source_b_txs = [dict(r) for r in rows]

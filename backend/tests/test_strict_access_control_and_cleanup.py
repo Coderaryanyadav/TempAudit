@@ -504,3 +504,131 @@ def test_backup_evidence_tampering_injection_and_removal(tmp_path):
             except Exception:
                 pass
 
+
+def test_trial_balance_report_download_access_scoping():
+    """Verify that download_trial_balance_report enforces engagement access scoping."""
+    init_db()
+    conn = get_db_connection()
+    try:
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("INSERT OR REPLACE INTO clients (id, name, entity_type, pan, created_at) VALUES (881, 'TB Scoping Client', 'Pvt Ltd', 'ABCDE1234F', ?)", (now,))
+        conn.execute("""
+            INSERT OR REPLACE INTO users (id, username, email, full_name, password_hash, role, is_active, created_at)
+            VALUES (882, 'unassigned_staff', 'staff@test.com', 'Unassigned Staff', 'hash', 'Audit Staff', 1, ?)
+        """, (now,))
+        conn.execute("""
+            INSERT OR REPLACE INTO users (id, username, email, full_name, password_hash, role, is_active, created_at)
+            VALUES (883, 'assigned_staff', 'assigned@test.com', 'Assigned Staff', 'hash', 'Audit Staff', 1, ?)
+        """, (now,))
+        conn.execute("""
+            INSERT OR REPLACE INTO engagements (id, client_id, title, audit_type, financial_year, lead_auditor_id, assigned_staff_id, created_at, updated_at)
+            VALUES (8801, 881, 'TB Protected Engagement', 'Statutory', '2024-25', 1, 883, ?, ?)
+        """, (now, now))
+        conn.commit()
+
+        from backend.app.routers.trial_balance import download_trial_balance_report
+
+        unassigned_user = {"id": 882, "username": "unassigned_staff", "role": "Audit Staff"}
+        assigned_user = {"id": 883, "username": "assigned_staff", "role": "Audit Staff"}
+
+        # 1. Unassigned Audit Staff MUST BE REJECTED WITH 403 FORBIDDEN
+        with pytest.raises(HTTPException) as exc_info:
+            download_trial_balance_report(8801, current_user=unassigned_user)
+        assert exc_info.value.status_code == 403
+        assert "forbidden" in exc_info.value.detail.lower() or "authorization" in exc_info.value.detail.lower()
+
+        # 2. Assigned Audit Staff is permitted
+        res = download_trial_balance_report(8801, current_user=assigned_user)
+        assert res.status_code == 200
+        assert b"TRIAL BALANCE ANALYSIS" in res.body
+    finally:
+        conn.close()
+
+
+def test_dashboard_summary_stats_unassigned_staff_scoping():
+    """Verify that /dashboard/summary-stats returns zero counts and no client leak to unassigned staff."""
+    init_db()
+    conn = get_db_connection()
+    try:
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("INSERT OR REPLACE INTO clients (id, name, entity_type, created_at) VALUES (771, 'Secret Client Alpha', 'Pvt Ltd', ?)", (now,))
+        conn.execute("""
+            INSERT OR REPLACE INTO users (id, username, email, full_name, password_hash, role, is_active, created_at)
+            VALUES (772, 'isolated_staff', 'isolated@test.com', 'Isolated Staff', 'hash', 'Audit Staff', 1, ?)
+        """, (now,))
+        conn.execute("""
+            INSERT OR REPLACE INTO engagements (id, client_id, title, audit_type, financial_year, status, lead_auditor_id, assigned_staff_id, created_at, updated_at)
+            VALUES (7701, 771, 'Secret Alpha Audit', 'Statutory', '2024-25', 'Under Review', 1, NULL, ?, ?)
+        """, (now, now))
+        conn.execute("""
+            INSERT OR REPLACE INTO audit_findings (id, engagement_id, finding_code, category, severity, title, description, engine_type, status, created_at)
+            VALUES (77001, 7701, 'FND-001', 'Tax', 'CRITICAL', 'Confidential Tax Finding', 'Desc', 'Deterministic', 'Open', ?)
+        """, (now,))
+        conn.commit()
+
+        from backend.app.routers.engagements import get_dashboard_summary_stats
+
+        unassigned_staff = {"id": 772, "username": "isolated_staff", "role": "Audit Staff"}
+        stats = get_dashboard_summary_stats(engagement_id=None, current_user=unassigned_staff)
+
+        # Scoped counts must be completely isolated (0 clients, 0 engagements, 0 pending, 0 findings)
+        assert stats["active_clients_count"] == 0
+        assert stats["active_engagements_count"] == 0
+        assert stats["pending_reviews_count"] == 0
+        assert stats["pending_review_engagements"] == []
+        assert stats["open_findings_count"] == 0
+        assert stats["critical_findings_count"] == 0
+        assert stats["total_turnover_examined"] == 0.0
+
+        # Admin user receives global numbers including Secret Client Alpha
+        admin_user = {"id": 1, "username": "admin", "role": "Admin"}
+        admin_stats = get_dashboard_summary_stats(engagement_id=None, current_user=admin_user)
+        assert admin_stats["active_clients_count"] > 0
+        assert admin_stats["active_engagements_count"] > 0
+    finally:
+        conn.close()
+
+
+def test_reconciliation_source_category_validation():
+    """Verify that BRS, GST, and Sales reconciliation engines reject invalid source file categories."""
+    init_db()
+    conn = get_db_connection()
+    try:
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("INSERT OR REPLACE INTO clients (id, name, entity_type, created_at) VALUES (661, 'Recon Test Client', 'Pvt Ltd', ?)", (now,))
+        conn.execute("""
+            INSERT OR REPLACE INTO engagements (id, client_id, title, audit_type, financial_year, lead_auditor_id, created_at, updated_at)
+            VALUES (6601, 661, 'Recon Test Audit', 'Statutory', '2024-25', 1, ?, ?)
+        """, (now, now))
+        # Create an uploaded file with category 'Sales Register'
+        conn.execute("""
+            INSERT OR REPLACE INTO uploaded_files (id, engagement_id, file_name, file_type, file_path, data_category, uploaded_at)
+            VALUES (66101, 6601, 'sales_register_q1.xlsx', 'xlsx', '/tmp/sales.xlsx', 'Sales Register', ?)
+        """, (now,))
+        # Create an uploaded file with category 'Bank Statement'
+        conn.execute("""
+            INSERT OR REPLACE INTO uploaded_files (id, engagement_id, file_name, file_type, file_path, data_category, uploaded_at)
+            VALUES (66102, 6601, 'bank_statement_sbi.pdf', 'pdf', '/tmp/bank.pdf', 'Bank Statement', ?)
+        """, (now,))
+        conn.commit()
+
+        # 1. BRS: Supplying Sales Register file as bank statement source MUST FAIL
+        from backend.app.services.bank_reconciliation_engine import run_bank_reconciliation
+        with pytest.raises(ValueError) as exc_brs:
+            run_bank_reconciliation(6601, file_b_id=66101)
+        assert "not a valid bank statement source" in str(exc_brs.value).lower()
+
+        # 2. GST: Supplying Bank Statement file as GST portal dataset (Source A) MUST FAIL
+        from backend.app.services.gst_reconciliation_engine import run_gst_reconciliation
+        with pytest.raises(ValueError) as exc_gst:
+            run_gst_reconciliation(6601, source_a_file_id=66102)
+        assert "not a valid gst portal dataset" in str(exc_gst.value).lower()
+
+        # 3. Sales Recon: Supplying Bank Statement as Sales Register source MUST FAIL
+        from backend.app.services.sales_purchase_reconciliation_engine import run_sales_purchase_reconciliation
+        with pytest.raises(ValueError) as exc_sales:
+            run_sales_purchase_reconciliation(6601, recon_type="Sales Reconciliation", register_file_id=66102)
+        assert "not a valid sales register source" in str(exc_sales.value).lower()
+    finally:
+        conn.close()
+

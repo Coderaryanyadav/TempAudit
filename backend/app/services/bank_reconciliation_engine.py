@@ -108,11 +108,19 @@ def run_bank_reconciliation(
     if file_b_id:
         # WF-003: Validate that file_b_id belongs to the requested engagement
         file_b_check = conn.execute(
-            "SELECT id FROM uploaded_files WHERE id = ? AND engagement_id = ?",
+            "SELECT id, data_category, file_type, file_name FROM uploaded_files WHERE id = ? AND engagement_id = ?",
             (file_b_id, engagement_id)
         ).fetchone()
         if not file_b_check:
             raise ValueError(f"Uploaded bank statement file ID {file_b_id} does not belong to engagement {engagement_id}.")
+        cat = (file_b_check["data_category"] or "").strip().upper()
+        ft = (file_b_check["file_type"] or "").strip().upper()
+        fname = (file_b_check["file_name"] or "").lower()
+        valid_bank_categories = {"BANK STATEMENT", "BANK STATEMENT (PDF)", "BANK STATEMENTS", "BANK"}
+        if cat not in valid_bank_categories and ft not in valid_bank_categories and "bank" not in fname:
+            raise ValueError(
+                f"File ID {file_b_id} has category '{file_b_check['data_category']}', which is not a valid Bank Statement source."
+            )
         stmt_rows = conn.execute(
             "SELECT * FROM transactions WHERE file_id = ? AND engagement_id = ? ORDER BY date ASC, id ASC",
             (file_b_id, engagement_id)

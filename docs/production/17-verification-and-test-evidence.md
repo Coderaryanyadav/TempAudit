@@ -62,7 +62,7 @@ TOTAL ASSERTIONS EXECUTED                                                PASSED 
 - **Command**: `python3 -m pytest backend/tests -v`
 - **Output**:
   ```
-  ======================= 250 passed, 1 warning in 11.28s ========================
+  ======================= 256 passed, 1 warning in 16.72s ========================
   ```
 - **Exit Code**: `0`
 

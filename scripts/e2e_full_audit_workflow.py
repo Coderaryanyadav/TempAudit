@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import tempfile
 import shutil
 import atexit
+import subprocess
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -598,16 +599,36 @@ def run_all_steps():
     except Exception as e:
         record_step(22, "Restore From Backup Snapshot", False, str(e))
 
-    # Step 23: Application Restart Simulation (Fresh App State & Client Reload)
-    fresh_client = None
+    # Step 23: Application Restart (Independent OS Process Verification)
+    fresh_client = TestClient(app)
     try:
-        from backend.app.main import app as fresh_app
-        fresh_client = TestClient(fresh_app)
-        health_resp = fresh_client.get("/api/health")
-        assert health_resp.status_code == 200, f"Health check failed on restarted client: {health_resp.text}"
-        h_data = health_resp.json()
-        assert h_data.get("status") in ["healthy", "ok", "ACTIVE"] or "timestamp" in h_data or h_data.get("database") == "connected"
-        record_step(23, "Restart Application & Verify Health", True, f"FastAPI service healthy on fresh connection (status: {h_data.get('status', 'OK')})")
+        sub_check = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import os, sys, json;"
+                    "from backend.app.database import get_db_connection;"
+                    "from fastapi.testclient import TestClient;"
+                    "from backend.app.main import app;"
+                    "c = TestClient(app);"
+                    "r = c.get('/api/health');"
+                    "assert r.status_code == 200, f'Status {r.status_code}';"
+                    "conn = get_db_connection();"
+                    "cnt = conn.execute('SELECT COUNT(*) FROM clients').fetchone()[0];"
+                    "conn.close();"
+                    "print(json.dumps({'status': r.json().get('status', 'healthy'), 'clients': cnt}))"
+                )
+            ],
+            capture_output=True,
+            text=True,
+            env=os.environ.copy()
+        )
+        assert sub_check.returncode == 0, f"Subprocess restart check failed: {sub_check.stderr}"
+        sub_data = json.loads(sub_check.stdout.strip().splitlines()[-1])
+        assert sub_data.get("status") in ["healthy", "ok", "ACTIVE"]
+        assert sub_data.get("clients") > 0
+        record_step(23, "Restart Application & Verify Health", True, f"External OS subprocess boot verified health & restored state (status: {sub_data.get('status')})")
     except Exception as e:
         record_step(23, "Restart Application & Verify Health", False, str(e))
 

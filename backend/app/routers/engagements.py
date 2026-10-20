@@ -35,57 +35,130 @@ def get_dashboard_summary_stats(
     if engagement_id:
         require_engagement_access(engagement_id, current_user)
 
+    from backend.app.auth import normalize_role
+    user_id = current_user.get("id") if current_user else None
+    user_role = normalize_role(current_user.get("role")) if current_user else "Admin"
+    is_restricted = bool(current_user and user_role not in ["Admin", "Auditor"])
+
     conn = get_db_connection()
     try:
-        # 1. Total Active Clients
-        active_clients_count = conn.execute("SELECT COUNT(*) as c FROM clients").fetchone()["c"]
+        if is_restricted and not engagement_id:
+            # 1. Total Active Clients (Scoped to assigned engagements)
+            active_clients_count = conn.execute(
+                "SELECT COUNT(DISTINCT client_id) as c FROM engagements WHERE (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
 
-        # 2. Total Active Engagements
-        active_eng_count = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status IN ('Draft', 'In Progress', 'Under Review')").fetchone()["c"]
-        
-        # 3. Pending Reviews
-        pending_review_count = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status = 'Under Review'").fetchone()["c"]
-        pending_review_engs = [dict(r) for r in conn.execute("""
-            SELECT e.id, e.title, e.financial_year, c.name as client_name
-            FROM engagements e
-            JOIN clients c ON e.client_id = c.id
-            WHERE e.status = 'Under Review'
-        """).fetchall()]
-
-        # 4. Completed Engagements
-        completed_eng_count = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status = 'Completed'").fetchone()["c"]
-
-        # 5. Total Archived Engagements
-        archived_eng_count = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status = 'Archived'").fetchone()["c"]
-
-        # 6. Open & High-Risk Findings (For active engagement or overall)
-        if engagement_id:
-            open_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND status IN ('Open', 'In Review')", (engagement_id,)).fetchone()["c"]
-            high_risk_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND severity IN ('CRITICAL', 'HIGH')", (engagement_id,)).fetchone()["c"]
-            crit_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND severity = 'CRITICAL'", (engagement_id,)).fetchone()["c"]
-            turnover = conn.execute("SELECT SUM(debit) as s FROM transactions WHERE engagement_id = ?", (engagement_id,)).fetchone()["s"] or 0.0
+            # 2. Total Active Engagements
+            active_eng_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status IN ('Draft', 'In Progress', 'Under Review') AND (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
             
-            # Unmatched transactions
+            # 3. Pending Reviews
+            pending_review_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status = 'Under Review' AND (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+            pending_review_engs = [dict(r) for r in conn.execute("""
+                SELECT e.id, e.title, e.financial_year, c.name as client_name
+                FROM engagements e
+                JOIN clients c ON e.client_id = c.id
+                WHERE e.status = 'Under Review' AND (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchall()]
+
+            # 4. Completed Engagements
+            completed_eng_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status = 'Completed' AND (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+
+            # 5. Total Archived Engagements
+            archived_eng_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status = 'Archived' AND (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+
+            # 6. Scoped Findings, Turnover, Unmatched
+            open_findings_count = conn.execute(
+                "SELECT COUNT(*) as c FROM audit_findings WHERE status IN ('Open', 'In Review') AND engagement_id IN (SELECT id FROM engagements WHERE assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+            high_risk_findings_count = conn.execute(
+                "SELECT COUNT(*) as c FROM audit_findings WHERE severity IN ('CRITICAL', 'HIGH') AND engagement_id IN (SELECT id FROM engagements WHERE assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+            crit_findings_count = conn.execute(
+                "SELECT COUNT(*) as c FROM audit_findings WHERE severity = 'CRITICAL' AND engagement_id IN (SELECT id FROM engagements WHERE assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+            turnover = conn.execute(
+                "SELECT SUM(debit) as s FROM transactions WHERE engagement_id IN (SELECT id FROM engagements WHERE assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["s"] or 0.0
+            
             unmatched_count = conn.execute("""
                 SELECT COUNT(*) as c FROM reconciliation_items ri
                 JOIN reconciliations r ON ri.recon_id = r.id
-                WHERE r.engagement_id = ? AND (ri.status IN ('Unmatched', 'Suggested') OR ri.match_level = 'UNMATCHED')
-            """, (engagement_id,)).fetchone()["c"]
+                WHERE r.engagement_id IN (SELECT id FROM engagements WHERE assigned_staff_id = ? OR lead_auditor_id = ?)
+                  AND (ri.status IN ('Unmatched', 'Suggested') OR ri.match_level = 'UNMATCHED')
+            """, (user_id, user_id)).fetchone()["c"]
             if unmatched_count == 0:
-                recon_summary = conn.execute("SELECT SUM(unmatched_bank_count + unmatched_book_count) as s FROM reconciliations WHERE engagement_id = ?", (engagement_id,)).fetchone()["s"]
+                recon_summary = conn.execute(
+                    "SELECT SUM(unmatched_bank_count + unmatched_book_count) as s FROM reconciliations WHERE engagement_id IN (SELECT id FROM engagements WHERE assigned_staff_id = ? OR lead_auditor_id = ?)",
+                    (user_id, user_id)
+                ).fetchone()["s"]
                 unmatched_count = int(recon_summary or 0)
         else:
-            open_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE status IN ('Open', 'In Review')").fetchone()["c"]
-            high_risk_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE severity IN ('CRITICAL', 'HIGH')").fetchone()["c"]
-            crit_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE severity = 'CRITICAL'").fetchone()["c"]
-            turnover = conn.execute("SELECT SUM(debit) as s FROM transactions").fetchone()["s"] or 0.0
+            # 1. Total Active Clients
+            active_clients_count = conn.execute("SELECT COUNT(*) as c FROM clients").fetchone()["c"]
+
+            # 2. Total Active Engagements
+            active_eng_count = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status IN ('Draft', 'In Progress', 'Under Review')").fetchone()["c"]
             
-            unmatched_count = conn.execute("""
-                SELECT COUNT(*) as c FROM reconciliation_items WHERE status IN ('Unmatched', 'Suggested') OR match_level = 'UNMATCHED'
-            """).fetchone()["c"]
-            if unmatched_count == 0:
-                recon_summary = conn.execute("SELECT SUM(unmatched_bank_count + unmatched_book_count) as s FROM reconciliations").fetchone()["s"]
-                unmatched_count = int(recon_summary or 0)
+            # 3. Pending Reviews
+            pending_review_count = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status = 'Under Review'").fetchone()["c"]
+            pending_review_engs = [dict(r) for r in conn.execute("""
+                SELECT e.id, e.title, e.financial_year, c.name as client_name
+                FROM engagements e
+                JOIN clients c ON e.client_id = c.id
+                WHERE e.status = 'Under Review'
+            """).fetchall()]
+
+            # 4. Completed Engagements
+            completed_eng_count = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status = 'Completed'").fetchone()["c"]
+
+            # 5. Total Archived Engagements
+            archived_eng_count = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status = 'Archived'").fetchone()["c"]
+
+            # 6. Open & High-Risk Findings (For active engagement or overall)
+            if engagement_id:
+                open_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND status IN ('Open', 'In Review')", (engagement_id,)).fetchone()["c"]
+                high_risk_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND severity IN ('CRITICAL', 'HIGH')", (engagement_id,)).fetchone()["c"]
+                crit_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND severity = 'CRITICAL'", (engagement_id,)).fetchone()["c"]
+                turnover = conn.execute("SELECT SUM(debit) as s FROM transactions WHERE engagement_id = ?", (engagement_id,)).fetchone()["s"] or 0.0
+                
+                # Unmatched transactions
+                unmatched_count = conn.execute("""
+                    SELECT COUNT(*) as c FROM reconciliation_items ri
+                    JOIN reconciliations r ON ri.recon_id = r.id
+                    WHERE r.engagement_id = ? AND (ri.status IN ('Unmatched', 'Suggested') OR ri.match_level = 'UNMATCHED')
+                """, (engagement_id,)).fetchone()["c"]
+                if unmatched_count == 0:
+                    recon_summary = conn.execute("SELECT SUM(unmatched_bank_count + unmatched_book_count) as s FROM reconciliations WHERE engagement_id = ?", (engagement_id,)).fetchone()["s"]
+                    unmatched_count = int(recon_summary or 0)
+            else:
+                open_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE status IN ('Open', 'In Review')").fetchone()["c"]
+                high_risk_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE severity IN ('CRITICAL', 'HIGH')").fetchone()["c"]
+                crit_findings_count = conn.execute("SELECT COUNT(*) as c FROM audit_findings WHERE severity = 'CRITICAL'").fetchone()["c"]
+                turnover = conn.execute("SELECT SUM(debit) as s FROM transactions").fetchone()["s"] or 0.0
+                
+                unmatched_count = conn.execute("""
+                    SELECT COUNT(*) as c FROM reconciliation_items WHERE status IN ('Unmatched', 'Suggested') OR match_level = 'UNMATCHED'
+                """).fetchone()["c"]
+                if unmatched_count == 0:
+                    recon_summary = conn.execute("SELECT SUM(unmatched_bank_count + unmatched_book_count) as s FROM reconciliations").fetchone()["s"]
+                    unmatched_count = int(recon_summary or 0)
 
         return {
             "active_clients_count": active_clients_count,

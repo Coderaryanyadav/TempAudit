@@ -59,9 +59,26 @@ def run_sales_purchase_reconciliation(
     # If a specific file is uploaded as Sales/Purchase Register
     register_txs = []
     if register_file_id:
-        chk_reg = conn.execute("SELECT id FROM uploaded_files WHERE id = ? AND engagement_id = ?", (register_file_id, engagement_id)).fetchone()
+        chk_reg = conn.execute(
+            "SELECT id, data_category, file_type, file_name FROM uploaded_files WHERE id = ? AND engagement_id = ?",
+            (register_file_id, engagement_id)
+        ).fetchone()
         if not chk_reg:
             raise ValueError(f"Register file ID {register_file_id} does not belong to engagement {engagement_id}.")
+        cat_reg = (chk_reg["data_category"] or "").strip().upper()
+        fname_reg = (chk_reg["file_name"] or "").lower()
+        if is_sales:
+            valid_reg_cats = {"SALES REGISTER", "SALES", "SALES DATA", "REVENUE"}
+            if cat_reg not in valid_reg_cats and "sale" not in fname_reg:
+                raise ValueError(
+                    f"Register file ID {register_file_id} has category '{chk_reg['data_category']}', which is not a valid Sales Register source."
+                )
+        else:
+            valid_reg_cats = {"PURCHASE REGISTER", "PURCHASE", "PURCHASE DATA", "EXPENSE REGISTER"}
+            if cat_reg not in valid_reg_cats and "purchase" not in fname_reg:
+                raise ValueError(
+                    f"Register file ID {register_file_id} has category '{chk_reg['data_category']}', which is not a valid Purchase Register source."
+                )
         rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? AND engagement_id = ? ORDER BY date ASC, id ASC", (register_file_id, engagement_id)).fetchall()
         if rows:
             register_txs = [dict(r) for r in rows]

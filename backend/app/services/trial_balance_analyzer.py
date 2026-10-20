@@ -67,23 +67,11 @@ def analyze_trial_balance(engagement_id: int) -> Dict[str, Any]:
                   WHERE engagement_id = ? 
                     AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
               )
-              OR (
-                  NOT EXISTS (
-                      SELECT 1 FROM uploaded_files 
-                      WHERE engagement_id = ? 
-                        AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
-                  )
-                  AND file_id NOT IN (
-                      SELECT id FROM uploaded_files 
-                      WHERE engagement_id = ? 
-                        AND data_category IN ('Sales Register', 'Purchase Register', 'Bank Statement', 'GST Data', 'GSTR-1', 'GSTR-2B', 'GSTR-3B')
-                  )
-              )
           )
-          AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'GST_DATA')
+          AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'EXPENSE_REGISTER', 'GST_DATA')
         GROUP BY ledger, account_group
         ORDER BY account_group ASC, ledger ASC
-    """, (engagement_id, engagement_id, engagement_id, engagement_id)).fetchall()
+    """, (engagement_id, engagement_id)).fetchall()
 
     # 2. Check if explicit ledgers table has entries for this engagement
     ledger_master_rows = conn.execute("""

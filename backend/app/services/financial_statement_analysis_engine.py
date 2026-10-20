@@ -148,22 +148,10 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                   WHERE engagement_id = ? 
                     AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
               )
-              OR (
-                  NOT EXISTS (
-                      SELECT 1 FROM uploaded_files 
-                      WHERE engagement_id = ? 
-                        AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
-                  )
-                  AND file_id NOT IN (
-                      SELECT id FROM uploaded_files 
-                      WHERE engagement_id = ? 
-                        AND data_category IN ('Sales Register', 'Purchase Register', 'Bank Statement', 'GST Data', 'GSTR-1', 'GSTR-2B', 'GSTR-3B')
-                  )
-              )
           )
-          AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'GST_DATA')
+          AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'EXPENSE_REGISTER', 'GST_DATA')
         GROUP BY ledger, account_group
-    """, (engagement_id, engagement_id, engagement_id, engagement_id)).fetchall()
+    """, (engagement_id, engagement_id)).fetchall()
 
     # 2. Check for exact Previous Year (PY) Engagement (e.g. 2025-26 -> 2024-25)
     from backend.app.utils.financial_year import derive_prior_financial_year
@@ -190,22 +178,10 @@ def run_financial_statement_analysis(engagement_id: int) -> Dict[str, Any]:
                       WHERE engagement_id = ? 
                         AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
                   )
-                  OR (
-                      NOT EXISTS (
-                          SELECT 1 FROM uploaded_files 
-                          WHERE engagement_id = ? 
-                            AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
-                      )
-                      AND file_id NOT IN (
-                          SELECT id FROM uploaded_files 
-                          WHERE engagement_id = ? 
-                            AND data_category IN ('Sales Register', 'Purchase Register', 'Bank Statement', 'GST Data', 'GSTR-1', 'GSTR-2B', 'GSTR-3B')
-                      )
-                  )
               )
-              AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'GST_DATA')
+              AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'EXPENSE_REGISTER', 'GST_DATA')
             GROUP BY ledger, account_group
-        """, (py_eng_row["id"], py_eng_row["id"], py_eng_row["id"], py_eng_row["id"])).fetchall()
+        """, (py_eng_row["id"], py_eng_row["id"])).fetchall()
 
     # 3. Aggregate Ledger Figures strictly according to Canonical Chart of Accounts rules
     def aggregate_statements(rows):
