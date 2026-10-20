@@ -44,12 +44,17 @@ if not exist "venv" (
 
 :: 4. Install Dependencies
 echo.
-echo [4/7] Installing production dependencies from requirements.txt...
 call venv\Scripts\activate.bat
 python -m pip install --upgrade pip --quiet
-python -m pip install -r requirements.txt --quiet
+if exist requirements.lock (
+    echo [4/7] Installing pinned dependencies from requirements.lock...
+    python -m pip install -r requirements.lock --quiet
+) else (
+    echo [4/7] Installing dependencies from requirements.txt...
+    python -m pip install -r requirements.txt --quiet
+)
 if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Dependency installation failed. Check internet connection or requirements.txt.
+    echo [ERROR] Dependency installation failed. Check internet connection or requirements file.
     exit /b 1
 )
 echo [OK] All dependencies successfully verified and installed.

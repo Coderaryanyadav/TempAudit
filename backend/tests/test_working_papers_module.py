@@ -15,16 +15,17 @@ def setup_database():
     seed_test_database()
 
 def get_auth_token():
-    # Login as default admin
-    res = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
-    assert res.status_code == 200, f"Login failed: {res.text}"
-    return res.json()["access_token"]
+    from backend.app.auth import create_access_token
+    return create_access_token({"sub": "admin", "role": "Admin", "uid": 1})
 
 
 def test_working_papers_full_workflow():
     token = get_auth_token()
     headers = {"Authorization": f"Bearer {token}"}
-    engagement_id = 1
+    conn = get_db_connection()
+    eng_row = conn.execute("SELECT id FROM engagements LIMIT 1").fetchone()
+    conn.close()
+    engagement_id = eng_row["id"] if eng_row else 1
 
     # 1. Create working paper
     wp_data = {

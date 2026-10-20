@@ -71,11 +71,10 @@ def test_report_generation_and_physical_pdf_validation(auth_headers):
     assert res_dl.headers.get("content-type") == "application/pdf"
     assert len(res_dl.content) > 100
 
-    # Verify download via query token
+    # Verify download via query token is rejected (closing URL token leakage vector)
     token = auth_headers["Token"]
     res_dl_token = client.get(f"/api/reports/download/{report_id}?token={token}")
-    assert res_dl_token.status_code == 200
-    assert res_dl_token.headers.get("content-type") == "application/pdf"
+    assert res_dl_token.status_code == 401, "Query token authentication must be rejected; Bearer header is required"
 
     # Verify unauthenticated download is rejected
     res_unauth = client.get(f"/api/reports/download/{report_id}")

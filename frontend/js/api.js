@@ -23,10 +23,9 @@ class FinAuditAPI {
   }
 
   static attachAuthToken(url) {
-    const token = this.getToken();
-    if (!token) return url;
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}token=${encodeURIComponent(token)}`;
+    // For security, authentication tokens are transmitted via Authorization Bearer headers
+    // rather than URL query parameters to prevent leakage in browser history and server logs.
+    return url;
   }
 
   static async request(endpoint, options = {}) {

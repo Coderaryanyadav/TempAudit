@@ -38,10 +38,15 @@ fi
 
 # 3. Activate and Install Dependencies
 echo ""
-echo "[3/8] Installing production dependencies from requirements.txt..."
 source venv/bin/activate
 pip install --upgrade pip --quiet
-pip install -r requirements.txt --quiet
+if [ -f "requirements.lock" ]; then
+    echo "[3/8] Installing pinned production dependencies from requirements.lock..."
+    pip install -r requirements.lock --quiet
+else
+    echo "[3/8] Installing production dependencies from requirements.txt..."
+    pip install -r requirements.txt --quiet
+fi
 echo "[OK] All dependencies successfully verified and installed."
 
 # 4. Create Runtime Directories

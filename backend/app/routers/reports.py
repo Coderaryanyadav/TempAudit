@@ -1,9 +1,13 @@
 import os
 import json
+import uuid
+import logging
 from datetime import datetime
 from typing import Optional, List, Dict
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import FileResponse
+
+logger = logging.getLogger(__name__)
 
 from backend.app.schemas import GenerateReportRequest
 from backend.app.auth import get_current_user, require_engagement_access
@@ -177,8 +181,15 @@ def generate_pdf_report(
             "download_url": f"/api/reports/download/{report_id}",
             "message": f"Report '{display_title}' generated successfully."
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate PDF report: {str(e)}")
+        error_ref = uuid.uuid4().hex[:8]
+        logger.exception("Failed to generate PDF report [Ref=%s]: %s", error_ref, e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while generating the PDF audit report (Error Reference: {error_ref}). Please contact support or review server logs."
+        )
 
 @router.get("/download/{report_id}")
 def download_report(report_id: int, current_user: dict = Depends(get_current_user)):

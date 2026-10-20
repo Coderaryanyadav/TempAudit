@@ -46,16 +46,26 @@ DEFAULT_SETTINGS = {
 }
 
 
+import re
+
+APPROVED_BACKUP_PATTERN = re.compile(r"^finauditpro_backup_\d{8}_\d{6}(?:_[a-zA-Z0-9_-]+)?\.db$")
+
+
 def _enforce_backup_retention(retention_days: int = 30):
-    """Deletes backup files older than retention_days."""
+    """
+    Deletes approved backup files older than retention_days.
+    Strictly verifies filename against approved pattern and rejects symlinks or unrelated .db files.
+    """
     try:
         if not os.path.exists(BACKUP_DIR) or retention_days <= 0:
             return
         now = time.time()
         max_age_seconds = retention_days * 86400
         for f in os.listdir(BACKUP_DIR):
+            if not APPROVED_BACKUP_PATTERN.match(f):
+                continue
             fpath = os.path.join(BACKUP_DIR, f)
-            if os.path.isfile(fpath) and (f.startswith("finauditpro_backup_") or f.endswith(".db")):
+            if os.path.isfile(fpath) and not os.path.islink(fpath):
                 if (now - os.path.getmtime(fpath)) > max_age_seconds:
                     try:
                         os.remove(fpath)

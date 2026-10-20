@@ -24,23 +24,19 @@ if [ ! -f "backend/finauditpro.db" ]; then
     python -m backend.app.database
 fi
 
-# 2b. Ensure Master Administrator is verified and ready
+# 2b. Verify Administrator Account Status
 python -c "
-try:
-    from backend.app.database import get_db_connection, init_db
-    init_db()
-    conn = get_db_connection()
-    admin = conn.execute(\"SELECT id, username FROM users WHERE role = 'Admin' LIMIT 1\").fetchone()
-    if not admin:
-        from scripts.create_admin import create_admin_user
-        create_admin_user('admin', 'admin123', 'admin@finauditpro.local', 'Master Administrator (FCA)')
-        print('[Auth Setup] Initialized Master Administrator: admin (Password: admin123)')
-    else:
-        print(f'[Auth Status] Master Administrator verified: {admin[\"username\"]}')
-    conn.close()
-except Exception as e:
-    print(f'[Auth Note] {e}')
-" || true
+from backend.app.database import get_db_connection, init_db
+init_db()
+conn = get_db_connection()
+admin = conn.execute(\"SELECT id, username FROM users WHERE role = 'Admin' AND is_active = 1 LIMIT 1\").fetchone()
+if not admin:
+    print('[Auth Setup] No administrator account found. First-run setup required.')
+    print('[Auth Setup] Open http://127.0.0.1:8000 or run: python scripts/create_admin.py')
+else:
+    print(f'[Auth Status] Master Administrator verified: {admin[\"username\"]}')
+conn.close()
+"
 
 
 # 3. Start LM Studio Local AI Server & Load Model

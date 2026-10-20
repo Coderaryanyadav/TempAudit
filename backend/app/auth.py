@@ -23,8 +23,25 @@ def get_session_timeout_minutes() -> int:
         pass
     return 60
 
+COMMON_WEAK_PASSWORDS = {
+    "password", "password123", "password123456", "admin123", "admin12345678",
+    "administrator", "administrator1", "12345678", "123456789012",
+    "passwordpassword", "welcome123456", "qwertyuiop12", "finauditpro123",
+    "tempaudit123", "letmein123"
+}
+
+def validate_password_strength(password: str) -> None:
+    """Enforces consistent password requirements across all user creation and reset flows."""
+    if not password or len(password) < 8:
+        raise ValueError("Password must be at least 8 characters long.")
+    if password.lower() in COMMON_WEAK_PASSWORDS:
+        raise ValueError("Password is too common or easily guessable. Please choose a stronger passphrase.")
+
+_CACHED_JWT_SECRET: Optional[str] = None
+
 def get_jwt_secret() -> str:
     """Retrieves secret key from environment or persisted database settings (Refusing hardcoded fallbacks)."""
+    global _CACHED_JWT_SECRET
     env_secret = os.environ.get("FINAUDIT_SECRET_KEY")
     KNOWN_INSECURE_SECRETS = {
         "c9d79e627e7813a37c8440ddc4d27f5a455c14243828a1c8f15499f1702d4e68",
@@ -35,6 +52,9 @@ def get_jwt_secret() -> str:
             raise RuntimeError("Insecure default or placeholder FINAUDIT_SECRET_KEY detected; refusing to start.")
         return env_secret.strip()
     
+    if _CACHED_JWT_SECRET is not None:
+        return _CACHED_JWT_SECRET
+
     try:
         conn = get_db_connection()
         conn.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)")
@@ -42,6 +62,7 @@ def get_jwt_secret() -> str:
         if row and row["value"]:
             secret = row["value"]
             conn.close()
+            _CACHED_JWT_SECRET = secret
             return secret
         
         new_secret = secrets.token_hex(32)
@@ -49,6 +70,7 @@ def get_jwt_secret() -> str:
         conn.execute("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('jwt_secret_key', ?, ?)", (new_secret, now_str))
         conn.commit()
         conn.close()
+        _CACHED_JWT_SECRET = new_secret
         return new_secret
     except Exception as e:
         raise RuntimeError("JWT secret is unavailable; refusing to start authentication.") from e
@@ -144,21 +166,16 @@ def invalidate_user_sessions(user_id: int):
         conn.close()
 
 def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    request: Request = None
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> dict:
-    token = None
-    if credentials and credentials.credentials:
-        token = credentials.credentials
-    elif request and request.query_params.get("token"):
-        token = request.query_params.get("token")
-
-    if not token:
+    if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=401,
             detail="Authentication required. Please provide a valid Bearer token.",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+    token = credentials.credentials
 
     secret = get_jwt_secret()
     try:

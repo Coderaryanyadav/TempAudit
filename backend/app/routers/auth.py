@@ -14,7 +14,8 @@ from backend.app.schemas import (
 )
 from backend.app.auth import (
     verify_password, hash_password, create_access_token,
-    get_current_user, require_role, normalize_role, invalidate_user_sessions
+    get_current_user, require_role, normalize_role, invalidate_user_sessions,
+    validate_password_strength
 )
 from backend.app.database import get_db_connection
 from backend.app.utils.audit_logger import log_audit_event
@@ -23,11 +24,6 @@ router = APIRouter(prefix="/api/auth", tags=["User Management & Authentication"]
 
 USERNAME_REGEX = r"^[a-zA-Z0-9_.]{3,50}$"
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
-
-COMMON_WEAK_PASSWORDS = {
-    "password123456", "admin12345678", "administrator1", "123456789012",
-    "passwordpassword", "welcome123456", "qwertyuiop12"
-}
 
 def _ensure_rate_limit_table(conn):
     conn.execute("""
@@ -168,11 +164,10 @@ def initial_setup(user_data: InitialAdminCreate):
     if not re.match(EMAIL_REGEX, email):
         raise HTTPException(status_code=400, detail="Please enter a valid email address.")
 
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
-
-    if password.lower() in COMMON_WEAK_PASSWORDS:
-        raise HTTPException(status_code=400, detail="Password is too common or easily guessable. Please choose a stronger passphrase.")
+    try:
+        validate_password_strength(password)
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
 
     conn = get_db_connection()
     try:
@@ -522,8 +517,10 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
         if not user or not verify_password(req.old_password, user["password_hash"]):
             raise HTTPException(status_code=400, detail="Current password entered is incorrect.")
 
-        if len(req.new_password) < 8:
-            raise HTTPException(status_code=400, detail="New password must be at least 8 characters long.")
+        try:
+            validate_password_strength(req.new_password)
+        except ValueError as val_err:
+            raise HTTPException(status_code=400, detail=str(val_err))
 
         new_hash = hash_password(req.new_password)
         now_str = datetime.now().isoformat()
@@ -604,13 +601,18 @@ def activate_user(req: UserActivationSubmit):
     Transitions account from INVITED to ACTIVE. Issues immediate access token.
     """
     token = req.activation_token.strip()
-    if len(req.password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
+    try:
+        validate_password_strength(req.password)
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
 
     conn = get_db_connection()
     try:
+        # Atomic immediate transaction lock to prevent race conditions during activation
+        conn.execute("BEGIN IMMEDIATE")
         user = conn.execute("SELECT * FROM users WHERE activation_token = ?", (token,)).fetchone()
         if not user:
+            conn.rollback()
             raise HTTPException(status_code=404, detail="Invalid or expired activation token.")
 
         u = dict(user)
@@ -620,10 +622,12 @@ def activate_user(req: UserActivationSubmit):
                 exp_dt = datetime.fromisoformat(exp_str)
                 now_dt = datetime.now(exp_dt.tzinfo) if exp_dt.tzinfo else datetime.now()
                 if now_dt > exp_dt:
+                    conn.rollback()
                     raise HTTPException(status_code=400, detail="Activation token has expired. Request a new token from your administrator.")
             except HTTPException:
                 raise
             except (ValueError, TypeError) as parse_err:
+                conn.rollback()
                 raise HTTPException(status_code=400, detail="Activation token contains invalid expiry metadata. Request a new token.") from parse_err
 
         new_hash = hash_password(req.password)
@@ -674,12 +678,13 @@ def activate_user(req: UserActivationSubmit):
 
 @router.get("/users")
 def list_users(current_user: dict = Depends(require_role(["Admin"]))):
-    """Admin: List all users."""
+    """Admin: List all users (omits raw activation tokens to prevent credential leakage)."""
     conn = get_db_connection()
     try:
         rows = conn.execute("""
             SELECT id, username, email, full_name, role, designation, status, is_active, phone,
-                   activation_token, activation_expires_at, last_login, created_at
+                   (activation_token IS NOT NULL) AS has_pending_invitation,
+                   activation_expires_at, last_login, created_at
             FROM users
             ORDER BY id ASC
         """).fetchall()
@@ -688,6 +693,9 @@ def list_users(current_user: dict = Depends(require_role(["Admin"]))):
         for r in rows:
             u = dict(r)
             u["role"] = normalize_role(u["role"])
+            u["has_pending_invitation"] = bool(u.get("has_pending_invitation"))
+            # Explicitly ensure raw activation_token is not returned
+            u["activation_token"] = None
             users.append(u)
         return users
     finally:
@@ -716,6 +724,11 @@ def create_user(user_data: UserCreate, current_user: dict = Depends(require_role
         ).fetchone()
         if existing:
             raise HTTPException(status_code=400, detail="Username or email address is already registered.")
+
+        try:
+            validate_password_strength(user_data.password)
+        except ValueError as val_err:
+            raise HTTPException(status_code=400, detail=str(val_err))
 
         pwd_hash = hash_password(user_data.password)
         now_str = datetime.now().isoformat()
@@ -942,8 +955,10 @@ def reset_user_activation(user_id: int, current_user: dict = Depends(require_rol
 @router.post("/users/{user_id}/reset-password")
 def admin_reset_password(user_id: int, req: AdminResetPasswordRequest, current_user: dict = Depends(require_role(["Admin"]))):
     """Admin: Reset a user's password directly."""
-    if len(req.new_password) < 8:
-        raise HTTPException(status_code=400, detail="New password must be at least 8 characters long.")
+    try:
+        validate_password_strength(req.new_password)
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
 
     conn = get_db_connection()
     try:

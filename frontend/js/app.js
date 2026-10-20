@@ -2007,12 +2007,9 @@ async function renderUserManagement() {
                   </td>
                   <td class="text-center">
                     <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
-                      ${u.status === 'INVITED' && u.activation_token ? `
-                        <button class="btn btn-sm btn-outline" data-token="${escapeHTML(u.activation_token)}" data-name="${escapeHTML(u.full_name)}" onclick="copyActivationCode(this.dataset.token, this.dataset.name)" title="Copy Activation Code">
-                          Copy Code
-                        </button>
-                        <button class="btn btn-sm btn-secondary" data-userid="${u.id}" data-username="${escapeHTML(u.username)}" onclick="handleReissueActivation(Number(this.dataset.userid), this.dataset.username)" title="Re-issue Token">
-                          ${ICONS.refresh} New Code
+                      ${u.status === 'INVITED' ? `
+                        <button class="btn btn-sm btn-secondary" data-userid="${u.id}" data-username="${escapeHTML(u.username)}" onclick="handleReissueActivation(Number(this.dataset.userid), this.dataset.username)" title="Re-issue Activation Code">
+                          ${ICONS.refresh} Re-issue Code
                         </button>
                       ` : ''}
                       ${u.id !== state.currentUser.id ? `
@@ -11745,9 +11742,7 @@ async function downloadReport(reportId, reportTitle) {
   try {
     await FinAuditAPI.downloadFile(`/api/reports/download/${reportId}`, filename);
   } catch (err) {
-    // Fallback with token in query param
-    const token = FinAuditAPI.getToken();
-    window.open(`/api/reports/download/${reportId}?token=${encodeURIComponent(token || "")}`, "_blank");
+    notifyError("Failed to download PDF report: " + (err.message || "Network error."));
   }
 }
 
@@ -16471,10 +16466,8 @@ function exportAuditTrailData(format) {
     : FinAuditAPI.getAuditTrailExportCsvUrl(params);
 
   const filename = format === "json" ? "audit_trail_export.json" : "audit_trail_export.csv";
-  FinAuditAPI.downloadFile(url, filename).catch(() => {
-    const token = FinAuditAPI.getToken();
-    const sep = url.includes("?") ? "&" : "?";
-    window.open(`${url}${sep}token=${encodeURIComponent(token || "")}`, "_blank");
+  FinAuditAPI.downloadFile(url, filename).catch((err) => {
+    notifyError("Failed to export audit trail: " + (err.message || "Network error."));
   });
 }
 

@@ -64,14 +64,34 @@ def download_evidence(
     require_engagement_access(evidence["engagement_id"], current_user)
     
     storage_path = evidence["storage_path"]
-    if os.path.isabs(storage_path):
-        abs_path = storage_path
-    else:
-        abs_path = os.path.join(os.path.dirname(BASE_EVIDENCE_DIR), storage_path)
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    allowed_roots = [
+        os.path.realpath(BASE_EVIDENCE_DIR),
+        os.path.realpath(os.path.join(project_root, "uploaded_files")),
+        os.path.realpath(os.path.join(project_root, "backend", "uploaded_files"))
+    ]
 
-    if not os.path.exists(abs_path):
+    clean_path = storage_path.strip()
+    if os.path.isabs(clean_path):
+        candidate_path = os.path.normpath(clean_path)
+    else:
+        candidate_path = os.path.normpath(os.path.join(os.path.dirname(BASE_EVIDENCE_DIR), clean_path))
+
+    canonical_path = os.path.realpath(candidate_path)
+
+    # Enforce strict canonical storage boundary check to block directory traversal & symlink escapes
+    if not any(canonical_path.startswith(root + os.sep) for root in allowed_roots):
+        conn.close()
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Evidence file path resides outside authorized repository storage boundaries."
+        )
+
+    if not os.path.isfile(canonical_path):
         conn.close()
         raise HTTPException(status_code=404, detail="Physical evidence file not found on disk.")
+
+    abs_path = canonical_path
 
     # Integrity verification
     sha = hashlib.sha256()

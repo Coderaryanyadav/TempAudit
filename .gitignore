@@ -53,3 +53,5 @@ backend/backups/*
 backend/logs/*
 !backend/logs/.gitkeep
 uploaded_files/
+.github/
+

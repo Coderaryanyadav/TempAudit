@@ -6,7 +6,7 @@ services:
     image: tempaudit-sla:2026
     container_name: tempaudit-sla
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       FINAUDIT_DB_PATH: /data/finauditpro.db
       FINAUDIT_SECRET_KEY: ${FINAUDIT_SECRET_KEY:-}

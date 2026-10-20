@@ -46,20 +46,19 @@ if __name__ == "__main__":
     from backend.app.database import init_db
     init_db()
 
-    # Ensure Master Administrator account is verified and ready
+    # Verify Administrator account status
+    from backend.app.database import get_db_connection
+    conn = get_db_connection()
     try:
-        from backend.app.database import get_db_connection
-        conn = get_db_connection()
-        admin_row = conn.execute("SELECT id, username FROM users WHERE role = 'Admin' LIMIT 1").fetchone()
+        admin_row = conn.execute("SELECT id, username FROM users WHERE role = 'Admin' AND is_active = 1 LIMIT 1").fetchone()
         if not admin_row:
-            from scripts.create_admin import create_admin_user
-            create_admin_user("admin", "admin123", "admin@finauditpro.local", "Master Administrator (FCA)")
-            print("  [Auth] Initialized Master Administrator: admin (Password: admin123)")
+            print("  [Auth Setup] No active administrator account detected.")
+            print("  -> First-run setup required. Open http://127.0.0.1:8000 to configure your credentials,")
+            print("  -> Or provision an administrator via CLI: python scripts/create_admin.py")
         else:
-            print(f"  [Auth] Master Administrator ready: '{admin_row['username']}'")
+            print(f"  [Auth Status] Master Administrator verified: '{admin_row['username']}'")
+    finally:
         conn.close()
-    except Exception as e:
-        print(f"  [Auth Note] {e}")
 
     # Launch browser in separate thread
     threading.Thread(target=open_browser, daemon=True).start()

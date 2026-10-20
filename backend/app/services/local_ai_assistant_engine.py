@@ -1212,7 +1212,11 @@ The audit engine identified **{len(ledger_risk_map)}** ledger account(s) that re
         
         matched_txs = [t for t in self.transactions if t.get("id") in aff_ids] if aff_ids else []
         if not matched_txs:
-            matched_txs = [t for t in self.transactions if code in str(t.get("voucher_no", "")) or str(target_finding.get("id")) in str(t.get("id", ""))]
+            matched_txs = [
+                t for t in self.transactions 
+                if (code and code in str(t.get("voucher_no", ""))) or 
+                   (target_finding.get("transaction_id") and str(t.get("id", "")) == str(target_finding.get("transaction_id")))
+            ]
 
         if matched_txs:
             evidence_list = []
@@ -1221,6 +1225,7 @@ The audit engine identified **{len(ledger_risk_map)}** ledger account(s) that re
                 tx_copy["finding_id"] = target_finding.get("id")
                 tx_copy["finding_code"] = code
                 tx_copy["severity"] = sev
+                tx_copy["title"] = title
                 evidence_list.append(tx_copy)
         else:
             diff_str = target_finding.get("difference") or ""

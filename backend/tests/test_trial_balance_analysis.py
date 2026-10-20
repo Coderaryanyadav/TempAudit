@@ -12,13 +12,8 @@ class TestTrialBalanceAnalysisModule(unittest.TestCase):
         init_db()
         cls.client = TestClient(app)
 
-        # Login
-        res = cls.client.post("/api/auth/login", json={"username": "admin", "password": "adminpassword123"})
-        if res.status_code == 200:
-            cls.token = res.json()["access_token"]
-        else:
-            res = cls.client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
-            cls.token = res.json()["access_token"]
+        from backend.app.auth import create_access_token
+        cls.token = create_access_token({"sub": "admin", "role": "Admin", "uid": 1})
         cls.headers = {"Authorization": f"Bearer {cls.token}"}
 
     def test_01_deterministic_balanced_tb(self):
