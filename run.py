@@ -1,6 +1,13 @@
 import os
 import sys
 
+# Load environment configuration from .env if present
+try:
+    from backend.app.env import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 # Auto-detect and seamlessly switch to project virtual environment if available
 in_venv = getattr(sys, "base_prefix", sys.prefix) != sys.prefix or "VIRTUAL_ENV" in os.environ
 if not in_venv:

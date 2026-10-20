@@ -9,6 +9,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from backend.app.database import get_db_connection
 import secrets
 
+from backend.app.env import load_dotenv
+
+load_dotenv()
+
 ALGORITHM = "HS256"
 
 def get_session_timeout_minutes() -> int:
@@ -40,7 +44,7 @@ def validate_password_strength(password: str) -> None:
 _CACHED_JWT_SECRET: Optional[str] = None
 
 def get_jwt_secret() -> str:
-    """Retrieves secret key from environment or persisted database settings (Refusing hardcoded fallbacks)."""
+    """Retrieves secret key from environment or dedicated internal secrets table (Refusing hardcoded fallbacks)."""
     global _CACHED_JWT_SECRET
     env_secret = os.environ.get("FINAUDIT_SECRET_KEY")
     KNOWN_INSECURE_SECRETS = {
@@ -57,17 +61,35 @@ def get_jwt_secret() -> str:
 
     try:
         conn = get_db_connection()
+        # Isolate internal secrets into dedicated table never exposed to settings API
+        conn.execute("CREATE TABLE IF NOT EXISTS internal_system_secrets (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)")
         conn.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)")
-        row = conn.execute("SELECT value FROM app_settings WHERE key = 'jwt_secret_key'").fetchone()
+
+        # Always purge legacy jwt_secret_key from app_settings if present
+        legacy_row = conn.execute("SELECT value FROM app_settings WHERE key = 'jwt_secret_key'").fetchone()
+
+        row = conn.execute("SELECT value FROM internal_system_secrets WHERE key = 'jwt_secret_key'").fetchone()
         if row and row["value"]:
             secret = row["value"]
+            if legacy_row:
+                conn.execute("DELETE FROM app_settings WHERE key = 'jwt_secret_key'")
+                conn.commit()
+            conn.close()
+            _CACHED_JWT_SECRET = secret
+            return secret
+
+        now_str = datetime.now(timezone.utc).isoformat()
+        if legacy_row and legacy_row["value"]:
+            secret = legacy_row["value"]
+            conn.execute("INSERT OR REPLACE INTO internal_system_secrets (key, value, updated_at) VALUES ('jwt_secret_key', ?, ?)", (secret, now_str))
+            conn.execute("DELETE FROM app_settings WHERE key = 'jwt_secret_key'")
+            conn.commit()
             conn.close()
             _CACHED_JWT_SECRET = secret
             return secret
         
         new_secret = secrets.token_hex(32)
-        now_str = datetime.now(timezone.utc).isoformat()
-        conn.execute("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('jwt_secret_key', ?, ?)", (new_secret, now_str))
+        conn.execute("INSERT OR REPLACE INTO internal_system_secrets (key, value, updated_at) VALUES ('jwt_secret_key', ?, ?)", (new_secret, now_str))
         conn.commit()
         conn.close()
         _CACHED_JWT_SECRET = new_secret

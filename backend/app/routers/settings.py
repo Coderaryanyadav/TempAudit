@@ -75,27 +75,6 @@ def _enforce_backup_retention(retention_days: int = 30):
         pass
 
 
-@router.get("")
-def get_all_settings(current_user: dict = Depends(get_current_user)):
-    """Retrieve all application settings merged with defaults."""
-    conn = get_db_connection()
-    rows = conn.execute("SELECT key, value, updated_at FROM app_settings").fetchall()
-    conn.close()
-
-    stored = {}
-    for r in rows:
-        try:
-            stored[r["key"]] = json.loads(r["value"])
-        except Exception:
-            stored[r["key"]] = r["value"]
-
-    merged = {**DEFAULT_SETTINGS, **stored}
-    return {
-        "settings": merged,
-        "defaults": DEFAULT_SETTINGS
-    }
-
-
 ALLOWED_SETTINGS_SCHEMA = {
     "firm_name": {"type": str, "min_len": 1, "max_len": 200},
     "firm_icai_reg": {"type": str, "min_len": 1, "max_len": 50},
@@ -112,6 +91,41 @@ ALLOWED_SETTINGS_SCHEMA = {
     "strict_maker_checker": {"type": bool},
     "is_initial_setup_completed": {"type": bool},
 }
+
+SENSITIVE_DISALLOWED_SETTINGS = {
+    "jwt_secret_key",
+    "secret",
+    "secret_key",
+    "private_key",
+    "password",
+    "token",
+    "master_key",
+}
+
+
+@router.get("")
+def get_all_settings(current_user: dict = Depends(get_current_user)):
+    """Retrieve all application settings merged with defaults, strictly filtered by allowed schema."""
+    conn = get_db_connection()
+    rows = conn.execute("SELECT key, value, updated_at FROM app_settings").fetchall()
+    conn.close()
+
+    stored = {}
+    for r in rows:
+        key = r["key"]
+        # Enforce strict schema allowlist and defense-in-depth secret exclusion
+        if key not in ALLOWED_SETTINGS_SCHEMA or key.lower() in SENSITIVE_DISALLOWED_SETTINGS:
+            continue
+        try:
+            stored[key] = json.loads(r["value"])
+        except Exception:
+            stored[key] = r["value"]
+
+    merged = {**DEFAULT_SETTINGS, **stored}
+    return {
+        "settings": merged,
+        "defaults": DEFAULT_SETTINGS
+    }
 
 
 def _validate_setting(key: str, value: Any):

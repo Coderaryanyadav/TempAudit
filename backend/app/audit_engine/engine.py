@@ -32,7 +32,9 @@ class HybridAuditEngine:
             }
 
         # 1. Run Deterministic Rule Engine
-        det_engine = DeterministicAuditEngine(transactions, engagement.get("financial_year", "2024-25"))
+        from backend.app.audit_engine.deterministic import get_audit_rule_config
+        rule_config = get_audit_rule_config(conn)
+        det_engine = DeterministicAuditEngine(transactions, engagement.get("financial_year", "2024-25"), rule_config=rule_config)
         det_findings = det_engine.run_all_checks()
 
         # 2. Run Statistical / Machine Learning Engine

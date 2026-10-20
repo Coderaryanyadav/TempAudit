@@ -362,7 +362,9 @@ class CentralizedFindingsEngine:
             if not transactions:
                 return findings
 
-            det_engine = DeterministicAuditEngine(transactions, fy)
+            from backend.app.audit_engine.deterministic import get_audit_rule_config
+            rule_config = get_audit_rule_config(conn)
+            det_engine = DeterministicAuditEngine(transactions, fy, rule_config=rule_config)
             det_results = det_engine.run_all_checks() or []
 
             stat_engine = StatisticalAuditEngine(transactions)

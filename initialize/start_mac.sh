@@ -8,8 +8,15 @@ cd "$DIR"
 echo "=============================================================================="
 echo "  Starting FinAuditPro - Offline AI-Assisted Audit Assistant"
 echo "  Access URL: http://127.0.0.1:8000"
-echo "=============================================================================="
 echo ""
+
+# Load environment overrides from .env if present
+if [ -f ".env" ]; then
+    echo "Loading environment variables from .env..."
+    set -a
+    source .env
+    set +a
+fi
 
 # 1. Activate venv if present
 if [ -f "venv/bin/activate" ]; then

@@ -5,10 +5,58 @@ from typing import List, Dict, Any, Tuple
 GSTIN_REGEX = r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
 PAN_REGEX = r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$"
 
+DEFAULT_40A3_THRESHOLD = 10000.0
+DEFAULT_269ST_THRESHOLD = 200000.0
+
+
+def get_audit_rule_config(conn=None) -> Dict[str, Any]:
+    """Retrieves central audit rule thresholds from app_settings or statutory defaults."""
+    config = {
+        "cash_threshold_40a3": DEFAULT_40A3_THRESHOLD,
+        "cash_threshold_269st": DEFAULT_269ST_THRESHOLD,
+    }
+    close_after = False
+    try:
+        if conn is None:
+            from backend.app.database import get_db_connection
+            conn = get_db_connection()
+            close_after = True
+        rows = conn.execute(
+            "SELECT key, value FROM app_settings WHERE key IN ('cash_threshold_40a3', 'cash_threshold_269st')"
+        ).fetchall()
+        for r in rows:
+            try:
+                import json
+                val = json.loads(r["value"])
+                config[r["key"]] = float(val)
+            except Exception:
+                try:
+                    config[r["key"]] = float(r["value"])
+                except (ValueError, TypeError):
+                    pass
+    except Exception:
+        pass
+    finally:
+        if close_after and conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return config
+
+
 class DeterministicAuditEngine:
-    def __init__(self, transactions: List[Dict[str, Any]], financial_year: str = "2024-25"):
+    def __init__(
+        self,
+        transactions: List[Dict[str, Any]],
+        financial_year: str = "2024-25",
+        rule_config: Optional[Dict[str, Any]] = None
+    ):
         self.transactions = transactions
         self.financial_year = financial_year
+        self.rule_config = rule_config if rule_config is not None else get_audit_rule_config()
+        self.threshold_40a3 = float(self.rule_config.get("cash_threshold_40a3") or DEFAULT_40A3_THRESHOLD)
+        self.threshold_269st = float(self.rule_config.get("cash_threshold_269st") or DEFAULT_269ST_THRESHOLD)
         self.findings = []
 
     def run_all_checks(self) -> List[Dict[str, Any]]:
@@ -99,14 +147,15 @@ class DeterministicAuditEngine:
 
     def check_section_40a3_cash_payments(self):
         """
-        Rule: Income Tax Act Section 40A(3) - Cash payments exceeding ₹10,000 per person per day.
+        Rule: Income Tax Act Section 40A(3) - Cash payments exceeding statutory/configured threshold per person per day.
         Accounting Semantics:
-        - When the pure cash asset ledger ('Cash in hand', 'Petty Cash', 'Cash Account') is debited,
-          it represents cash being received (Receipt).
-        - When an expense or vendor ledger is debited (or transaction is a Payment), it represents an expenditure/payment.
+        - When pure cash asset ledger ('Cash in hand', 'Petty Cash', 'Cash Account') is debited, it represents Receipt.
+        - When an expense or vendor ledger is debited (or transaction is Payment), it represents expenditure/payment.
+        - Payees are distinguished from unresolved cash/expense ledgers to prevent false cross-voucher aggregation.
         """
         cash_keywords = ['cash', 'petty cash', 'cash in hand', 'bearer cheque']
-        cash_by_party_day = {}
+        cash_by_party_day: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        unresolved_by_ledger_day: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
         for t in self.transactions:
             ledger = str(t.get('ledger') or '').strip().lower()
@@ -121,9 +170,6 @@ class DeterministicAuditEngine:
             credit = float(t.get('credit') or 0.0)
             raw_amt = float(t.get('amount') or 0.0)
 
-            # Determine if this transaction is a payment / expenditure:
-            # Case 1: Pure cash asset ledger credited -> cash outflow / payment
-            # Case 2: Non-cash expense/vendor ledger debited with cash keyword in ledger/desc/type
             is_payment = False
             amount = 0.0
 
@@ -149,31 +195,76 @@ class DeterministicAuditEngine:
 
             if is_cash_tx and is_payment and amount > 0:
                 date = str(t.get('date') or '').split('T')[0]
-                party = str(t.get('party_name') or '').strip()
-                if not party or party.lower() in ['cash', 'cash account', 'cash in hand', 'petty cash']:
-                    party = str(t.get('ledger') or 'Unknown Party').strip()
-                    party = re.sub(r'\s*\(\s*cash\s*\)', '', party, flags=re.IGNORECASE).strip()
+                raw_party = str(t.get('party_name') or '').strip()
+                ledger_clean = str(t.get('ledger') or 'General Cash').strip()
+                ledger_clean = re.sub(r'\s*\(\s*cash\s*\)', '', ledger_clean, flags=re.IGNORECASE).strip()
+                vch = str(t.get('voucher_no') or t.get('id') or '—')
+                rec_id = t.get('id')
 
-                key = (date, party)
-                if key not in cash_by_party_day:
-                    cash_by_party_day[key] = {"total": 0.0, "records": [], "vouchers": []}
-                cash_by_party_day[key]["total"] += amount
-                cash_by_party_day[key]["records"].append(t.get('id'))
-                cash_by_party_day[key]["vouchers"].append(t.get('voucher_no'))
+                # Check if counterparty identity is established vs unresolved cash/expense ledger
+                is_unresolved = (
+                    not raw_party 
+                    or raw_party.lower() in ['cash', 'cash account', 'cash in hand', 'petty cash', 'unknown party', 'unknown counterparty', 'bearer']
+                    or raw_party.lower().startswith('expense')
+                )
+
+                if not is_unresolved:
+                    party = raw_party
+                    key = (date, party)
+                    if key not in cash_by_party_day:
+                        cash_by_party_day[key] = {"total": 0.0, "records": [], "vouchers": []}
+                    cash_by_party_day[key]["total"] += amount
+                    cash_by_party_day[key]["records"].append(rec_id)
+                    cash_by_party_day[key]["vouchers"].append(vch)
+                else:
+                    # Unresolved payee
+                    if amount > self.threshold_40a3:
+                        # Individual payment alone breaches statutory/configured threshold
+                        self.findings.append({
+                            "finding_code": "DET-TAX-40A3",
+                            "category": "Statutory Compliance",
+                            "severity": "CRITICAL" if amount > 50000 else "HIGH",
+                            "risk_score": 8.8,
+                            "title": f"Section 40A(3) Breach: Single Cash Payment of ₹{amount:,.2f} (Unresolved Payee, Ledger: {ledger_clean})",
+                            "description": f"Cash payment of ₹{amount:,.2f} under ledger '{ledger_clean}' on {date} (Voucher {vch}) exceeds the statutory limit of ₹{self.threshold_40a3:,.2f} under Section 40A(3) of the Income Tax Act, 1961.",
+                            "affected_records": [rec_id],
+                            "expected_value": f"Payment via Account Payee Cheque / DD / ECS / prescribed electronic mode <= ₹{self.threshold_40a3:,.2f}",
+                            "actual_value": f"Cash Payment: ₹{amount:,.2f}",
+                            "difference": f"Excess over limit: ₹{amount - self.threshold_40a3:,.2f}",
+                            "reason": "Direct cash expenditure exceeding statutory threshold must be disallowed under Section 40A(3) unless exempt under Rule 6DD.",
+                            "evidence": {
+                                "date": date,
+                                "party": f"Unresolved Payee (Ledger: {ledger_clean})",
+                                "vouchers": [vch],
+                                "total_cash": amount,
+                                "records_count": 1
+                            },
+                            "rule_used": "Income Tax Act, 1961 - Section 40A(3) read with Rule 6DD",
+                            "engine_type": "DETERMINISTIC",
+                            "ai_explanation": f"Under Section 40A(3), expenditure paid in cash exceeding ₹{self.threshold_40a3:,.2f} is disallowed and added back to taxable income in Form 3CD (Clause 21(d)).",
+                            "recommended_action": "Identify the payee from physical voucher/receipt and verify if Rule 6DD exemptions apply."
+                        })
+                    else:
+                        ukey = (date, ledger_clean)
+                        if ukey not in unresolved_by_ledger_day:
+                            unresolved_by_ledger_day[ukey] = {"total": 0.0, "records": [], "vouchers": []}
+                        unresolved_by_ledger_day[ukey]["total"] += amount
+                        unresolved_by_ledger_day[ukey]["records"].append(rec_id)
+                        unresolved_by_ledger_day[ukey]["vouchers"].append(vch)
 
         for (date, party), data in cash_by_party_day.items():
-            if data["total"] > 10000.0 and party.lower() not in ['cash', 'petty cash', 'bank', 'cash account', 'cash in hand']:
+            if data["total"] > self.threshold_40a3 and party.lower() not in ['cash', 'petty cash', 'bank', 'cash account', 'cash in hand']:
                 self.findings.append({
                     "finding_code": "DET-TAX-40A3",
                     "category": "Statutory Compliance",
                     "severity": "CRITICAL" if data["total"] > 50000 else "HIGH",
                     "risk_score": 8.8,
                     "title": f"Section 40A(3) Breach: Aggregate Cash Payment of ₹{data['total']:,.2f} to {party}",
-                    "description": f"Aggregate cash payments to '{party}' on {date} totaled ₹{data['total']:,.2f}, exceeding the statutory limit of ₹10,000 prescribed under Section 40A(3) of the Income Tax Act, 1961.",
+                    "description": f"Aggregate cash payments to '{party}' on {date} totaled ₹{data['total']:,.2f}, exceeding the threshold of ₹{self.threshold_40a3:,.2f} prescribed under Section 40A(3) of the Income Tax Act, 1961.",
                     "affected_records": data["records"],
-                    "expected_value": "Payment via Account Payee Cheque / DD / ECS / prescribed electronic mode <= ₹10,000",
+                    "expected_value": f"Payment via Account Payee Cheque / DD / ECS / prescribed electronic mode <= ₹{self.threshold_40a3:,.2f}",
                     "actual_value": f"Total Cash Paid: ₹{data['total']:,.2f}",
-                    "difference": f"Excess over limit: ₹{data['total'] - 10000:,.2f}",
+                    "difference": f"Excess over limit: ₹{data['total'] - self.threshold_40a3:,.2f}",
                     "reason": "Direct cash disallowance under Section 40A(3) will result in 100% add-back of this expenditure to taxable business income in Form 3CD (Clause 21(d)).",
                     "evidence": {
                         "date": date,
@@ -184,24 +275,46 @@ class DeterministicAuditEngine:
                     },
                     "rule_used": "Income Tax Act, 1961 - Section 40A(3) read with Rule 6DD",
                     "engine_type": "DETERMINISTIC",
-                    "ai_explanation": "Under Section 40A(3), where an assessee incurs any expenditure in respect of which a payment or aggregate of payments made to a person in a day exceeds ₹10,000 otherwise than by an account payee cheque or electronic clearing system, no deduction shall be allowed. This must be reported under Clause 21(d) of Tax Audit Report Form 3CD.",
+                    "ai_explanation": f"Under Section 40A(3), where an assessee incurs any expenditure in respect of which a payment or aggregate of payments made to a person in a day exceeds statutory threshold (₹{self.threshold_40a3:,.2f}) otherwise than by an account payee cheque or electronic clearing system, no deduction shall be allowed. This must be reported under Clause 21(d) of Tax Audit Report Form 3CD.",
                     "recommended_action": "Check whether the payment falls under any exemption listed under Rule 6DD (e.g. payments to cultivators, cottage industry, banking holidays). If not exempt, classify for 3CD tax audit disallowance."
+                })
+
+        for (date, ledger), data in unresolved_by_ledger_day.items():
+            if data["total"] > self.threshold_40a3 and len(data["records"]) > 1 and ledger.lower() not in ['cash', 'petty cash', 'bank', 'cash account', 'cash in hand']:
+                self.findings.append({
+                    "finding_code": "DET-TAX-40A3-UNRESOLVED",
+                    "category": "Statutory Compliance",
+                    "severity": "MEDIUM",
+                    "risk_score": 6.5,
+                    "title": f"Section 40A(3) Review Candidate: Aggregate Cash Vouchers of ₹{data['total']:,.2f} with Unresolved Payee on {date} (Ledger: {ledger})",
+                    "description": f"Multiple cash vouchers on {date} totaling ₹{data['total']:,.2f} were posted to ledger '{ledger}' without individual payee names. Manual verification of physical vouchers is required to confirm whether payments were made to the same person exceeding ₹{self.threshold_40a3:,.2f}.",
+                    "affected_records": data["records"],
+                    "expected_value": "Payee identity documented on all cash expenditure vouchers",
+                    "actual_value": f"Total Unresolved Cash: ₹{data['total']:,.2f} across {len(data['records'])} vouchers",
+                    "difference": f"Aggregate: ₹{data['total']:,.2f}",
+                    "reason": "Section 40A(3) disallowance applies per person per day. Where payee names are absent from accounting records, physical verification is required before confirming a tax disallowance.",
+                    "evidence": {
+                        "date": date,
+                        "ledger": ledger,
+                        "vouchers": data["vouchers"],
+                        "total_cash": data["total"],
+                        "records_count": len(data["records"]),
+                        "is_review_candidate": True
+                    },
+                    "rule_used": "Income Tax Act, 1961 - Section 40A(3) Payee Verification Guidance",
+                    "engine_type": "DETERMINISTIC",
+                    "ai_explanation": "Aggregate cash payments recorded under an expense ledger without individual counterparty names cannot be definitively classified as a single-payee Section 40A(3) violation without examining underlying physical receipts.",
+                    "recommended_action": "Inspect physical cash payment vouchers for the recorded date to determine individual payees and confirm applicability of Section 40A(3)."
                 })
 
     def check_section_269st_cash_receipts(self):
         """
-        Rule: Income Tax Act Section 269ST - Cash receipts of ₹2,00,000 or more:
+        Rule: Income Tax Act Section 269ST - Cash receipts of ₹2,00,000 or more (or configured threshold):
         (a) In aggregate from a person in a day; or
         (b) In respect of a single transaction; or
         (c) In respect of transactions relating to one event or occasion from a person.
-        Penalty under Section 271DA equals 100% of sum received.
+        Penalty under Section 271DA equals 100% of sum received, subject to reasonable cause exceptions under Section 273B.
         """
-        # -------------------------------------------------------------------------
-        # Section 269ST Aggregation Categories:
-        # (a) in aggregate from a person in a day;
-        # (b) in respect of a single transaction (e.g. against the same invoice/voucher reference);
-        # (c) in respect of transactions relating to one event or occasion from a person (e.g. project, contract, event).
-        # -------------------------------------------------------------------------
         receipts_by_person_day: Dict[Tuple[str, str], Dict[str, Any]] = {}
         receipts_by_ref_trans: Dict[Tuple[str, str], Dict[str, Any]] = {}
         cash_keywords = ['cash', 'petty cash', 'cash in hand']
@@ -218,7 +331,6 @@ class DeterministicAuditEngine:
             is_pure_cash_asset = ledger in ['cash', 'petty cash', 'cash in hand', 'cash account'] or ledger.startswith('cash in hand') or ledger.startswith('petty cash')
             is_cash_tx = is_pure_cash_asset or any(k in desc or k in tx_type or k in voucher_type or k in ledger for k in cash_keywords)
 
-            # Determine whether this is a cash receipt:
             is_receipt = False
             amount = 0.0
 
@@ -253,19 +365,17 @@ class DeterministicAuditEngine:
             vch = str(t.get('voucher_no') or t.get('id') or '—')
             rec_id = t.get('id')
 
-            # Reference identification for single transaction / event across dates
+            # Reference identification for single transaction / event across dates (Section 269ST(b) & (c))
+            # Must require explicit invoice/contract/bill/order/event identifier code (e.g. INV-101, CONTR-2024, EVENT-42)
+            # Loose keywords like 'advance' without a reference code are NOT aggregated across dates.
             inv_ref = str(t.get('invoice_no') or t.get('reference_no') or '').strip()
             if not inv_ref:
-                # Check description for invoice / contract / bill / receipt / order / event reference pattern
-                match_ref = re.search(r'\b(?:INV|BILL|CONTR|EVENT|ORD|REF|ADV|REC|BOOKING)[-:\s#]*([A-Za-z0-9_-]+)\b', desc, re.IGNORECASE)
+                match_ref = re.search(r'\b(?:INV|BILL|CONTR|EVENT|ORD|REF|BOOKING)[-:\s#]+([A-Za-z0-9_-]+)\b', desc, re.IGNORECASE)
                 if match_ref:
-                    inv_ref = match_ref.group(0).upper().replace(" ", "")
-                elif any(k in desc.lower() for k in ['booking', 'flat', 'plot', 'wedding', 'event', 'catering', 'annual function', 'conference', 'advance']):
-                    # Event/occasion or ongoing transaction cluster detected in narration
-                    for keyword in ['wedding', 'catering', 'conference', 'annual function', 'flat', 'plot', 'booking', 'advance']:
-                        if keyword in desc.lower():
-                            inv_ref = f"EVENT-{keyword.upper().replace(' ', '_')}"
-                            break
+                    code_part = match_ref.group(1).strip()
+                    if code_part and len(code_part) >= 2 and code_part.lower() not in ['received', 'payment', 'cash', 'for']:
+                        prefix = match_ref.group(0).split()[0].upper()[:4]
+                        inv_ref = f"{prefix}-{code_part.upper()}"
 
             # 1. Aggregate by person and day (Section 269ST(a))
             day_key = (party, date)
@@ -303,7 +413,7 @@ class DeterministicAuditEngine:
         # Evaluate condition (a): Person and Day
         for (party, date), data in receipts_by_person_day.items():
             tot = data["total_amount"]
-            if tot >= 200000.0 and party.lower() not in ['cash', 'cash account', 'cash in hand', 'bank']:
+            if tot >= self.threshold_269st and party.lower() not in ['cash', 'cash account', 'cash in hand', 'bank']:
                 vch_list = data["vouchers"]
                 rec_list = data["records"]
                 rec_set = set(rec_list)
@@ -317,12 +427,12 @@ class DeterministicAuditEngine:
                     "severity": "CRITICAL",
                     "risk_score": 9.5 if is_split else 9.2,
                     "title": f"Section 269ST Breach: Aggregate Cash Receipt of ₹{tot:,.2f} from {party}{split_note}",
-                    "description": f"Aggregate cash receipts from '{party}' on {date} totaled ₹{tot:,.2f}{split_note}, violating Section 269ST(a) of the Income Tax Act, 1961 (threshold ₹2,00,000 per person per day).",
+                    "description": f"Aggregate cash receipts from '{party}' on {date} totaled ₹{tot:,.2f}{split_note}, violating Section 269ST(a) of the Income Tax Act, 1961 (threshold ₹{self.threshold_269st:,.2f} per person per day).",
                     "affected_records": rec_list,
-                    "expected_value": "Receipts >= ₹2,00,000 through banking channels / account payee modes",
+                    "expected_value": f"Receipts >= ₹{self.threshold_269st:,.2f} through banking channels / account payee modes",
                     "actual_value": f"Total Cash Received: ₹{tot:,.2f}",
                     "difference": f"₹{tot:,.2f}",
-                    "reason": "Section 271DA levies an unavoidable penalty equal to 100% of the amount received in contravention of Section 269ST.",
+                    "reason": "Section 271DA provides for a penalty equal to 100% of the amount received in contravention of Section 269ST, subject to reasonable cause exceptions under Section 273B.",
                     "evidence": {
                         "date": date,
                         "party": party,
@@ -333,9 +443,10 @@ class DeterministicAuditEngine:
                     },
                     "rule_used": "Income Tax Act, 1961 - Section 269ST & Penalty Section 271DA",
                     "engine_type": "DETERMINISTIC",
-                    "ai_explanation": "Section 269ST prohibits receiving ₹2,00,000 or more in cash in aggregate from a person in a day, in respect of a single transaction, or relating to one event. A penalty equal to 100% of the sum received is leviable under Section 271DA.",
+                    "ai_explanation": f"Section 269ST prohibits receiving ₹{self.threshold_269st:,.2f} or more in cash in aggregate from a person in a day, in respect of a single transaction, or relating to one event. A penalty equal to 100% of the sum received is imposable under Section 271DA unless the assessee establishes reasonable cause under Section 273B or proves that statutory exceptions apply.",
                     "recommended_action": "Seek immediate management explanation, inspect bank deposit slips, and document in working papers for reporting under Clause 31 of Tax Audit Report 3CD."
                 })
+
         # Evaluate condition (b) & (c): Single Transaction or Event/Occasion across different dates
         for (party, ref), data in receipts_by_ref_trans.items():
             tot = data["total_amount"]
@@ -346,7 +457,7 @@ class DeterministicAuditEngine:
             if any(rec_set.issubset(s) for s in emitted_record_sets):
                 continue
 
-            if tot >= 200000.0 and party.lower() not in ['cash', 'cash account', 'cash in hand', 'bank']:
+            if tot >= self.threshold_269st and party.lower() not in ['cash', 'cash account', 'cash in hand', 'bank']:
                 emitted_record_sets.append(rec_set)
                 dates_str = ", ".join(sorted(data["dates"]))
                 vch_list = data["vouchers"]
@@ -357,12 +468,12 @@ class DeterministicAuditEngine:
                     "severity": "CRITICAL",
                     "risk_score": 9.6,
                     "title": f"Section 269ST Breach: Aggregate Cash Receipt of ₹{tot:,.2f} for Transaction/Event '{ref}' across dates",
-                    "description": f"Aggregate cash receipts from '{party}' relating to single transaction/event reference '{ref}' across dates ({dates_str}) totaled ₹{tot:,.2f}, violating Section 269ST(b)/(c) of the Income Tax Act, 1961 (threshold ₹2,00,000).",
+                    "description": f"Aggregate cash receipts from '{party}' relating to single transaction/event reference '{ref}' across dates ({dates_str}) totaled ₹{tot:,.2f}, violating Section 269ST(b)/(c) of the Income Tax Act, 1961 (threshold ₹{self.threshold_269st:,.2f}).",
                     "affected_records": rec_list,
-                    "expected_value": "Receipts >= ₹2,00,000 through banking channels / account payee modes",
+                    "expected_value": f"Receipts >= ₹{self.threshold_269st:,.2f} through banking channels / account payee modes",
                     "actual_value": f"Total Cash Received: ₹{tot:,.2f}",
                     "difference": f"₹{tot:,.2f}",
-                    "reason": "Section 271DA levies an unavoidable penalty equal to 100% of the amount received in contravention of Section 269ST (applies to receipts relating to a single transaction or event across multiple dates).",
+                    "reason": "Section 271DA provides for a penalty equal to 100% of the amount received in contravention of Section 269ST, subject to reasonable cause exceptions under Section 273B (applies to receipts relating to a single transaction or event across multiple dates).",
                     "evidence": {
                         "party": party,
                         "reference": ref,
@@ -374,7 +485,7 @@ class DeterministicAuditEngine:
                     },
                     "rule_used": "Income Tax Act, 1961 - Section 269ST(b)/(c) & Penalty Section 271DA",
                     "engine_type": "DETERMINISTIC",
-                    "ai_explanation": "Section 269ST(b) and (c) prohibit receiving ₹2,00,000 or more in cash in respect of a single transaction or relating to one event/occasion from a person, even if split across different dates. A penalty equal to 100% of the sum received is leviable under Section 271DA.",
+                    "ai_explanation": f"Section 269ST(b) and (c) prohibit receiving ₹{self.threshold_269st:,.2f} or more in cash in respect of a single transaction or relating to one event/occasion from a person, even if split across different dates. A penalty equal to 100% of the sum received is imposable under Section 271DA unless reasonable cause is proven under Section 273B or statutory exceptions apply under the Section 269ST proviso.",
                     "recommended_action": "Seek immediate management explanation, inspect related contract/invoice, and report under Clause 31 of Tax Audit Form 3CD."
                 })
 

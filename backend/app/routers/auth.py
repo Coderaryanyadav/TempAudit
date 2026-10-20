@@ -59,7 +59,8 @@ def _check_login_rate_limit(key: str):
         _ensure_rate_limit_table(conn)
         now = time.time()
         cutoff = now - 300 # 5 minute window
-        db_key = f"login_{key}"
+        norm_key = key.strip().lower() if key else ""
+        db_key = f"login_{norm_key}"
         conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp < ?", (db_key, cutoff))
         
         row = conn.execute("SELECT COUNT(*) as count FROM rate_limits WHERE key = ? AND timestamp >= ?", (db_key, cutoff)).fetchone()
@@ -77,7 +78,8 @@ def _record_login_failure(key: str):
     try:
         _ensure_rate_limit_table(conn)
         now = time.time()
-        db_key = f"login_{key}"
+        norm_key = key.strip().lower() if key else ""
+        db_key = f"login_{norm_key}"
         conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES (?, ?)", (db_key, now))
         conn.commit()
     finally:
@@ -87,7 +89,8 @@ def _clear_login_failures(key: str):
     conn = get_db_connection()
     try:
         _ensure_rate_limit_table(conn)
-        db_key = f"login_{key}"
+        norm_key = key.strip().lower() if key else ""
+        db_key = f"login_{norm_key}"
         conn.execute("DELETE FROM rate_limits WHERE key = ?", (db_key,))
         conn.commit()
     finally:
