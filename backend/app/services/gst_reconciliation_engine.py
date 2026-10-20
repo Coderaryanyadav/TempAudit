@@ -92,7 +92,10 @@ def run_gst_reconciliation(
     # 2. Extract Source A (e.g. GST Portal / GSTR-2B / GSTR-1 Dataset)
     source_a_txs = []
     if source_a_file_id:
-        rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? ORDER BY date ASC, id ASC", (source_a_file_id,)).fetchall()
+        chk_a = conn.execute("SELECT id FROM uploaded_files WHERE id = ? AND engagement_id = ?", (source_a_file_id, engagement_id)).fetchone()
+        if not chk_a:
+            raise ValueError(f"Source A file ID {source_a_file_id} does not belong to engagement {engagement_id}.")
+        rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? AND engagement_id = ? ORDER BY date ASC, id ASC", (source_a_file_id, engagement_id)).fetchall()
         if rows:
             source_a_txs = [dict(r) for r in rows]
 
@@ -111,7 +114,10 @@ def run_gst_reconciliation(
     # 3. Extract Source B (e.g. Purchase/Sales Register or Books)
     source_b_txs = []
     if source_b_file_id:
-        rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? ORDER BY date ASC, id ASC", (source_b_file_id,)).fetchall()
+        chk_b = conn.execute("SELECT id FROM uploaded_files WHERE id = ? AND engagement_id = ?", (source_b_file_id, engagement_id)).fetchone()
+        if not chk_b:
+            raise ValueError(f"Source B file ID {source_b_file_id} does not belong to engagement {engagement_id}.")
+        rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? AND engagement_id = ? ORDER BY date ASC, id ASC", (source_b_file_id, engagement_id)).fetchall()
         if rows:
             source_b_txs = [dict(r) for r in rows]
 

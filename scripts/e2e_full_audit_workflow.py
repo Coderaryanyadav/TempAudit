@@ -74,7 +74,7 @@ def run_all_steps():
     admin_password = "MasterSecurePassphrase2026!"
     
     try:
-        if not setup_status.get("is_setup_completed"):
+        if setup_status.get("state") == "UNINITIALIZED" or not setup_status.get("is_setup_completed"):
             admin_payload = {
                 "username": admin_username,
                 "email": f"{admin_username}@auditfirm.in",
@@ -86,14 +86,18 @@ def run_all_steps():
             assert resp.status_code == 200, f"Setup failed: {resp.text}"
             record_step(2, "Create Administrator", True, f"Created initial Lead Partner '{admin_username}' via /initial-setup")
         else:
+            # Use official administration recovery utility rather than direct SQLite manipulation
+            from scripts.create_admin import reset_admin_account, create_admin_user
             conn = get_db_connection()
-            u = conn.execute("SELECT username FROM users WHERE role='Admin' LIMIT 1").fetchone()
-            admin_username = u["username"]
-            conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", 
-                         (hash_password(admin_password), admin_username))
-            conn.commit()
+            u = conn.execute("SELECT username FROM users WHERE role='Admin' AND is_active = 1 LIMIT 1").fetchone()
             conn.close()
-            record_step(2, "Create Administrator", True, f"Verified master administrator account '{admin_username}'")
+            if u:
+                admin_username = u["username"]
+                reset_admin_account(admin_username, admin_password)
+                record_step(2, "Create Administrator", True, f"Verified and recovered administrator account '{admin_username}' via CLI admin utility")
+            else:
+                create_admin_user(admin_username, admin_password, f"{admin_username}@auditfirm.in", "CA Rajeshwar Sharma, FCA")
+                record_step(2, "Create Administrator", True, f"Provisioned administrator account '{admin_username}' via CLI admin utility")
     except Exception as e:
         record_step(2, "Create Administrator", False, str(e))
         return
@@ -263,8 +267,9 @@ def run_all_steps():
     except Exception as e:
         record_step(8, "Import PDF Evidence", False, str(e))
 
-    # Step 9: Validate Data Quality & Normalization
+    # Step 9: Validate Data Quality, Reject Invalid Rows & Verify Idempotency (WF-001, WF-002)
     try:
+        # 1. Assert pre-import validation on clean CSV
         resp = client.post(
             "/api/import/validate",
             json={"file_id": csv_file_id, "column_mapping": csv_mapping, "data_category": "General Ledger"}, 
@@ -272,18 +277,78 @@ def run_all_steps():
         )
         assert resp.status_code == 200, f"Validation failed: {resp.text}"
         val_report = resp.json().get("validation_report", {})
+        assert val_report.get("failed_rows") == 0 and val_report.get("valid_rows") == 8, f"Unexpected validation issues: {val_report}"
+
+        # 2. Upload and validate a file containing INVALID rows (missing required date)
+        bad_csv = """Date,Voucher_No,Ledger,Account_Group,Description,Debit,Credit,Party_Name,GSTIN
+,VR-BAD1,Cash In Hand,Asset,Invalid entry without date,1000.00,0.00,Self,
+2025-04-11,VR-GOOD1,Office Supplies,Expense,Valid row,500.00,0.00,Stationery Hub,
+"""
+        bad_files = {"file": ("invalid_rows_test.csv", io.BytesIO(bad_csv.encode("utf-8")), "text/csv")}
+        bad_up = client.post("/api/import/upload", data={"engagement_id": str(engagement_id), "data_category": "General Ledger"}, 
+                             files=bad_files, headers=admin_headers)
+        assert bad_up.status_code == 200
+        bad_file_id = bad_up.json()["file_id"]
+
+        bad_val = client.post("/api/import/validate",
+                              json={"file_id": bad_file_id, "column_mapping": csv_mapping, "data_category": "General Ledger"},
+                              headers=admin_headers)
+        assert bad_val.status_code == 200
+        bad_rep = bad_val.json().get("validation_report", {})
+        assert bad_rep.get("failed_rows", 0) > 0, "Validation failed to detect row with missing date"
+
+        # 3. Import bad file and assert that invalid row was SKIPPED / rejected from database insertion (WF-001)
+        bad_imp = client.post("/api/import/apply-mapping",
+                              json={"file_id": bad_file_id, "column_mapping": csv_mapping, "data_category": "General Ledger"},
+                              headers=admin_headers)
+        assert bad_imp.status_code == 200
+        imp_data = bad_imp.json()
+        assert imp_data.get("failed_rows", 0) > 0, "Failed row was not recorded in import result"
+
+        conn = get_db_connection()
+        persisted_bad = conn.execute("SELECT COUNT(*) FROM transactions WHERE file_id = ? AND (date IS NULL OR date = '')", (bad_file_id,)).fetchone()[0]
+        conn.close()
+        assert persisted_bad == 0, "Invalid row without date was incorrectly inserted into transactions table!"
+
+        # 4. Idempotency test (WF-002): re-calling apply-mapping on csv_file_id returns existing result without duplicating transactions
+        conn = get_db_connection()
+        tx_count_before = conn.execute("SELECT COUNT(*) FROM transactions WHERE file_id = ?", (csv_file_id,)).fetchone()[0]
+        conn.close()
+        replay_resp = client.post(
+            "/api/import/apply-mapping",
+            json={"file_id": csv_file_id, "column_mapping": csv_mapping, "data_category": "General Ledger"}, 
+            headers=admin_headers
+        )
+        assert replay_resp.status_code == 200
+        assert replay_resp.json().get("idempotent_replay") is True
+        conn = get_db_connection()
+        tx_count_after = conn.execute("SELECT COUNT(*) FROM transactions WHERE file_id = ?", (csv_file_id,)).fetchone()[0]
+        conn.close()
+        assert tx_count_before == tx_count_after, f"Idempotency violated: rows duplicated from {tx_count_before} to {tx_count_after}"
+
         record_step(9, "Validate Data Quality & Rules", True, 
-                    f"Validated {val_report.get('total_rows')} rows, detected {val_report.get('valid_rows')} valid entries")
+                    f"Verified rejection of invalid rows, zero date fabrication, and idempotent replay protection")
     except Exception as e:
-        record_step(9, "Validate Data Quality & Rules", False, str(e))
+        import traceback
+        record_step(9, "Validate Data Quality & Rules", False, traceback.format_exc())
 
     # Step 10: Run Audit Procedures (Hybrid Audit Engine)
     try:
         resp = client.post(f"/api/findings/run-engine/{engagement_id}", headers=admin_headers)
         assert resp.status_code == 200, f"Hybrid engine failed: {resp.text}"
         engine_res = resp.json()
+        assert engine_res.get("findings_count", 0) > 0, "Engine produced 0 findings"
+
+        # Assert expected findings exist in database
+        conn = get_db_connection()
+        findings_in_db = conn.execute("SELECT * FROM audit_findings WHERE engagement_id = ?", (engagement_id,)).fetchall()
+        conn.close()
+        assert len(findings_in_db) > 0, "No findings persisted in database"
+        rule_texts = " ".join([f"{f['rule_used']} {f['title']} {f['category']}" for f in findings_in_db])
+        assert any(term in rule_texts for term in ["40A", "Cash", "Benford", "Material", "Round", "Analytical"]), "Expected audit rules did not fire"
+
         record_step(10, "Run Hybrid Audit Procedures", True, 
-                    f"Executed Benford, ML & deterministic rules. Findings count: {engine_res.get('findings_count', 0)}")
+                    f"Executed hybrid rules with verified findings count: {len(findings_in_db)}")
     except Exception as e:
         record_step(10, "Run Hybrid Audit Procedures", False, str(e))
 
@@ -363,24 +428,61 @@ def run_all_steps():
     except Exception as e:
         record_step(14, "Delete Working Paper with Audit Log", False, str(e))
 
-    # Step 15: Run Reconciliation
+    # Step 15: Run Bank & GST Reconciliation (WF-003, WF-006)
     try:
-        resp = client.get(f"/api/reconciliation/{engagement_id}", headers=admin_headers)
-        assert resp.status_code == 200, f"Recon list failed: {resp.text}"
-        record_step(15, "Run Bank / GST Reconciliation", True, f"Retrieved engagement reconciliations workbench successfully")
+        # 1. Execute Bank Reconciliation Statement (BRS) matching
+        brs_payload = {
+            "engagement_id": engagement_id,
+            "bank_ledger_name": "Cash In Hand",
+            "title": "Cash / Bank Reconciliation Statement"
+        }
+        brs_resp = client.post("/api/reconciliation/execute", json=brs_payload, headers=admin_headers)
+        assert brs_resp.status_code == 200, f"BRS execute failed: {brs_resp.text}"
+        brs_data = brs_resp.json()
+        assert "recon_id" in brs_data or "id" in brs_data, "BRS result did not contain reconciliation ID"
+
+        # 2. Execute GST Reconciliation comparing GSTR-1 and Sales Register
+        gst_payload = {
+            "engagement_id": engagement_id,
+            "source_a_type": "GSTR-1",
+            "source_b_type": "Sales Register (Books)",
+            "title": "Q1 GST Sales Reconciliation"
+        }
+        gst_resp = client.post("/api/gst-reconciliation/execute", json=gst_payload, headers=admin_headers)
+        assert gst_resp.status_code == 200, f"GST execute failed: {gst_resp.text}"
+        gst_data = gst_resp.json()
+        assert "recon_id" in gst_data or "id" in gst_data, "GST result did not contain reconciliation ID"
+
+        record_step(15, "Run Bank / GST Reconciliation", True, 
+                    f"Executed BRS (ID #{brs_data.get('recon_id') or brs_data.get('id')}) and GST Recon (ID #{gst_data.get('recon_id') or gst_data.get('id')})")
     except Exception as e:
         record_step(15, "Run Bank / GST Reconciliation", False, str(e))
 
-    # Step 16: Generate Financial Statements
+    # Step 16: Generate Financial Statements & Validate Ledger Integrity (Section 4)
     try:
         resp = client.get(f"/api/financial-statements/{engagement_id}", headers=admin_headers)
         assert resp.status_code == 200, f"Financial statements failed: {resp.text}"
+        fs_data = resp.json()
+        assert "profit_and_loss" in fs_data or "revenue" in fs_data or "trial_balance" in fs_data
+
+        # Assert Trial Balance values strictly derived from General Ledger transactions:
+        # Debits = 250k + 180k + 35k + 15k + 75k + 45k = 600,000.00
+        # Credits = 850k + 420k = 1,270,000.00
+        tb_resp = client.get(f"/api/trial-balance/{engagement_id}", headers=admin_headers)
+        assert tb_resp.status_code == 200, f"Trial balance query failed: {tb_resp.text}"
+        tb_data = tb_resp.json()
+
+        assert tb_data["grand_total_debit"] == 600500.0, f"Expected debits 600500.0, got {tb_data['grand_total_debit']}"
+        assert tb_data["grand_total_credit"] == 1270000.0, f"Expected credits 1270000.0, got {tb_data['grand_total_credit']}"
+        # Assert auxiliary Sales Register upload was NOT counted as general ledger postings
+        assert tb_data["grand_total_credit"] != 3122600.0, "Accounting contamination: Sales register contaminated Trial Balance!"
+
         record_step(16, "Generate Financial Statements", True, 
-                    f"Generated Balance Sheet, P&L, and Trial Balance summaries")
+                    f"Generated Financial Statements with verified Trial Balance: Dr ₹{tb_data['grand_total_debit']:,.2f}, Cr ₹{tb_data['grand_total_credit']:,.2f}")
     except Exception as e:
         record_step(16, "Generate Financial Statements", False, str(e))
 
-    # Step 17: Export Audit Trail & Verify Hash Chain
+    # Step 17: Export Audit Trail & Verify Cryptographic Hash Chain
     try:
         resp = client.get("/api/audit-trail", headers=admin_headers)
         assert resp.status_code == 200, f"Audit trail failed: {resp.text}"
@@ -390,7 +492,11 @@ def run_all_steps():
         
         verify_resp = client.post("/api/audit-trail/verify", headers=admin_headers)
         assert verify_resp.status_code == 200, f"Verification failed: {verify_resp.text}"
-        record_step(17, "Export Cryptographic Audit Trail", True, f"Verified {len(logs)} chained tamper-evident SHA-256 audit events")
+        verify_data = verify_resp.json()
+        assert verify_data.get("valid") is True, f"Cryptographic audit trail hash chain invalid: {verify_data}"
+        assert verify_data.get("entries_checked", 0) > 0, "Zero entries verified in audit chain"
+
+        record_step(17, "Export Cryptographic Audit Trail", True, f"Verified {verify_data.get('entries_checked')} chained tamper-evident SHA-256 audit events (valid=True)")
     except Exception as e:
         record_step(17, "Export Cryptographic Audit Trail", False, str(e))
 
@@ -443,35 +549,69 @@ def run_all_steps():
 
     # Step 21: Database Backup
     backup_filename = None
+    pre_backup_counts = {}
     try:
+        conn = get_db_connection()
+        pre_backup_counts = {
+            "clients": conn.execute("SELECT COUNT(*) FROM clients").fetchone()[0],
+            "engagements": conn.execute("SELECT COUNT(*) FROM engagements").fetchone()[0],
+            "transactions": conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0],
+            "findings": conn.execute("SELECT COUNT(*) FROM audit_findings").fetchone()[0],
+            "working_papers": conn.execute("SELECT COUNT(*) FROM working_papers").fetchone()[0],
+            "audit_logs": conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+        }
+        conn.close()
+
         resp = client.post("/api/audit-trail/backup/create", headers=admin_headers)
         assert resp.status_code == 200, f"Backup failed: {resp.text}"
         backup_res = resp.json()
         backup_filename = backup_res.get("filename") or backup_res.get("backup_file")
+        assert backup_filename, "Backup succeeded but returned no backup filename"
         record_step(21, "Create Local Database Backup", True, f"Snapshot successfully created: {backup_filename}")
     except Exception as e:
         record_step(21, "Create Local Database Backup", False, str(e))
 
-    # Step 22: Database Restore
+    # Step 22: Database Restore & Record Parity
     try:
-        if backup_filename:
-            resp = client.post(f"/api/audit-trail/backup/restore/{backup_filename}", headers=admin_headers)
-            assert resp.status_code == 200, f"Restore failed: {resp.text}"
-            record_step(22, "Restore From Backup Snapshot", True, f"Restored active database from '{backup_filename}'")
-        else:
-            record_step(22, "Restore From Backup Snapshot", True, "Verified backup file restoration endpoint")
+        assert backup_filename, "No backup filename available to restore"
+        resp = client.post(f"/api/audit-trail/backup/restore/{backup_filename}", headers=admin_headers)
+        assert resp.status_code == 200, f"Restore failed: {resp.text}"
+
+        conn = get_db_connection()
+        post_restore_counts = {
+            "clients": conn.execute("SELECT COUNT(*) FROM clients").fetchone()[0],
+            "engagements": conn.execute("SELECT COUNT(*) FROM engagements").fetchone()[0],
+            "transactions": conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0],
+            "findings": conn.execute("SELECT COUNT(*) FROM audit_findings").fetchone()[0],
+            "working_papers": conn.execute("SELECT COUNT(*) FROM working_papers").fetchone()[0],
+            "audit_logs": conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+        }
+        conn.close()
+
+        # Validate that restored records match pre-backup counts
+        assert post_restore_counts["clients"] == pre_backup_counts["clients"], "Clients count mismatch after restore"
+        assert post_restore_counts["engagements"] == pre_backup_counts["engagements"], "Engagements count mismatch after restore"
+        assert post_restore_counts["transactions"] == pre_backup_counts["transactions"], "Transactions count mismatch after restore"
+        assert post_restore_counts["findings"] == pre_backup_counts["findings"], "Findings count mismatch after restore"
+
+        record_step(22, "Restore From Backup Snapshot", True, f"Restored active database from '{backup_filename}' with verified record parity")
     except Exception as e:
         record_step(22, "Restore From Backup Snapshot", False, str(e))
 
-    # Step 23: Application Restart Simulation
+    # Step 23: Application Restart Simulation (Fresh App State & Client Reload)
+    fresh_client = None
     try:
-        health_resp = client.get("/api/health")
-        assert health_resp.status_code == 200, f"Health check failed: {health_resp.text}"
-        record_step(23, "Restart Application & Verify Health", True, f"FastAPI service healthy on port 8000 (status: {health_resp.json().get('status')})")
+        from backend.app.main import app as fresh_app
+        fresh_client = TestClient(fresh_app)
+        health_resp = fresh_client.get("/api/health")
+        assert health_resp.status_code == 200, f"Health check failed on restarted client: {health_resp.text}"
+        h_data = health_resp.json()
+        assert h_data.get("status") in ["healthy", "ok", "ACTIVE"] or "timestamp" in h_data or h_data.get("database") == "connected"
+        record_step(23, "Restart Application & Verify Health", True, f"FastAPI service healthy on fresh connection (status: {h_data.get('status', 'OK')})")
     except Exception as e:
         record_step(23, "Restart Application & Verify Health", False, str(e))
 
-    # Step 24: Verify Data Survives & Integrity Intact
+    # Step 24: Verify Data Persistence & Cryptographic Hash Chain Integrity Post-Restore
     try:
         conn = get_db_connection()
         c_count = conn.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
@@ -483,8 +623,16 @@ def run_all_steps():
         conn.close()
 
         assert c_count > 0 and e_count > 0 and t_count > 0 and f_count > 0 and w_count > 0
+
+        # Verify hash chain using the fresh client post-restart
+        active_c = fresh_client if fresh_client else client
+        post_verify = active_c.post("/api/audit-trail/verify", headers=admin_headers)
+        assert post_verify.status_code == 200, f"Post-restore verification failed: {post_verify.text}"
+        v_res = post_verify.json()
+        assert v_res.get("valid") is True, f"Audit hash chain integrity corrupted after restore: {v_res}"
+
         record_step(24, "Verify Data Persistence & Chain Integrity", True, 
-                    f"Surviving records: {c_count} clients, {e_count} engagements, {t_count} transactions, {f_count} findings, {w_count} WPs, {a_count} audit chain hashes")
+                    f"Surviving records: {c_count} clients, {e_count} engagements, {t_count} transactions, {f_count} findings, {w_count} WPs, {a_count} verified audit chain hashes (valid=True)")
     except Exception as e:
         record_step(24, "Verify Data Persistence & Chain Integrity", False, str(e))
 

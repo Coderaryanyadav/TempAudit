@@ -214,6 +214,38 @@ def apply_mapping(
         check_engagement_access(conn, engagement_id, current_user)
 
         category = req.data_category or file_info.get("data_category") or "General Ledger"
+
+        # WF-002: Idempotency guard - if already imported and not forced, return original import result
+        existing_tx = conn.execute(
+            "SELECT COUNT(*) as cnt FROM transactions WHERE file_id = ?", (req.file_id,)
+        ).fetchone()
+        existing_tx_count = existing_tx["cnt"] if existing_tx else 0
+        if (file_info.get("successful_rows") or 0) > 0 and existing_tx_count > 0 and not getattr(req, "force_reimport", False):
+            val_errors = json.loads(file_info.get("errors_json") or "[]")
+            return {
+                "status": "success",
+                "file_id": req.file_id,
+                "file_name": file_info["file_name"],
+                "file_type": file_info["file_type"],
+                "data_category": file_info.get("data_category") or category,
+                "engagement_id": engagement_id,
+                "imported_rows": file_info.get("successful_rows") or existing_tx_count,
+                "total_rows": file_info.get("row_count") or existing_tx_count,
+                "failed_rows": file_info.get("failed_rows") or 0,
+                "warning_count": file_info.get("warning_count") or 0,
+                "validation_report": {
+                    "is_valid": (file_info.get("failed_rows") or 0) == 0,
+                    "total_rows": file_info.get("row_count") or existing_tx_count,
+                    "successful_rows": file_info.get("successful_rows") or existing_tx_count,
+                    "failed_rows": file_info.get("failed_rows") or 0,
+                    "warning_count": file_info.get("warning_count") or 0,
+                    "errors": val_errors,
+                    "warnings": []
+                },
+                "message": f"File '{file_info['file_name']}' was already imported. Returned existing import record.",
+                "idempotent_replay": True
+            }
+
         import_result = import_and_save_transactions(
             engagement_id=engagement_id,
             file_id=req.file_id,

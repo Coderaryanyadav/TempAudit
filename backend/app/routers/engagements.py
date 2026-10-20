@@ -112,7 +112,7 @@ def get_comprehensive_dashboard_route(
     if engagement_id:
         require_engagement_access(engagement_id, current_user)
     try:
-        return DashboardService.get_comprehensive_dashboard(engagement_id)
+        return DashboardService.get_comprehensive_dashboard(engagement_id, current_user=current_user)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate dashboard metrics: {str(e)}")
 
@@ -124,7 +124,7 @@ def get_engagement_comprehensive_dashboard_route(
     """Returns comprehensive dashboard data for a specific engagement."""
     require_engagement_access(engagement_id, current_user)
     try:
-        return DashboardService.get_comprehensive_dashboard(engagement_id)
+        return DashboardService.get_comprehensive_dashboard(engagement_id, current_user=current_user)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate engagement dashboard: {str(e)}")
 

@@ -83,14 +83,22 @@ def run_bank_reconciliation(
         book_query += " AND ledger = ?"
         book_params.append(bank_ledger_name)
     else:
-        # Default to bank ledger if exists, else all
+        # Default to bank ledger if exists; require explicit bank ledger filter so unrelated expenses are never included
         chk = conn.execute("SELECT DISTINCT ledger FROM transactions WHERE engagement_id = ? AND (LOWER(ledger) LIKE '%bank%' OR LOWER(ledger) LIKE '%hdfc%' OR LOWER(ledger) LIKE '%sbi%' OR LOWER(ledger) LIKE '%icici%')", (engagement_id,)).fetchone()
         if chk:
             bank_ledger_name = chk["ledger"]
             book_query += " AND ledger = ?"
             book_params.append(bank_ledger_name)
         else:
-            bank_ledger_name = "Bank Account"
+            chk_exact = conn.execute("SELECT DISTINCT ledger FROM transactions WHERE engagement_id = ? AND (LOWER(ledger) = 'bank account' OR LOWER(ledger) = 'bank')", (engagement_id,)).fetchone()
+            if chk_exact:
+                bank_ledger_name = chk_exact["ledger"]
+                book_query += " AND ledger = ?"
+                book_params.append(bank_ledger_name)
+            else:
+                bank_ledger_name = "Bank Account"
+                book_query += " AND ledger = ?"
+                book_params.append(bank_ledger_name)
 
     book_rows = conn.execute(book_query + " ORDER BY date ASC, id ASC", tuple(book_params)).fetchall()
     book_txs = [dict(r) for r in book_rows]
@@ -98,8 +106,17 @@ def run_bank_reconciliation(
     # 2. Fetch or Prepare Bank Statement Transactions
     bank_txs = []
     if file_b_id:
-        # If transactions imported under this file_id exist
-        stmt_rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? ORDER BY date ASC, id ASC", (file_b_id,)).fetchall()
+        # WF-003: Validate that file_b_id belongs to the requested engagement
+        file_b_check = conn.execute(
+            "SELECT id FROM uploaded_files WHERE id = ? AND engagement_id = ?",
+            (file_b_id, engagement_id)
+        ).fetchone()
+        if not file_b_check:
+            raise ValueError(f"Uploaded bank statement file ID {file_b_id} does not belong to engagement {engagement_id}.")
+        stmt_rows = conn.execute(
+            "SELECT * FROM transactions WHERE file_id = ? AND engagement_id = ? ORDER BY date ASC, id ASC",
+            (file_b_id, engagement_id)
+        ).fetchall()
         if stmt_rows:
             bank_txs = [dict(r) for r in stmt_rows]
     else:

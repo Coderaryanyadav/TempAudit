@@ -223,6 +223,7 @@ class ColumnMappingRequest(BaseModel):
     file_id: int
     column_mapping: Dict[str, str]
     data_category: Optional[str] = "General Ledger"
+    force_reimport: Optional[bool] = False
 
 class ValidateMappingRequest(BaseModel):
     file_id: int

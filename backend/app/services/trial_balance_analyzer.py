@@ -45,7 +45,7 @@ def analyze_trial_balance(engagement_id: int) -> Dict[str, Any]:
     """
     conn = get_db_connection()
 
-    # 1. Fetch all transactions grouped by ledger
+    # 1. Fetch all transactions grouped by ledger (strictly scoped to General Ledger postings)
     txn_rows = conn.execute("""
         SELECT 
             ledger,
@@ -60,9 +60,30 @@ def analyze_trial_balance(engagement_id: int) -> Dict[str, Any]:
             MIN(id) as sample_tx_id
         FROM transactions
         WHERE engagement_id = ?
+          AND (
+              file_id IS NULL
+              OR file_id IN (
+                  SELECT id FROM uploaded_files 
+                  WHERE engagement_id = ? 
+                    AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
+              )
+              OR (
+                  NOT EXISTS (
+                      SELECT 1 FROM uploaded_files 
+                      WHERE engagement_id = ? 
+                        AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
+                  )
+                  AND file_id NOT IN (
+                      SELECT id FROM uploaded_files 
+                      WHERE engagement_id = ? 
+                        AND data_category IN ('Sales Register', 'Purchase Register', 'Bank Statement', 'GST Data', 'GSTR-1', 'GSTR-2B', 'GSTR-3B')
+                  )
+              )
+          )
+          AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'GST_DATA')
         GROUP BY ledger, account_group
         ORDER BY account_group ASC, ledger ASC
-    """, (engagement_id,)).fetchall()
+    """, (engagement_id, engagement_id, engagement_id, engagement_id)).fetchall()
 
     # 2. Check if explicit ledgers table has entries for this engagement
     ledger_master_rows = conn.execute("""
@@ -341,8 +362,29 @@ def analyze_trial_balance(engagement_id: int) -> Dict[str, Any]:
                SUM(CASE WHEN credit < 0 THEN 1 ELSE 0 END) as neg_cr
         FROM transactions
         WHERE engagement_id = ? AND (debit < 0 OR credit < 0)
+          AND (
+              file_id IS NULL
+              OR file_id IN (
+                  SELECT id FROM uploaded_files 
+                  WHERE engagement_id = ? 
+                    AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
+              )
+              OR (
+                  NOT EXISTS (
+                      SELECT 1 FROM uploaded_files 
+                      WHERE engagement_id = ? 
+                        AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
+                  )
+                  AND file_id NOT IN (
+                      SELECT id FROM uploaded_files 
+                      WHERE engagement_id = ? 
+                        AND data_category IN ('Sales Register', 'Purchase Register', 'Bank Statement', 'GST Data', 'GSTR-1', 'GSTR-2B', 'GSTR-3B')
+                  )
+              )
+          )
+          AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'GST_DATA')
         GROUP BY ledger
-    """, (engagement_id,)).fetchall()
+    """, (engagement_id, engagement_id, engagement_id, engagement_id)).fetchall()
 
     if neg_txns:
         neg_ledgers = [r["ledger"] for r in neg_txns]

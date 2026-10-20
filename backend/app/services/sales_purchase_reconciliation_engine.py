@@ -59,7 +59,10 @@ def run_sales_purchase_reconciliation(
     # If a specific file is uploaded as Sales/Purchase Register
     register_txs = []
     if register_file_id:
-        rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? ORDER BY date ASC, id ASC", (register_file_id,)).fetchall()
+        chk_reg = conn.execute("SELECT id FROM uploaded_files WHERE id = ? AND engagement_id = ?", (register_file_id, engagement_id)).fetchone()
+        if not chk_reg:
+            raise ValueError(f"Register file ID {register_file_id} does not belong to engagement {engagement_id}.")
+        rows = conn.execute("SELECT * FROM transactions WHERE file_id = ? AND engagement_id = ? ORDER BY date ASC, id ASC", (register_file_id, engagement_id)).fetchall()
         if rows:
             register_txs = [dict(r) for r in rows]
 

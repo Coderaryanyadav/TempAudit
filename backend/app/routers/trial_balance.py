@@ -63,8 +63,29 @@ def get_ledger_drilldown(engagement_id: int, ledger_name: str, current_user: dic
     rows = conn.execute("""
         SELECT * FROM transactions
         WHERE engagement_id = ? AND ledger = ?
+          AND (
+              file_id IS NULL
+              OR file_id IN (
+                  SELECT id FROM uploaded_files 
+                  WHERE engagement_id = ? 
+                    AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
+              )
+              OR (
+                  NOT EXISTS (
+                      SELECT 1 FROM uploaded_files 
+                      WHERE engagement_id = ? 
+                        AND data_category IN ('General Ledger', 'Trial Balance', 'Journal Entries', 'Ledger', 'Accounting Data')
+                  )
+                  AND file_id NOT IN (
+                      SELECT id FROM uploaded_files 
+                      WHERE engagement_id = ? 
+                        AND data_category IN ('Sales Register', 'Purchase Register', 'Bank Statement', 'GST Data', 'GSTR-1', 'GSTR-2B', 'GSTR-3B')
+                  )
+              )
+          )
+          AND UPPER(COALESCE(transaction_type, '')) NOT IN ('BANK_STATEMENT', 'BANK STATEMENT', 'SALES_REGISTER', 'PURCHASE_REGISTER', 'GST_DATA')
         ORDER BY date ASC, id ASC
-    """, (engagement_id, ledger_name)).fetchall()
+    """, (engagement_id, ledger_name, engagement_id, engagement_id, engagement_id)).fetchall()
 
     transactions = []
     running_balance = 0.0

@@ -48,17 +48,34 @@ def create_admin_user(
         cursor = conn.cursor()
         now_str = datetime.now().isoformat()
 
-        # Check for username or email collision
-        existing = cursor.execute(
-            "SELECT id, username, email, role FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)",
-            (username.strip(), email.strip())
+        # WF-004: Check for username and email collisions independently
+        existing_username = cursor.execute(
+            "SELECT id, username, email, role FROM users WHERE LOWER(username) = LOWER(?)",
+            (username.strip(),)
         ).fetchone()
 
-        if existing:
+        existing_email = cursor.execute(
+            "SELECT id, username, email, role FROM users WHERE LOWER(email) = LOWER(?)",
+            (email.strip(),)
+        ).fetchone()
+
+        if existing_username and existing_email and existing_username["id"] != existing_email["id"]:
             raise ValueError(
-                f"An account with username '{username}' or email '{email}' already exists (ID #{existing['id']}). "
+                f"Conflict detected: Username '{username}' belongs to account #{existing_username['id']} "
+                f"while email '{email}' belongs to a different account #{existing_email['id']}. "
+                "Account creation refused to prevent cross-account corruption or privilege escalation."
+            )
+        if existing_username:
+            raise ValueError(
+                f"An account with username '{username}' already exists (ID #{existing_username['id']}). "
                 "Account creation refused to prevent privilege escalation or accidental credential overwrite. "
-                "Use the '--reset-password' flag to explicitly authorize account recovery."
+                "Use the '--reset-password' flag with an unambiguous identifier to authorize account recovery."
+            )
+        if existing_email:
+            raise ValueError(
+                f"An account with email '{email}' already exists (ID #{existing_email['id']}). "
+                "Account creation refused to prevent privilege escalation or accidental credential overwrite. "
+                "Use the '--reset-password' flag with an unambiguous identifier to authorize account recovery."
             )
 
         pwd_hash = hash_password(password)
@@ -108,13 +125,25 @@ def reset_admin_account(
         cursor = conn.cursor()
         now_str = datetime.now().isoformat()
 
-        existing = cursor.execute(
-            "SELECT id, username, email, role FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)",
-            (identifier.strip(), identifier.strip())
-        ).fetchone()
+        # WF-004: Strict lookup by email if contains '@', else by username
+        clean_id = identifier.strip()
+        if "@" in clean_id:
+            matches = cursor.execute(
+                "SELECT id, username, email, role FROM users WHERE LOWER(email) = LOWER(?)",
+                (clean_id,)
+            ).fetchall()
+        else:
+            matches = cursor.execute(
+                "SELECT id, username, email, role FROM users WHERE LOWER(username) = LOWER(?)",
+                (clean_id,)
+            ).fetchall()
 
-        if not existing:
+        if not matches:
             raise ValueError(f"No existing user account matching '{identifier}' was found to reset.")
+        if len(matches) > 1:
+            raise ValueError(f"Ambiguous identifier '{identifier}': multiple accounts matched ({[m['id'] for m in matches]}). Specify unique username.")
+
+        existing = matches[0]
 
         uid = existing["id"]
         pwd_hash = hash_password(new_password)

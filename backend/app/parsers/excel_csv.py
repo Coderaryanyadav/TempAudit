@@ -421,11 +421,11 @@ def validate_imported_dataframe(df: pd.DataFrame, mapping: Dict[str, str], data_
                 })
         else:
             if has_date_col:
-                row_warnings.append({
+                row_errors.append({
                     "row": row_num,
                     "field": "date",
-                    "error_type": "EMPTY_DATE",
-                    "message": "Date is empty for this row.",
+                    "error_type": "MISSING_DATE",
+                    "message": "Accounting transaction date is required for this row.",
                     "value": ""
                 })
 
@@ -620,6 +620,9 @@ def import_and_save_transactions(
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # WF-002: Ensure import operation is atomic and idempotent by clearing prior transactions for this file
+    cursor.execute("DELETE FROM transactions WHERE file_id = ?", (file_id,))
+
     imported_count = 0
     failed_count = 0
     ledger_totals = {}
@@ -628,8 +631,17 @@ def import_and_save_transactions(
 
     now_ts = datetime.now().isoformat()
 
+    failed_row_numbers = {e["row"] for e in val_report.get("errors", [])}
+    has_date_col = any(v == "date" for v in mapping.values())
+
     for idx, row in df.iterrows():
         row_num = idx + 1
+
+        # WF-001: Strictly reject and skip rows with validation errors from database insertion
+        if row_num in failed_row_numbers:
+            failed_count += 1
+            continue
+
         original_dict = {}
 
         # Preserve complete untouched raw input values for this row
@@ -640,13 +652,33 @@ def import_and_save_transactions(
         # Execute deterministic normalization engine
         norm_tx, row_logs = normalize_row_data(original_dict, mapping, row_num=row_num)
 
+        # WF-001: Never substitute current date for missing accounting transaction date
+        standard_date = norm_tx.get("date")
+        if not standard_date and has_date_col:
+            failed_count += 1
+            val_report["errors"].append({
+                "row": row_num,
+                "field": "date",
+                "error_type": "MISSING_DATE",
+                "message": "Accounting transaction date is missing; cannot substitute today's date.",
+                "value": ""
+            })
+            val_report["failed_rows"] += 1
+            continue
+
+        if not standard_date:
+            standard_date = ""
+
         ledger_name = norm_tx.get("ledger") or norm_tx.get("party_name") or "General Ledger"
         debit = norm_tx.get("debit", 0.0)
         credit = norm_tx.get("credit", 0.0)
         amount = norm_tx.get("amount", max(debit, credit))
         tax_amount = norm_tx.get("tax_amount", 0.0)
         account_group = norm_tx.get("account_group") or ("Expense" if debit > 0 else "Revenue")
-        standard_date = norm_tx.get("date") or datetime.now().strftime("%Y-%m-%d")
+
+        # Skip rows that are completely blank (no date, no amount, no party)
+        if not standard_date and amount == 0.0 and debit == 0.0 and credit == 0.0 and ledger_name == "General Ledger":
+            continue
 
         cursor.execute("""
         INSERT INTO transactions (
@@ -716,7 +748,7 @@ def import_and_save_transactions(
         ledger_totals[ledger_name]["debit"] += debit
         ledger_totals[ledger_name]["credit"] += credit
 
-    # Update or insert into ledgers summary table
+    # WF-009: Update ledgers summary table cleanly using actual transactions sums to prevent compounding
     for l_name, l_data in ledger_totals.items():
         closing = l_data["op"] + l_data["debit"] - l_data["credit"]
         cursor.execute("""
@@ -725,9 +757,9 @@ def import_and_save_transactions(
             total_debit, total_credit, closing_balance
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(engagement_id, ledger_name) DO UPDATE SET
-            total_debit = total_debit + excluded.total_debit,
-            total_credit = total_credit + excluded.total_credit,
-            closing_balance = closing_balance + excluded.total_debit - excluded.total_credit
+            total_debit = (SELECT COALESCE(SUM(debit), 0.0) FROM transactions WHERE engagement_id = excluded.engagement_id AND ledger = excluded.ledger_name),
+            total_credit = (SELECT COALESCE(SUM(credit), 0.0) FROM transactions WHERE engagement_id = excluded.engagement_id AND ledger = excluded.ledger_name),
+            closing_balance = opening_balance + (SELECT COALESCE(SUM(debit), 0.0) - COALESCE(SUM(credit), 0.0) FROM transactions WHERE engagement_id = excluded.engagement_id AND ledger = excluded.ledger_name)
         """, (
             engagement_id,
             l_name,
@@ -758,7 +790,7 @@ def import_and_save_transactions(
     """, (
         len(df),
         imported_count,
-        val_report["failed_rows"],
+        max(val_report["failed_rows"], failed_count),
         val_report["warning_count"],
         data_category,
         json.dumps(mapping),
@@ -769,7 +801,7 @@ def import_and_save_transactions(
     conn.commit()
     conn.close()
 
-    rows_rejected = val_report["failed_rows"]
+    rows_rejected = max(val_report["failed_rows"], failed_count)
     data_quality_warning = (rows_rejected > 0) or (val_report["warning_count"] > 0)
 
     return {

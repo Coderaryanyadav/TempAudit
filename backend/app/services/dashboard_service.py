@@ -32,9 +32,14 @@ def get_month_name(ym_str: str) -> str:
 
 class DashboardService:
     @classmethod
-    def get_comprehensive_dashboard(cls, engagement_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_comprehensive_dashboard(
+        cls,
+        engagement_id: Optional[int] = None,
+        current_user: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Retrieves real, 100% database-backed metrics for the main FinAuditPro dashboard:
+        - Scoped strictly by user role and engagement assignment (WF-005)
         - 6 TOP CARDS: Active Clients, Active Engagements, Open Findings, High-Risk Findings, Unmatched Transactions, Pending Reviews
         - 7 MAIN SECTIONS:
           1. Engagement Overview
@@ -53,7 +58,11 @@ class DashboardService:
           - Year-on-year movement
         """
         conn = get_db_connection()
-        
+        from backend.app.auth import normalize_role
+        user_id = current_user.get("id") if current_user else None
+        user_role = normalize_role(current_user.get("role")) if current_user else "Admin"
+        is_restricted = bool(current_user and user_role not in ["Admin", "Auditor"])
+
         # 1. Resolve Active Engagement
         eng = None
         if engagement_id:
@@ -68,46 +77,91 @@ class DashboardService:
                 WHERE e.id = ?
             """, (engagement_id,)).fetchone()
             if eng_row:
-                eng = dict(eng_row)
-        
+                eng_dict = dict(eng_row)
+                if not is_restricted or (eng_dict.get("assigned_staff_id") == user_id or eng_dict.get("lead_auditor_id") == user_id):
+                    eng = eng_dict
+                else:
+                    engagement_id = None
+
         if not eng:
-            # Pick the latest non-archived engagement or fallback to latest
-            eng_row = conn.execute("""
-                SELECT e.*, c.name as client_name, c.pan as client_pan, c.gstin as client_gstin,
-                       c.entity_type as client_entity_type, c.industry as client_industry,
-                       u.full_name as lead_auditor_name, s.full_name as assigned_staff_name
-                FROM engagements e
-                JOIN clients c ON e.client_id = c.id
-                LEFT JOIN users u ON e.lead_auditor_id = u.id
-                LEFT JOIN users s ON e.assigned_staff_id = s.id
-                ORDER BY CASE WHEN e.status IN ('In Progress', 'Draft', 'Under Review') THEN 0 ELSE 1 END, e.id DESC
-                LIMIT 1
-            """).fetchone()
+            if is_restricted:
+                eng_row = conn.execute("""
+                    SELECT e.*, c.name as client_name, c.pan as client_pan, c.gstin as client_gstin,
+                           c.entity_type as client_entity_type, c.industry as client_industry,
+                           u.full_name as lead_auditor_name, s.full_name as assigned_staff_name
+                    FROM engagements e
+                    JOIN clients c ON e.client_id = c.id
+                    LEFT JOIN users u ON e.lead_auditor_id = u.id
+                    LEFT JOIN users s ON e.assigned_staff_id = s.id
+                    WHERE (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+                    ORDER BY CASE WHEN e.status IN ('In Progress', 'Draft', 'Under Review') THEN 0 ELSE 1 END, e.id DESC
+                    LIMIT 1
+                """, (user_id, user_id)).fetchone()
+            else:
+                eng_row = conn.execute("""
+                    SELECT e.*, c.name as client_name, c.pan as client_pan, c.gstin as client_gstin,
+                           c.entity_type as client_entity_type, c.industry as client_industry,
+                           u.full_name as lead_auditor_name, s.full_name as assigned_staff_name
+                    FROM engagements e
+                    JOIN clients c ON e.client_id = c.id
+                    LEFT JOIN users u ON e.lead_auditor_id = u.id
+                    LEFT JOIN users s ON e.assigned_staff_id = s.id
+                    ORDER BY CASE WHEN e.status IN ('In Progress', 'Draft', 'Under Review') THEN 0 ELSE 1 END, e.id DESC
+                    LIMIT 1
+                """).fetchone()
+
             if eng_row:
                 eng = dict(eng_row)
                 engagement_id = eng["id"]
 
-        all_engagements_rows = conn.execute("""
-            SELECT e.id, e.title, e.financial_year, e.status, e.audit_type, c.name as client_name
-            FROM engagements e
-            JOIN clients c ON e.client_id = c.id
-            ORDER BY e.id DESC
-        """).fetchall()
+        if is_restricted:
+            all_engagements_rows = conn.execute("""
+                SELECT e.id, e.title, e.financial_year, e.status, e.audit_type, c.name as client_name
+                FROM engagements e
+                JOIN clients c ON e.client_id = c.id
+                WHERE (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+                ORDER BY e.id DESC
+            """, (user_id, user_id)).fetchall()
+        else:
+            all_engagements_rows = conn.execute("""
+                SELECT e.id, e.title, e.financial_year, e.status, e.audit_type, c.name as client_name
+                FROM engagements e
+                JOIN clients c ON e.client_id = c.id
+                ORDER BY e.id DESC
+            """).fetchall()
         all_engagements = [dict(r) for r in all_engagements_rows]
 
         # -------------------------------------------------------------
-        # TOP METRIC CARDS (Using real DB values)
+        # TOP METRIC CARDS (Using real DB values scoped by authorization)
         # -------------------------------------------------------------
-        active_clients_count = conn.execute("SELECT COUNT(*) as c FROM clients").fetchone()["c"]
-        active_engagements_count = conn.execute(
-            "SELECT COUNT(*) as c FROM engagements WHERE status IN ('Draft', 'In Progress', 'Under Review')"
-        ).fetchone()["c"]
-        completed_engagements_count = conn.execute(
-            "SELECT COUNT(*) as c FROM engagements WHERE status = 'Completed'"
-        ).fetchone()["c"]
-        archived_engagements_count = conn.execute(
-            "SELECT COUNT(*) as c FROM engagements WHERE status = 'Archived'"
-        ).fetchone()["c"]
+        if is_restricted:
+            active_clients_count = conn.execute(
+                "SELECT COUNT(DISTINCT client_id) as c FROM engagements WHERE (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+            active_engagements_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status IN ('Draft', 'In Progress', 'Under Review') AND (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+            completed_engagements_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status = 'Completed' AND (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+            archived_engagements_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status = 'Archived' AND (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+        else:
+            active_clients_count = conn.execute("SELECT COUNT(*) as c FROM clients").fetchone()["c"]
+            active_engagements_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status IN ('Draft', 'In Progress', 'Under Review')"
+            ).fetchone()["c"]
+            completed_engagements_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status = 'Completed'"
+            ).fetchone()["c"]
+            archived_engagements_count = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status = 'Archived'"
+            ).fetchone()["c"]
 
         # Open & High-Risk Findings
         if engagement_id:
@@ -123,6 +177,25 @@ class DashboardService:
                 "SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND severity = 'CRITICAL' AND status NOT IN ('Resolved', 'Waived')",
                 (engagement_id,)
             ).fetchone()["c"]
+        elif is_restricted:
+            open_findings_count = conn.execute("""
+                SELECT COUNT(*) as c FROM audit_findings f
+                JOIN engagements e ON f.engagement_id = e.id
+                WHERE f.status IN ('Open', 'In Review', 'Under Review')
+                  AND (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchone()["c"]
+            high_risk_findings_count = conn.execute("""
+                SELECT COUNT(*) as c FROM audit_findings f
+                JOIN engagements e ON f.engagement_id = e.id
+                WHERE f.severity IN ('CRITICAL', 'HIGH') AND f.status NOT IN ('Resolved', 'Waived')
+                  AND (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchone()["c"]
+            critical_findings_count = conn.execute("""
+                SELECT COUNT(*) as c FROM audit_findings f
+                JOIN engagements e ON f.engagement_id = e.id
+                WHERE f.severity = 'CRITICAL' AND f.status NOT IN ('Resolved', 'Waived')
+                  AND (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchone()["c"]
         else:
             open_findings_count = conn.execute(
                 "SELECT COUNT(*) as c FROM audit_findings WHERE status IN ('Open', 'In Review', 'Under Review')"
@@ -136,19 +209,32 @@ class DashboardService:
 
         # Unmatched Transactions
         if engagement_id:
-            # Count unmatched items from reconciliation_items if present
             unmatched_items_count = conn.execute("""
                 SELECT COUNT(*) as c FROM reconciliation_items ri
                 JOIN reconciliations r ON ri.recon_id = r.id
                 WHERE r.engagement_id = ? AND (ri.status IN ('Unmatched', 'Suggested') OR ri.match_level = 'UNMATCHED')
             """, (engagement_id,)).fetchone()["c"]
-            
-            # If no detailed items, check summary columns from reconciliations
             if unmatched_items_count == 0:
                 recon_summary = conn.execute("""
                     SELECT SUM(unmatched_bank_count + unmatched_book_count) as s
                     FROM reconciliations WHERE engagement_id = ?
                 """, (engagement_id,)).fetchone()["s"]
+                unmatched_items_count = int(recon_summary or 0)
+        elif is_restricted:
+            unmatched_items_count = conn.execute("""
+                SELECT COUNT(*) as c FROM reconciliation_items ri
+                JOIN reconciliations r ON ri.recon_id = r.id
+                JOIN engagements e ON r.engagement_id = e.id
+                WHERE (ri.status IN ('Unmatched', 'Suggested') OR ri.match_level = 'UNMATCHED')
+                  AND (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchone()["c"]
+            if unmatched_items_count == 0:
+                recon_summary = conn.execute("""
+                    SELECT SUM(r.unmatched_bank_count + r.unmatched_book_count) as s
+                    FROM reconciliations r
+                    JOIN engagements e ON r.engagement_id = e.id
+                    WHERE (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+                """, (user_id, user_id)).fetchone()["s"]
                 unmatched_items_count = int(recon_summary or 0)
         else:
             unmatched_items_count = conn.execute("""
@@ -158,7 +244,7 @@ class DashboardService:
                 recon_summary = conn.execute("SELECT SUM(unmatched_bank_count + unmatched_book_count) as s FROM reconciliations").fetchone()["s"]
                 unmatched_items_count = int(recon_summary or 0)
 
-        # Pending Reviews (Engagements Under Review + Working Papers Under Review/Needs Correction + Findings Under Review)
+        # Pending Reviews
         if engagement_id:
             eng_under_review = 1 if (eng and eng.get("status") == "Under Review") else 0
             wp_under_review = conn.execute(
@@ -169,6 +255,24 @@ class DashboardService:
                 "SELECT COUNT(*) as c FROM audit_findings WHERE engagement_id = ? AND status IN ('Under Review', 'In Review')",
                 (engagement_id,)
             ).fetchone()["c"]
+            pending_reviews_count = eng_under_review + wp_under_review + findings_under_review
+        elif is_restricted:
+            eng_under_review = conn.execute(
+                "SELECT COUNT(*) as c FROM engagements WHERE status = 'Under Review' AND (assigned_staff_id = ? OR lead_auditor_id = ?)",
+                (user_id, user_id)
+            ).fetchone()["c"]
+            wp_under_review = conn.execute("""
+                SELECT COUNT(*) as c FROM working_papers wp
+                JOIN engagements e ON wp.engagement_id = e.id
+                WHERE wp.status IN ('Under Review', 'Needs Correction')
+                  AND (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchone()["c"]
+            findings_under_review = conn.execute("""
+                SELECT COUNT(*) as c FROM audit_findings f
+                JOIN engagements e ON f.engagement_id = e.id
+                WHERE f.status IN ('Under Review', 'In Review')
+                  AND (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchone()["c"]
             pending_reviews_count = eng_under_review + wp_under_review + findings_under_review
         else:
             eng_under_review = conn.execute("SELECT COUNT(*) as c FROM engagements WHERE status = 'Under Review'").fetchone()["c"]
@@ -207,8 +311,16 @@ class DashboardService:
         # -------------------------------------------------------------
         # SECTION 2: RISK OVERVIEW & SEVERITY / AREA DISTRIBUTION
         # -------------------------------------------------------------
-        findings_query = "SELECT * FROM audit_findings" + (f" WHERE engagement_id = {engagement_id}" if engagement_id else "")
-        finding_rows = conn.execute(findings_query).fetchall()
+        if engagement_id:
+            finding_rows = conn.execute("SELECT * FROM audit_findings WHERE engagement_id = ?", (engagement_id,)).fetchall()
+        elif is_restricted:
+            finding_rows = conn.execute("""
+                SELECT f.* FROM audit_findings f
+                JOIN engagements e ON f.engagement_id = e.id
+                WHERE (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchall()
+        else:
+            finding_rows = conn.execute("SELECT * FROM audit_findings").fetchall()
         
         severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
         engine_counts = {"DETERMINISTIC": 0, "STATISTICAL_ML": 0, "LOCAL_AI": 0}
@@ -291,22 +403,57 @@ class DashboardService:
         # -------------------------------------------------------------
         # SECTION 3: RECENT FINDINGS TABLE
         # -------------------------------------------------------------
-        recent_findings_query = """
-            SELECT id, finding_code, title, severity, category, module,
-                   expected_value, actual_value, difference, rule_used,
-                   engine_type, status, auditor_comment, risk_score, created_at
-            FROM audit_findings
-        """ + (f" WHERE engagement_id = {engagement_id}" if engagement_id else "") + """
-            ORDER BY CASE severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, id DESC
-            LIMIT 10
-        """
-        recent_findings = [dict(r) for r in conn.execute(recent_findings_query).fetchall()]
+        if engagement_id:
+            recent_findings_query = """
+                SELECT id, finding_code, title, severity, category, module,
+                       expected_value, actual_value, difference, rule_used,
+                       engine_type, status, auditor_comment, risk_score, created_at
+                FROM audit_findings
+                WHERE engagement_id = ?
+                ORDER BY CASE severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, id DESC
+                LIMIT 10
+            """
+            recent_findings = [dict(r) for r in conn.execute(recent_findings_query, (engagement_id,)).fetchall()]
+        elif is_restricted:
+            recent_findings_query = """
+                SELECT f.id, f.finding_code, f.title, f.severity, f.category, f.module,
+                       f.expected_value, f.actual_value, f.difference, f.rule_used,
+                       f.engine_type, f.status, f.auditor_comment, f.risk_score, f.created_at
+                FROM audit_findings f
+                JOIN engagements e ON f.engagement_id = e.id
+                WHERE (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+                ORDER BY CASE f.severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, f.id DESC
+                LIMIT 10
+            """
+            recent_findings = [dict(r) for r in conn.execute(recent_findings_query, (user_id, user_id)).fetchall()]
+        else:
+            recent_findings_query = """
+                SELECT id, finding_code, title, severity, category, module,
+                       expected_value, actual_value, difference, rule_used,
+                       engine_type, status, auditor_comment, risk_score, created_at
+                FROM audit_findings
+                ORDER BY CASE severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, id DESC
+                LIMIT 10
+            """
+            recent_findings = [dict(r) for r in conn.execute(recent_findings_query).fetchall()]
 
         # -------------------------------------------------------------
         # SECTION 4: RECONCILIATION STATUS
         # -------------------------------------------------------------
-        recon_query = "SELECT * FROM reconciliations" + (f" WHERE engagement_id = {engagement_id}" if engagement_id else "") + " ORDER BY id DESC"
-        reconciliations_list = [dict(r) for r in conn.execute(recon_query).fetchall()]
+        if engagement_id:
+            recon_query = "SELECT * FROM reconciliations WHERE engagement_id = ? ORDER BY id DESC"
+            reconciliations_list = [dict(r) for r in conn.execute(recon_query, (engagement_id,)).fetchall()]
+        elif is_restricted:
+            recon_query = """
+                SELECT r.* FROM reconciliations r
+                JOIN engagements e ON r.engagement_id = e.id
+                WHERE (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+                ORDER BY r.id DESC
+            """
+            reconciliations_list = [dict(r) for r in conn.execute(recon_query, (user_id, user_id)).fetchall()]
+        else:
+            recon_query = "SELECT * FROM reconciliations ORDER BY id DESC"
+            reconciliations_list = [dict(r) for r in conn.execute(recon_query).fetchall()]
 
         total_matched = sum(r.get("matched_count", 0) or 0 for r in reconciliations_list)
         total_unmatched_bank = sum(r.get("unmatched_bank_count", 0) or 0 for r in reconciliations_list)
@@ -329,10 +476,22 @@ class DashboardService:
         # SECTION 5: ANOMALY SUMMARY (Benford, ML, Spikes)
         # -------------------------------------------------------------
         # Benford 1st digit calculation on real transactions
-        tx_rows = conn.execute(
-            "SELECT id, date, voucher_no, ledger, party_name, debit, credit, amount, description FROM transactions" +
-            (f" WHERE engagement_id = {engagement_id}" if engagement_id else "")
-        ).fetchall()
+        if engagement_id:
+            tx_rows = conn.execute(
+                "SELECT id, date, voucher_no, ledger, party_name, debit, credit, amount, description FROM transactions WHERE engagement_id = ?",
+                (engagement_id,)
+            ).fetchall()
+        elif is_restricted:
+            tx_rows = conn.execute("""
+                SELECT t.id, t.date, t.voucher_no, t.ledger, t.party_name, t.debit, t.credit, t.amount, t.description
+                FROM transactions t
+                JOIN engagements e ON t.engagement_id = e.id
+                WHERE (e.assigned_staff_id = ? OR e.lead_auditor_id = ?)
+            """, (user_id, user_id)).fetchall()
+        else:
+            tx_rows = conn.execute(
+                "SELECT id, date, voucher_no, ledger, party_name, debit, credit, amount, description FROM transactions"
+            ).fetchall()
 
         digit_counts = {str(d): 0 for d in range(1, 10)}
         total_valid_digits = 0
