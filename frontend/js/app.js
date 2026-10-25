@@ -8988,45 +8988,7 @@ async function renderFinancialStatements() {
   }
 }
 
-// Local AI Audit Assistant View
-async function renderAIAssistant() {
-  const container = document.getElementById("content-container");
-
-  container.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <div>
-        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Local AI Audit Assistant & Query Engine</h2>
-        <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
-          100% Offline AI Natural Language Auditor • Evidence-backed reasoning
-        </div>
-      </div>
-    </div>
-
-    <div class="chat-container">
-      <div class="chat-messages" id="chat-messages">
-        <div class="chat-bubble bot">
-          <b>Audit Assistant ready.</b><br/>
-          I have indexed all transactions, trial balance groupings, and audit findings for this engagement. How can I assist with your audit verification?
-        </div>
-      </div>
-
-      <div style="padding: 8px 16px; background: var(--bg-sidebar); display: flex; gap: 8px; overflow-x: auto;">
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Show large cash transactions above Section 40A(3) limit')">Section 40A(3) Cash Violations</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the critical risks in this engagement?')">Critical Audit Risks</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('What are the top 5 highest value vouchers?')">Top 5 Highest Vouchers</button>
-        <button class="btn btn-sm btn-secondary" onclick="sendQuickPrompt('Are there any GSTIN format or ITC matching issues?')">GSTIN & ITC Compliance</button>
-      </div>
-
-      <div class="chat-input-bar">
-        <input type="text" id="chat-input" class="form-control" placeholder="Ask a question about financial vouchers, tax limits, or audit rules..." onkeydown="if(event.key==='Enter') submitChatMessage()">
-        <button class="btn btn-primary" onclick="submitChatMessage()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-          Ask
-        </button>
-      </div>
-    </div>
-  `;
-}
+// Legacy Chat Helper (preserved for query logging)
 
 async function sendQuickPrompt(promptText) {
   document.getElementById("chat-input").value = promptText;
@@ -15021,8 +14983,13 @@ async function triggerYoYFactualAI(itemKey) {
 // -------------------------------------------------------------
 // LOCAL AI AUDIT ASSISTANT MODULE (100% Offline)
 // -------------------------------------------------------------
+const MANDATORY_DISCLAIMER = "AI-generated audit assistance. Numerical records and findings above are authoritative; verify source vouchers before making audit decisions.";
+
 if (!state.assistantState) {
   state.assistantState = {
+    conversations: [],
+    activeConversationId: null,
+    loadedEngagementId: null,
     messages: [],
     isLoading: false,
     suggestedPrompts: []
@@ -15033,15 +15000,52 @@ async function renderAIAssistant() {
   const container = document.getElementById("content-container");
   if (!state.currentEngagementId) {
     container.innerHTML = `
-    <div class="card" style="padding: 40px; text-align: center; color: var(--text-secondary);">
+      <div class="card" style="padding: 40px; text-align: center; color: var(--text-secondary);">
         <h3>No Engagement Selected</h3>
-        <p style="margin-top: 8px;">Please select an audit engagement to converse with the Local AI Assistant.</p>
-      </div >
+        <p style="margin-top: 8px;">Please select an audit engagement from the top header to converse with the Audit Assistant.</p>
+      </div>
     `;
     return;
   }
 
-  // Load suggested prompts if not already loaded
+  // 1. Reset state if engagement changed (Enforces Strict Isolation)
+  if (state.assistantState.loadedEngagementId !== state.currentEngagementId) {
+    state.assistantState.loadedEngagementId = state.currentEngagementId;
+    state.assistantState.conversations = [];
+    state.assistantState.activeConversationId = null;
+    state.assistantState.messages = [];
+  }
+
+  // 2. Load conversations for engagement if not loaded
+  if (state.assistantState.conversations.length === 0) {
+    try {
+      const convList = await FinAuditAPI.getAssistantConversations(state.currentEngagementId);
+      state.assistantState.conversations = convList || [];
+      if (state.assistantState.conversations.length > 0 && !state.assistantState.activeConversationId) {
+        state.assistantState.activeConversationId = state.assistantState.conversations[0].id;
+      }
+    } catch (e) {
+      console.warn("Could not load conversations:", e);
+    }
+  }
+
+  // 3. Load messages for active conversation if needed
+  if (state.assistantState.activeConversationId && state.assistantState.messages.length === 0 && !state.assistantState.isLoading) {
+    try {
+      const msgList = await FinAuditAPI.getAssistantMessages(state.assistantState.activeConversationId, state.currentEngagementId);
+      state.assistantState.messages = (msgList || []).map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        tool_calls: m.tool_calls,
+        evidence: m.evidence
+      }));
+    } catch (e) {
+      console.warn("Could not load messages:", e);
+    }
+  }
+
+  // 4. Load suggested prompts if not already loaded
   if (state.assistantState.suggestedPrompts.length === 0) {
     try {
       const res = await FinAuditAPI.getSuggestedPrompts(state.currentEngagementId);
@@ -15051,28 +15055,54 @@ async function renderAIAssistant() {
     }
   }
 
-  // If conversation is empty, populate initial greeting
-  if (state.assistantState.messages.length === 0) {
-    state.assistantState.messages.push({
+  // Initial welcome message if conversation is empty
+  const messagesToRender = [...state.assistantState.messages];
+  if (messagesToRender.length === 0) {
+    messagesToRender.push({
       role: "assistant",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      content: `Hello! I am your ** 100 % offline Local AI Audit Assistant ** for ** ${state.activeEngagement?.client_name || 'this client'} ** (${state.activeEngagement?.financial_year || 'FY'}).
+      content: `Hello! I am your **Offline Conversational Audit Assistant** for **${state.activeEngagement?.client_name || 'this client'}** (${state.activeEngagement?.financial_year || 'FY'}).
 
-I evaluate your imported ledger records deterministically and synthesize explainable CA - grade findings without sending any data outside your device.
+I am grounded in your recorded ledger entries and audit findings using **safe, read-only tools**. I never invent figures or overwrite audit decisions.
 
-#### How can I assist your audit today ?
-    Choose one of the quick prompt chips below or type your specific question: `,
+#### What would you like to investigate?
+Ask any natural audit question, drill down into evidence, or select a suggested topic below:`,
       disclaimer: "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: [],
-      source_transactions: [],
       suggested_actions: [
-        "Ask about unusual transactions",
-        "Compare year-on-year variances",
-        "Review bank reconciliation exceptions"
+        "Why was this transaction flagged?",
+        "Are there other cash payments for this vendor?",
+        "Explain relevant tax limit"
       ]
     });
   }
 
+  // Render conversations sidebar items
+  const convListHtml = state.assistantState.conversations.map(c => {
+    const isActive = c.id === state.assistantState.activeConversationId;
+    return `
+      <div 
+        class="assistant-thread-item" 
+        style="display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-radius: var(--radius-md); margin-bottom: 4px; cursor: pointer; background: ${isActive ? 'rgba(99, 102, 241, 0.12)' : 'transparent'}; border: 1px solid ${isActive ? 'rgba(99, 102, 241, 0.3)' : 'transparent'}; font-size: 13px;"
+        onclick="selectAssistantConversation('${c.id}')"
+      >
+        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <span style="color: ${isActive ? '#4f46e5' : '#64748b'};">${ICONS.fileText}</span>
+          <span style="color: ${isActive ? '#1e293b' : 'var(--text-secondary)'}; font-weight: ${isActive ? '600' : '400'}; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(c.title)}</span>
+        </div>
+        <button 
+          class="btn-icon" 
+          title="Delete thread" 
+          onclick="event.stopPropagation(); deleteAssistantConversation('${c.id}')"
+          style="border: none; background: transparent; padding: 2px; color: #94a3b8; cursor: pointer;"
+        >
+          ${ICONS.trash}
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  // Prompt chips
   const promptChipsHtml = state.assistantState.suggestedPrompts.map(p => {
     const iconSvg = (p.icon === 'alert') ? ICONS.alertTriangle :
       (p.icon === 'trending' || p.icon === 'chart') ? ICONS.chartBar :
@@ -15087,89 +15117,166 @@ I evaluate your imported ledger records deterministically and synthesize explain
     `;
   }).join("");
 
-  const messagesHtml = state.assistantState.messages.map((m, idx) => renderAssistantMessageItem(m, idx)).join("");
+  const messagesHtml = messagesToRender.map((m, idx) => renderAssistantMessageItem(m, idx)).join("");
 
   container.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 120px); max-height: calc(100vh - 120px);">
-      <!-- Header -->
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
-        <div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">Audit Assistant</h2>
-            <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 500; font-size: 11px;"><span class="status-indicator-dot online"></span>Local Model</span>
-          </div>
-          <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 3px;">
-            Interactive deterministic audit intelligence for <strong>${state.activeEngagement?.client_name || 'Client'}</strong> (${state.activeEngagement?.financial_year || 'FY'})
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-secondary btn-sm" onclick="loadExecutiveSummaryNarrative()">
-            ${ICONS.fileText} Executive Audit Memo
-          </button>
-          <button class="btn btn-secondary btn-sm" onclick="clearAssistantChat()">
-            ${ICONS.trash} Clear Chat
+    <div style="display: flex; gap: 16px; height: calc(100vh - 120px); max-height: calc(100vh - 120px);">
+      <!-- Left Column: Conversation Threads Sidebar -->
+      <div style="width: 250px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); display: flex; flex-direction: column; overflow: hidden;">
+        <div style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">Threads</span>
+          <button class="btn btn-primary btn-sm" onclick="startNewAssistantConversation()" style="padding: 4px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 4px;">
+            <span>+</span> New Chat
           </button>
         </div>
-      </div>
-
-      <!-- Mandatory Disclaimer Alert -->
-      <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #b45309;">
-        <span class="status-indicator-dot" style="background: #d97706;"></span>
-        <div>
-          <strong>Compliance Notice:</strong> <em>Generated assistant analysis. Verify findings against source records before making audit decisions.</em>
+        <div style="flex: 1; overflow-y: auto; padding: 8px;">
+          ${convListHtml || '<div style="padding: 16px 8px; text-align: center; color: #94a3b8; font-size: 12px;">No saved conversations yet. Click "New Chat" to begin.</div>'}
         </div>
       </div>
 
-      <!-- Prompt Chips Carousel -->
-      <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin;">
-        ${promptChipsHtml}
-      </div>
-
-      <!-- Chat Messages Container -->
-      <div id="assistant-chat-stream" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 12px 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md);">
-        ${messagesHtml}
-        ${state.assistantState.isLoading ? `
-          <div style="display: flex; gap: 12px; align-items: flex-start;">
-            <div style="width: 34px; height: 34px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0;">AI</div>
-            <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 10px;">
-              <span class="spinner-inline"></span>
-              <span>Evaluating query deterministically across local database & audit rules...</span>
+      <!-- Right Column: Main Chat Pane -->
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 12px; height: 100%; min-width: 0;">
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h2 style="margin: 0; font-size: 19px; color: var(--text-primary);">Audit Assistant</h2>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 500; font-size: 11px;">
+                <span class="status-indicator-dot online"></span>Evidence Grounded
+              </span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+              Auditing <strong>${state.activeEngagement?.client_name || 'Client'}</strong> (${state.activeEngagement?.financial_year || 'FY'}) — Multi-turn dialogue with real-time audit tools
             </div>
           </div>
-        ` : ''}
-      </div>
 
-      <!-- Input Bar -->
-    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; display: flex; gap: 8px; align-items: center;">
-      <input
-        type="text"
-        id="assistant-query-input"
-        class="form-control"
-        placeholder="Ask a question about this engagement (e.g. 'Show me unusual transactions.', 'Which ledgers have the largest YoY changes?')..."
-        style="border: none; background: transparent; font-size: 13.5px;"
-        onkeydown="if(event.key === 'Enter') handleAssistantSend();"
-        ${state.assistantState.isLoading ? 'disabled' : ''}
-        autofocus
-      >
-        <button
-          class="btn btn-primary"
-          id="assistant-send-btn"
-          onclick="handleAssistantSend()"
-          ${state.assistantState.isLoading ? 'disabled' : ''}
-          style="display: flex; align-items: center; gap: 6px; padding: 8px 18px;"
-        >
-          <span>Ask Local AI</span>
-          <span>↵</span>
-        </button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" onclick="loadExecutiveSummaryNarrative()">
+              ${ICONS.fileText} Executive Audit Memo
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="clearAssistantChat()">
+              ${ICONS.trash} Reset Messages
+            </button>
+          </div>
+        </div>
+
+        <!-- Mandatory Disclaimer Alert -->
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #b45309;">
+          <span class="status-indicator-dot" style="background: #d97706;"></span>
+          <div>
+            <strong>ICAI Compliance Notice:</strong> <em>Advisory assistant output. All calculations and findings are anchored to authoritative source records. Verify physical vouchers before signing opinions.</em>
+          </div>
+        </div>
+
+        <!-- Prompt Chips Carousel -->
+        <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; flex-shrink: 0;">
+          ${promptChipsHtml}
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div id="assistant-chat-stream" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 14px 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          ${messagesHtml}
+          ${state.assistantState.isLoading ? `
+            <div style="display: flex; gap: 12px; align-items: flex-start;">
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; flex-shrink: 0;">AI</div>
+              <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 12px 16px; border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 10px;">
+                <span class="spinner-inline"></span>
+                <span>Executing read-only audit tools across local ledger records...</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Input Bar -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+          <input
+            type="text"
+            id="assistant-query-input"
+            class="form-control"
+            placeholder="Ask a question about this engagement (e.g. 'Why was this flagged?', 'Check other cash payments for Direct Vendor')..."
+            style="border: none; background: transparent; font-size: 13.5px;"
+            onkeydown="if(event.key === 'Enter') handleAssistantSend();"
+            ${state.assistantState.isLoading ? 'disabled' : ''}
+            autofocus
+          >
+          <button
+            class="btn btn-primary"
+            id="assistant-send-btn"
+            onclick="handleAssistantSend()"
+            ${state.assistantState.isLoading ? 'disabled' : ''}
+            style="display: flex; align-items: center; gap: 6px; padding: 8px 18px;"
+          >
+            <span>Ask Local AI</span>
+            <span>↵</span>
+          </button>
+        </div>
+      </div>
     </div>
-    </div >
-    `;
+  `;
 
   // Scroll chat to bottom
   const chatStream = document.getElementById("assistant-chat-stream");
   if (chatStream) {
     chatStream.scrollTop = chatStream.scrollHeight;
+  }
+}
+
+async function startNewAssistantConversation() {
+  if (!state.currentEngagementId) return;
+  try {
+    const conv = await FinAuditAPI.createAssistantConversation(state.currentEngagementId, "New Conversation");
+    state.assistantState.conversations.unshift(conv);
+    state.assistantState.activeConversationId = conv.id;
+    state.assistantState.messages = [];
+    renderAIAssistant();
+  } catch (err) {
+    notifyError("Failed to create new conversation: " + err.message);
+  }
+}
+
+async function selectAssistantConversation(convId) {
+  if (state.assistantState.activeConversationId === convId) return;
+  state.assistantState.activeConversationId = convId;
+  state.assistantState.messages = [];
+  state.assistantState.isLoading = true;
+  renderAIAssistant();
+  try {
+    const msgList = await FinAuditAPI.getAssistantMessages(convId, state.currentEngagementId);
+    state.assistantState.messages = (msgList || []).map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+      tool_calls: m.tool_calls,
+      evidence: m.evidence
+    }));
+  } catch (err) {
+    notifyError("Failed to load messages: " + err.message);
+  } finally {
+    state.assistantState.isLoading = false;
+    renderAIAssistant();
+  }
+}
+
+async function deleteAssistantConversation(convId) {
+  const confirmed = await FinConfirm({
+    title: "Delete Conversation Thread",
+    message: "Are you sure you want to delete this conversation thread?",
+    consequences: ["All messages in this thread will be permanently deleted"],
+    confirmText: "Delete Thread",
+    isDanger: true
+  });
+  if (!confirmed) return;
+
+  try {
+    await FinAuditAPI.deleteAssistantConversation(convId, state.currentEngagementId);
+    state.assistantState.conversations = state.assistantState.conversations.filter(c => c.id !== convId);
+    if (state.assistantState.activeConversationId === convId) {
+      state.assistantState.activeConversationId = state.assistantState.conversations.length > 0 ? state.assistantState.conversations[0].id : null;
+      state.assistantState.messages = [];
+    }
+    renderAIAssistant();
+  } catch (err) {
+    notifyError("Failed to delete conversation: " + err.message);
   }
 }
 
@@ -15179,17 +15286,27 @@ function renderAssistantMessageItem(msg, idx) {
   if (isUser) {
     return `
     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-left: 60px;">
-        <div style="background: #4f46e5; color: #ffffff; padding: 12px 16px; border-radius: 12px 12px 2px 12px; font-size: 13.5px; ">
+        <div style="background: #4f46e5; color: #ffffff; padding: 12px 16px; border-radius: 12px 12px 2px 12px; font-size: 13.5px;">
           ${escapeHtml(msg.content)}
           <div style="font-size: 10.5px; color: rgba(255,255,255,0.7); text-align: right; margin-top: 4px;">${msg.timestamp}</div>
         </div>
         <div style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0;">CA</div>
-      </div >
+      </div>
     `;
   }
 
-  // Format AI response markdown into styled HTML
+  // Format AI response markdown into styled HTML with citation badges
   const formattedContent = formatAssistantMarkdown(msg.content);
+
+  // Tool executions banner
+  let toolsHtml = "";
+  if (msg.tool_calls && msg.tool_calls.length > 0) {
+    const toolBadges = msg.tool_calls.map(tc => {
+      const toolName = tc.tool || tc.name || "audit_tool";
+      return `<span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(79, 70, 229, 0.08); border: 1px solid rgba(79, 70, 229, 0.2); color: #4338ca; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-family: monospace;">⚡ ${escapeHtml(toolName)}</span>`;
+    }).join(" ");
+    toolsHtml = `<div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">${toolBadges}</div>`;
+  }
 
   // Supporting Evidence Table
   let evidenceHtml = "";
@@ -15202,21 +15319,21 @@ function renderAssistantMessageItem(msg, idx) {
         <td style="padding: 6px 10px; color: var(--text-secondary);">${e.party_name || e.vendor_name || e.rule || '—'}</td>
         <td style="padding: 6px 10px; text-align: right; font-weight: 600;">${e.amount_formatted || (e.amount ? formatINR(e.amount) : (e.difference || (e.current_year !== undefined ? formatINR(e.current_year) : '—')))}</td>
         <td style="padding: 6px 10px; text-align: center;">
-          ${e.severity ? getSeverityBadge(e.severity) : (e.risk ? `<span class="badge badge-${e.risk.toLowerCase()}">${e.risk}</span>` : '<span class="badge badge-low">Normal</span>')}
+          ${e.severity ? getSeverityBadge(e.severity) : (e.risk ? `<span class="badge badge-${e.risk.toLowerCase()}">${e.risk}</span>` : '<span class="badge badge-low">Verified</span>')}
         </td>
         <td style="padding: 6px 10px;">
           <button class="btn btn-sm btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="inspectAssistantTransaction(${JSON.stringify(e).replace(/"/g, '&quot;')})">
             ${ICONS.search} Inspect
           </button>
-        </td >
-      </tr >
+        </td>
+      </tr>
     `).join("");
 
     evidenceHtml = `
     <div style="margin-top: 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Supporting Evidence & Source Records (${msg.evidence.length} items)</span>
-          <span style="font-size: 11px; color: var(--text-secondary);">Click 'Inspect' to review full audit attributes</span>
+          <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Inspected Audit Evidence (${msg.evidence.length} records)</span>
+          <span style="font-size: 11px; color: var(--text-secondary);">Click 'Inspect' to review full attributes</span>
         </div>
         <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px;">
           <table class="table" style="margin: 0; width: 100%; font-size: 12px;">
@@ -15227,7 +15344,7 @@ function renderAssistantMessageItem(msg, idx) {
                 <th style="padding: 6px 10px;">Ledger Account</th>
                 <th style="padding: 6px 10px;">Party</th>
                 <th style="padding: 6px 10px; text-align: right;">Amount</th>
-                <th style="padding: 6px 10px; text-align: center;">Severity</th>
+                <th style="padding: 6px 10px; text-align: center;">Status</th>
                 <th style="padding: 6px 10px;">Action</th>
               </tr>
             </thead>
@@ -15236,7 +15353,7 @@ function renderAssistantMessageItem(msg, idx) {
             </tbody>
           </table>
         </div>
-      </div >
+      </div>
     `;
   }
 
@@ -15246,19 +15363,24 @@ function renderAssistantMessageItem(msg, idx) {
     actionsHtml = `
     <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;">
       ${msg.suggested_actions.map(act => `
-          <span style="font-size: 11.5px; background: rgba(99, 102, 241, 0.08); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 14px; padding: 3px 10px;">
-            ${escapeHtml(act)}
-          </span>
+          <button 
+            class="btn btn-secondary btn-sm" 
+            style="font-size: 11px; padding: 2px 8px; border-radius: 12px;"
+            onclick="fillAssistantPrompt('${escapeHtml(act).replace(/'/g, "\\'")}')"
+          >
+            💬 ${escapeHtml(act)}
+          </button>
         `).join("")
       }
-      </div >
+      </div>
     `;
   }
 
   return `
     <div style="display: flex; gap: 12px; align-items: flex-start; margin-right: 40px;">
-      <div style="width: 34px; height: 34px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; ">AI</div>
-      <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: 2px 12px 12px 12px; flex: 1; ">
+      <div style="width: 32px; height: 32px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; flex-shrink: 0;">AI</div>
+      <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 14px 18px; border-radius: 2px 12px 12px 12px; flex: 1;">
+        ${toolsHtml}
         <div style="font-size: 13.5px; color: var(--text-primary); line-height: 1.6;">
           ${formattedContent}
         </div>
@@ -15269,7 +15391,7 @@ function renderAssistantMessageItem(msg, idx) {
           <span>${msg.timestamp || ''}</span>
         </div>
       </div>
-    </div >
+    </div>
     `;
 }
 
@@ -15281,6 +15403,13 @@ function formatAssistantMarkdown(text) {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code style="background: var(--bg-sidebar); padding: 2px 5px; border-radius: 4px; font-size: 12px; color: var(--text-secondary);">$1</code>')
+    .replace(/\[HISTORICAL ASSISTANT CLAIM - UNVERIFIED FOR CURRENT AUDIT OPINION\]:?/gi, '<div style="font-size: 11px; font-weight: 700; color: #9a3412; background: #ffedd5; padding: 4px 8px; border-radius: 4px; margin-bottom: 6px; display: inline-block;">⚠️ HISTORICAL AI CLAIM (UNVERIFIED CONTEXT)</div><br/>')
+    .replace(/\[(Voucher|Tx):\s*([^\]]+)\]/gi, '<span class="badge" style="background: rgba(99, 102, 241, 0.12); color: #4338ca; font-weight: 600; font-size: 11px; margin: 0 2px; cursor: pointer;" title="Inspect Voucher">$1: $2</span>')
+    .replace(/\[(Finding):\s*([^\]]+)\]/gi, '<span class="badge" style="background: rgba(239, 68, 68, 0.12); color: #b91c1c; font-weight: 600; font-size: 11px; margin: 0 2px; cursor: pointer;" title="Inspect Audit Exception">$1: $2</span>')
+    .replace(/\[(Document|Doc):\s*([^\]]+)\]/gi, '<span class="badge" style="background: rgba(13, 148, 136, 0.12); color: #0f766e; font-weight: 600; font-size: 11px; margin: 0 2px; cursor: pointer;" title="Inspect Uploaded File">$1: $2</span>')
+    .replace(/\[(WP|WorkingPaper):\s*([^\]]+)\]/gi, '<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #047857; font-weight: 600; font-size: 11px; margin: 0 2px; cursor: pointer;" title="Inspect Working Paper">$1: $2</span>')
+    .replace(/\[(TrialBalance|TB):\s*([^\]]+)\]/gi, '<span class="badge" style="background: rgba(147, 51, 234, 0.12); color: #7e22ce; font-weight: 600; font-size: 11px; margin: 0 2px;" title="Trial Balance Account">$1: $2</span>')
+    .replace(/\[(Statute):\s*([^\]]+)\]/gi, '<span class="badge" style="background: rgba(37, 99, 235, 0.12); color: #1d4ed8; font-weight: 600; font-size: 11px; margin: 0 2px;" title="Statutory Benchmark">$1: $2</span>')
     .replace(/^\s*-\s+(.*$)/gim, '<div style="margin-left: 14px; margin-bottom: 4px; position: relative;"><span style="position: absolute; left: -12px;">•</span>$1</div>')
     .replace(/\n\n/g, '<div style="height: 8px;"></div>');
 
@@ -15313,14 +15442,36 @@ async function handleAssistantSend() {
   await renderAIAssistant();
 
   try {
-    const res = await FinAuditAPI.queryAssistant(state.currentEngagementId, query);
+    const res = await FinAuditAPI.chatAssistant(
+      state.currentEngagementId,
+      query,
+      state.assistantState.activeConversationId,
+      false
+    );
+
+    if (res.conversation_id) {
+      state.assistantState.activeConversationId = res.conversation_id;
+      const existing = state.assistantState.conversations.find(c => c.id === res.conversation_id);
+      if (existing) {
+        if (existing.title === "New Conversation") {
+          existing.title = (query.length > 35 ? query.substring(0, 35) + "..." : query);
+        }
+      } else {
+        state.assistantState.conversations.unshift({
+          id: res.conversation_id,
+          title: (query.length > 35 ? query.substring(0, 35) + "..." : query),
+          created_at: new Date().toISOString()
+        });
+      }
+    }
+
     state.assistantState.messages.push({
       role: "assistant",
       content: res.response || "No response received.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       disclaimer: res.disclaimer || "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: res.evidence || [],
-      source_transactions: res.source_transactions || [],
+      tool_calls: res.tools_called || [],
       suggested_actions: res.suggested_actions || []
     });
   } catch (err) {
@@ -15330,7 +15481,7 @@ async function handleAssistantSend() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       disclaimer: "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: [],
-      source_transactions: []
+      tool_calls: []
     });
   } finally {
     state.assistantState.isLoading = false;
@@ -15350,7 +15501,7 @@ async function loadExecutiveSummaryNarrative() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       disclaimer: res.disclaimer || "AI-generated assistance. Verify findings against source records before making audit decisions.",
       evidence: [],
-      source_transactions: [],
+      tool_calls: [],
       suggested_actions: [
         "Review Critical Severity findings in Risk & Findings module",
         "Generate Final PDF Audit Report"
@@ -15367,9 +15518,9 @@ async function loadExecutiveSummaryNarrative() {
 async function clearAssistantChat() {
   const confirmed = await FinConfirm({
     title: "Clear AI Conversation History",
-    message: "Clear local conversation history for this session?",
-    consequences: ["Current conversation context will be reset"],
-    confirmText: "Clear Chat",
+    message: "Clear conversation messages for this thread?",
+    consequences: ["Messages in current thread will be cleared"],
+    confirmText: "Clear Messages",
     isDanger: false
   });
   if (confirmed) {

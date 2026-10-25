@@ -744,6 +744,39 @@ class FinAuditAPI {
     return this.request(`/api/assistant/suggested-prompts/${engagementId}`);
   }
 
+  static getAssistantConversations(engagementId) {
+    return this.request(`/api/assistant/conversations/${engagementId}`);
+  }
+
+  static createAssistantConversation(engagementId, title = "New Conversation") {
+    return this.request("/api/assistant/conversations", {
+      method: "POST",
+      body: JSON.stringify({ engagement_id: engagementId, title: title })
+    });
+  }
+
+  static getAssistantMessages(conversationId, engagementId) {
+    return this.request(`/api/assistant/conversations/${conversationId}/messages?engagement_id=${engagementId}`);
+  }
+
+  static deleteAssistantConversation(conversationId, engagementId) {
+    return this.request(`/api/assistant/conversations/${conversationId}?engagement_id=${engagementId}`, {
+      method: "DELETE"
+    });
+  }
+
+  static chatAssistant(engagementId, message, conversationId = null, stream = false) {
+    return this.request("/api/assistant/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        engagement_id: engagementId,
+        message: message,
+        conversation_id: conversationId,
+        stream: stream
+      })
+    });
+  }
+
   // --- Audit Findings & Risk Management ---
   static getFindings(engagementId, filters = {}) {
     const params = new URLSearchParams();

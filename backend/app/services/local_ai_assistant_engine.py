@@ -1459,6 +1459,39 @@ Top {len(top_txs)} transactions by value in the general ledger:
     # INTENT HANDLER 12: General Audit Query & Overview
     # ----------------------------------------------------------------------
     def _handle_general_query(self, query: str) -> Dict[str, Any]:
+        q_clean = (query or "").strip().lower()
+        is_greeting = q_clean in ["hi", "hello", "hey", "help", "guide", "what can you do", "who are you", ""]
+
+        # If it's a specific conversational or follow-up question, evaluate with AssistantOrchestrator
+        if not is_greeting and len(q_clean) > 3:
+            try:
+                from backend.app.services.assistant_orchestrator import AssistantOrchestrator
+                orch_res = AssistantOrchestrator.execute_chat_turn(
+                    engagement_id=self.engagement_id,
+                    user_id=1,
+                    message=query
+                )
+                return {
+                    "query": query,
+                    "intent": "CONVERSATIONAL_AUDIT_INQUIRY",
+                    "response": orch_res.get("response", ""),
+                    "disclaimer": MANDATORY_DISCLAIMER,
+                    "calculated_metrics": {
+                        "total_transactions": len(self.transactions),
+                        "total_findings": len(self.findings)
+                    },
+                    "evidence": orch_res.get("evidence", []) or self.findings[:5],
+                    "source_transactions": self.transactions[:5],
+                    "suggested_actions": [
+                        "Inspect corroborating vouchers",
+                        "Review related audit findings",
+                        "Document in working paper"
+                    ],
+                    "provenance": orch_res.get("engine", "DETERMINISTIC_RULE")
+                }
+            except Exception as e:
+                logging.getLogger("uvicorn.error").warning("Orchestrator execution fallback: %s", e)
+
         total_debit = sum(float(t.get("debit") or 0.0) for t in self.transactions)
         total_credit = sum(float(t.get("credit") or 0.0) for t in self.transactions)
         tracked_ledgers = getattr(self, "distinct_ledgers_count", len(self.ledgers))

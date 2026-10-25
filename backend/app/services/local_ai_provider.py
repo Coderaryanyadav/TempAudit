@@ -120,12 +120,27 @@ class BaseLocalAIProvider(ABC):
         """Returns list of models currently loaded or available in local server."""
         pass
 
-    @abstractmethod
-    def generate(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.2, max_tokens: int = 2048) -> Dict[str, Any]:
+    def chat_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.2,
+        max_tokens: int = 2048
+    ) -> Dict[str, Any]:
         """
-        Executes local generation. Returns dict with 'text', 'engine', 'model', 'latency_ms'.
+        Executes multi-turn chat completion with optional tool calling.
         """
-        pass
+        prompt = messages[-1].get("content", "") if messages else ""
+        res = self.generate(prompt=prompt, temperature=temperature, max_tokens=max_tokens)
+        return {
+            "content": res.get("text", ""),
+            "tool_calls": [],
+            "engine": res.get("engine", self.get_engine_name()),
+            "model": res.get("model", self.model_name),
+            "latency_ms": res.get("latency_ms", 0.0),
+            "success": res.get("success", False),
+            "is_deterministic_fallback": res.get("is_deterministic_fallback", False)
+        }
 
 
 class LMStudioProvider(BaseLocalAIProvider):
@@ -177,12 +192,27 @@ class LMStudioProvider(BaseLocalAIProvider):
         return []
 
     def generate(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.2, max_tokens: int = 2048) -> Dict[str, Any]:
-        start = time.time()
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
+        res = self.chat_completion(messages=messages, temperature=temperature, max_tokens=max_tokens)
+        return {
+            "text": res.get("content", ""),
+            "engine": res.get("engine", self.get_engine_name()),
+            "model": res.get("model", self.model_name),
+            "latency_ms": res.get("latency_ms", 0.0),
+            "success": res.get("success", True)
+        }
 
+    def chat_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.2,
+        max_tokens: int = 2048
+    ) -> Dict[str, Any]:
+        start = time.time()
         model_to_use = self.model_name
         if not model_to_use or model_to_use == "local-model":
             avail = self.get_available_models()
@@ -194,13 +224,16 @@ class LMStudioProvider(BaseLocalAIProvider):
             else:
                 model_to_use = "local-model"
 
-        payload = {
+        payload: Dict[str, Any] = {
             "model": model_to_use,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": False
         }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
 
         try:
             req = urllib.request.Request(
@@ -212,17 +245,67 @@ class LMStudioProvider(BaseLocalAIProvider):
                 res_data = json.loads(resp.read().decode('utf-8'))
                 lat = round((time.time() - start) * 1000, 1)
                 choices = res_data.get("choices", [])
-                text = choices[0].get("message", {}).get("content", "") if choices else ""
-                model_used = res_data.get("model", self.model_name)
+                msg = choices[0].get("message", {}) if choices else {}
+                content = msg.get("content", "") or ""
+                tool_calls = msg.get("tool_calls", []) or []
+                model_used = res_data.get("model", model_to_use)
                 return {
-                    "text": text,
-                    "engine": "LM Studio",
+                    "content": content,
+                    "tool_calls": tool_calls,
+                    "engine": self.get_engine_name(),
                     "model": model_used,
                     "latency_ms": lat,
                     "success": True
                 }
         except Exception as e:
-            raise RuntimeError(f"LM Studio local inference failed: {str(e)}")
+            raise RuntimeError(f"{self.get_engine_name()} local inference failed: {str(e)}")
+
+
+class OllamaProvider(LMStudioProvider):
+    """
+    Ollama Local Server Provider (Port 11434).
+    Communicates via Ollama's native OpenAI-compatible API at http://localhost:11434/v1.
+    """
+    def __init__(self, endpoint: str = "http://localhost:11434", model_name: str = "qwen2.5:7b"):
+        super().__init__(endpoint=endpoint, model_name=model_name)
+
+    def get_engine_name(self) -> str:
+        return "Ollama (Local Daemon)"
+
+    def check_health(self) -> Tuple[bool, str, float]:
+        start = time.time()
+        try:
+            req = urllib.request.Request(
+                f"{self.endpoint}/api/tags",
+                headers={"User-Agent": "FinAuditPro/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                lat = round((time.time() - start) * 1000, 1)
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+                    if not models:
+                        return False, f"Ollama is running at {self.endpoint}, but no models are installed. Run 'ollama pull qwen2.5:7b'.", lat
+                    active_m = self.model_name if (self.model_name and any(self.model_name in m for m in models)) else models[0]
+                    return True, f"Ollama Connected — Available model: {active_m}", lat
+        except Exception as e:
+            lat = round((time.time() - start) * 1000, 1)
+            return False, f"Ollama is not running at {self.endpoint}. AI assistance is unavailable, but audit calculations and analysis remain available.", lat
+        return False, "Ollama is not running.", 0.0
+
+    def get_available_models(self) -> List[str]:
+        try:
+            req = urllib.request.Request(
+                f"{self.endpoint}/api/tags",
+                headers={"User-Agent": "FinAuditPro/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    return [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+        except Exception:
+            pass
+        return []
 
 
 class BuiltinDeterministicAIProvider(BaseLocalAIProvider):
@@ -271,6 +354,52 @@ class BuiltinDeterministicAIProvider(BaseLocalAIProvider):
             "is_deterministic_fallback": True
         }
 
+    def chat_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.2,
+        max_tokens: int = 2048
+    ) -> Dict[str, Any]:
+        start = time.time()
+        user_query = messages[-1].get("content", "") if messages else ""
+        
+        # Check statutory repository
+        from backend.app.services.assistant_tools import AssistantTools
+        guidance = AssistantTools.get_statutory_rule_guidance(user_query)
+        
+        if "statute" in guidance:
+            response_text = (
+                f"**[OFFLINE STATUTORY BENCHMARK — Built-in Reasoner (Zero Daemon)]**\n\n"
+                f"### {guidance.get('statute', 'Statutory Standard')}\n"
+                f"- **Applicable Threshold**: {guidance.get('threshold', 'N/A')}\n"
+                f"- **Statutory Provision**: {guidance.get('provision', '')}\n\n"
+            )
+            if "exceptions" in guidance:
+                response_text += f"- **Statutory Exceptions (Rule 6DD)**: {guidance.get('exceptions')}\n\n"
+            if "audit_procedure" in guidance:
+                response_text += f"**Recommended Substantive Testing Procedure**:\n{guidance.get('audit_procedure')}\n"
+        else:
+            response_text = (
+                f"**[ENGINE NOTICE: Local AI Daemon Offline]**\n\n"
+                f"FinAuditPro is operating in **100% offline standalone mode** with the deterministic audit core active.\n\n"
+                f"To enable natural conversational Q&A and multi-turn inquiry:\n"
+                f"1. Start **LM Studio** on `http://localhost:1234` or **Ollama** on `http://localhost:11434`.\n"
+                f"2. Load recommended audit model: `qwen2.5:7b` or `llama3.2:3b`.\n"
+                f"3. You can still inspect all deterministic findings and run full reconciliations via the navigation sidebar."
+            )
+
+        lat = round((time.time() - start) * 1000, 1)
+        return {
+            "content": response_text,
+            "tool_calls": [],
+            "engine": "DETERMINISTIC_RULE_ENGINE",
+            "model": self.model_name,
+            "latency_ms": lat,
+            "success": True,
+            "is_deterministic_fallback": True
+        }
+
 
 # =========================================================================
 # 3. Offline AI Model Manager (Singleton Configuration & Controller)
@@ -294,6 +423,13 @@ AVAILABLE_ENGINES = [
         "default_endpoint": "http://localhost:1234",
         "recommended_models": ["local-model", "meta-llama-3-8b-instruct", "mistral-7b-instruct-v0.2", "qwen2.5-7b-instruct"],
         "ram_requirement": "8 GB RAM / 4 GB VRAM"
+    },
+    {
+        "id": "Ollama",
+        "name": "Ollama Local Engine (CLI / Daemon)",
+        "default_endpoint": "http://localhost:11434",
+        "recommended_models": ["qwen2.5:7b", "llama3.2:3b", "qwen2.5-coder:7b", "mistral:7b"],
+        "ram_requirement": "4 GB - 8 GB RAM"
     },
     {
         "id": "Builtin",
@@ -394,6 +530,8 @@ class LocalAIModelManager:
 
         if engine == "LMStudio":
             return LMStudioProvider(endpoint=endpoint, model_name=model_name)
+        elif engine == "Ollama":
+            return OllamaProvider(endpoint=endpoint, model_name=model_name)
         else:
             return BuiltinDeterministicAIProvider()
 

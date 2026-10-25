@@ -61,6 +61,8 @@ def init_db():
             "reconciliations",
             "reconciliation_items",
             "schema_migrations",
+            "ai_conversations",
+            "ai_messages",
         ]
         missing_tables = []
         for table_name in required_tables:

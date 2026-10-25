@@ -389,6 +389,33 @@ class AssistantQuery(BaseModel):
     voucher_no: Optional[str] = None
     context_type: Optional[str] = "general"
 
+class ConversationCreate(BaseModel):
+    engagement_id: int
+    title: Optional[str] = "New Conversation"
+
+class ConversationResponse(BaseModel):
+    id: str
+    engagement_id: int
+    user_id: int
+    title: str
+    created_at: str
+    updated_at: str
+
+class MessageResponse(BaseModel):
+    id: int
+    conversation_id: str
+    role: str
+    content: str
+    tool_calls: Optional[List[Dict[str, Any]]] = None
+    evidence: Optional[List[Dict[str, Any]]] = None
+    created_at: str
+
+class ChatTurnRequest(BaseModel):
+    conversation_id: Optional[str] = None
+    engagement_id: int
+    message: str = Field(..., min_length=1, max_length=10000)
+    stream: Optional[bool] = False
+
 class ReconciliationRequest(BaseModel):
     engagement_id: int
     recon_type: str
