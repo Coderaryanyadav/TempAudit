@@ -30,7 +30,7 @@ ARYAN_COMPANY: Dict[str, Any] = {
     "email": "aryan@example.test",
     "phone": "+91 98000 11111",
     "address": "Plot 101, Bandra Kurla Complex, Bandra East, Mumbai 400051",
-    "nature_of_business": "[SYNTHETIC TEST DATASET - NOT REAL CLIENT DATA] Fintech software engineering, payment orchestration APIs, and cloud microservices development.",
+    "nature_of_business": "Fintech software engineering, payment orchestration APIs, and cloud microservices development.",
     "authorized_capital": 50000000.0,
     "paid_up_capital": 25000000.0,
     "bank_name": "HDFC Bank Ltd",

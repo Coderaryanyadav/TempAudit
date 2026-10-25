@@ -1,6 +1,8 @@
 {
   "name": "Aryan Fintech Pvt. Ltd.",
   "short_code": "ARYAN",
+  "environment": "TEST",
+  "synthetic": true,
   "industry": "Financial Technology / Software Services",
   "company_type": "Private Limited Company",
   "state": "Maharashtra",

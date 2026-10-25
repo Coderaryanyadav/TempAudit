@@ -115,11 +115,11 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
     else:
         conn = get_db_connection()
         
-        # 1. Fetch transactions
+        # 1. Fetch transactions (Scope to General Ledger books)
         tx_rows = conn.execute("""
             SELECT id, date, ledger, party_name, debit, credit, amount, voucher_no, invoice_no, description, reference_no, account_group
             FROM transactions
-            WHERE engagement_id = ?
+            WHERE engagement_id = ? AND (transaction_type = 'GENERAL_LEDGER' OR transaction_type IS NULL)
             ORDER BY date ASC, id ASC
         """, (engagement_id,)).fetchall()
 
@@ -194,7 +194,7 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
     inv_map: Dict[str, List[Dict[str, Any]]] = {}
     for t in txs:
         inv = (t["invoice_no"] or "").strip().upper()
-        if inv and len(inv) >= 3:
+        if inv and len(inv) >= 3 and inv not in ["—", "-", "N/A", "NA"]:
             inv_map.setdefault(inv, []).append(t)
 
     for inv, group in inv_map.items():
@@ -202,6 +202,11 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
                     t1, t2 = group[i], group[j]
+                    dr1, cr1 = float(t1.get("debit") or 0.0), float(t1.get("credit") or 0.0)
+                    dr2, cr2 = float(t2.get("debit") or 0.0), float(t2.get("credit") or 0.0)
+                    # Opposing entries (pure debit vs pure credit) are double-entry balance legs or reversals, not duplicates
+                    if (dr1 > 0 and cr1 == 0 and cr2 > 0 and dr2 == 0) or (cr1 > 0 and dr1 == 0 and dr2 > 0 and cr2 == 0):
+                        continue
                     amt1 = float(t1["amount"] or 0.0)
                     amt2 = float(t2["amount"] or 0.0)
                     is_same_amt = abs(amt1 - amt2) < 0.01
@@ -215,7 +220,7 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
     vouch_map: Dict[str, List[Dict[str, Any]]] = {}
     for t in txs:
         v = (t["voucher_no"] or "").strip().upper()
-        if v and len(v) >= 2:
+        if v and len(v) >= 2 and v not in ["—", "-", "N/A", "NA"]:
             key = f"{v}|{t['ledger']}"
             vouch_map.setdefault(key, []).append(t)
 
@@ -224,6 +229,10 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
                     t1, t2 = group[i], group[j]
+                    dr1, cr1 = float(t1.get("debit") or 0.0), float(t1.get("credit") or 0.0)
+                    dr2, cr2 = float(t2.get("debit") or 0.0), float(t2.get("credit") or 0.0)
+                    if (dr1 > 0 and cr1 == 0 and cr2 > 0 and dr2 == 0) or (cr1 > 0 and dr1 == 0 and dr2 > 0 and cr2 == 0):
+                        continue
                     add_dup_pair(
                         t1, t2,
                         "Same Voucher Number", 95.0,
@@ -247,6 +256,10 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
                     t1, t2 = group[i], group[j]
+                    dr1, cr1 = float(t1.get("debit") or 0.0), float(t1.get("credit") or 0.0)
+                    dr2, cr2 = float(t2.get("debit") or 0.0), float(t2.get("credit") or 0.0)
+                    if (dr1 > 0 and cr1 == 0 and cr2 > 0 and dr2 == 0) or (cr1 > 0 and dr1 == 0 and dr2 > 0 and cr2 == 0):
+                        continue
                     add_dup_pair(
                         t1, t2,
                         "Same Date + Amount + Party", 95.0,
@@ -257,7 +270,7 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
     ref_map: Dict[str, List[Dict[str, Any]]] = {}
     for t in txs:
         ref = (t["reference_no"] or "").strip().upper()
-        if ref and len(ref) >= 4:
+        if ref and len(ref) >= 4 and ref not in ["—", "-", "N/A", "NA"]:
             ref_map.setdefault(ref, []).append(t)
 
     for ref, group in ref_map.items():
@@ -265,6 +278,10 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
                     t1, t2 = group[i], group[j]
+                    dr1, cr1 = float(t1.get("debit") or 0.0), float(t1.get("credit") or 0.0)
+                    dr2, cr2 = float(t2.get("debit") or 0.0), float(t2.get("credit") or 0.0)
+                    if t1.get("voucher_no") == t2.get("voucher_no") and ((dr1 > 0 and cr1 == 0 and cr2 > 0 and dr2 == 0) or (cr1 > 0 and dr1 == 0 and dr2 > 0 and cr2 == 0)):
+                        continue
                     add_dup_pair(
                         t1, t2,
                         "Same Reference Number", 96.0,
@@ -322,10 +339,10 @@ def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
                     # Check Narration similarity
                     desc_sim = string_similarity(t1["description"], t2["description"]) if (t1["description"] and t2["description"]) else 0.0
 
-                    # Fuzzy match condition 1: Similar party (>= 85%) + exact/near amount
-                    # Periodic recurring entries (rent, salary, subscriptions > 21 days apart) without identical invoice are NOT duplicates
-                    if p_sim >= 0.85 and amt1 > 0 and (amt_diff <= 1.0 or amt_diff / max_amt <= 0.01):
-                        if date_diff_days > 21 and (not t1.get("invoice_no") or t1.get("invoice_no") != t2.get("invoice_no")):
+                    # Fuzzy match condition 1: Similar party (>= 90%) + exact/near amount within 3 days
+                    # Periodic recurring entries (rent, salary, subscriptions across different months) without identical invoice are NOT duplicates
+                    if p_sim >= 0.90 and amt1 > 0 and (amt_diff <= 1.0 or amt_diff / max_amt <= 0.01):
+                        if date_diff_days > 3 and (not t1.get("invoice_no") or t1.get("invoice_no") != t2.get("invoice_no")):
                             continue
                         sim_score = round(p_sim * 95.0 + (5.0 if amt_diff == 0 else 0.0), 1)
                         add_dup_pair(

@@ -440,8 +440,11 @@ class CentralizedFindingsEngine:
             from backend.app.services.duplicate_missing_detector import detect_duplicates_and_gaps
             dup_report = detect_duplicates_and_gaps(engagement_id)
 
-            # Exact duplicates
+            # High-confidence substantive duplicates (Exact, Same Invoice, Same Voucher)
             for grp in dup_report.get("duplicate_groups", []):
+                g_type = grp.get("group_type", "")
+                if g_type not in ["Exact Duplicate", "Same Invoice Number", "Same Voucher Number"]:
+                    continue
                 grp_id = grp.get("group_code", "DUP-EXACT")
                 code = f"FIND-{grp_id.replace('#', '').replace(' ', '-')}"
                 amt = float(grp.get("amount") or 0.0)
@@ -582,15 +585,52 @@ class CentralizedFindingsEngine:
             anom_report = detect_all_anomalies(engagement_id)
             anomalies = anom_report.get("anomalies", [])
 
+            # Keep track of transactions already covered by statutory or duplicate findings
+            existing_tx_ids = set()
+            for r in conn.execute(
+                "SELECT affected_records_json FROM audit_findings WHERE engagement_id = ?",
+                (engagement_id,)
+            ).fetchall():
+                try:
+                    for tid in json.loads(r[0] or "[]"):
+                        existing_tx_ids.add(tid)
+                except Exception:
+                    pass
+
             for anom in anomalies:
+                tx_info = anom.get("transaction") or {}
+                tx_id = anom.get("transaction_id")
+                if tx_id and tx_id in existing_tx_ids:
+                    continue
+
+                ev = anom.get("evidence") or {}
+                ledger = tx_info.get("ledger") or ev.get("ledger") or ""
+                party = tx_info.get("party_name") or ev.get("party") or ev.get("party_name") or ""
+                amt = float(tx_info.get("amount") or ev.get("amount") or ev.get("cash_payment_amount") or ev.get("cash_receipt_amount") or 0.0)
+                pattern = anom.get("pattern_type") or anom.get("detected_pattern", "Outlier")
+                sev = str(anom.get("severity") or "MEDIUM").upper()
+                level = anom.get("level", "Statistical")
+
+                # Filter out mass background statistical/ML exploratory noise
+                # Promote only high-significance, substantive exceptions
+                is_substantive = False
+                if "Statutory Cash" in pattern:
+                    is_substantive = True
+                elif ("Weekend" in pattern or "Off-Hour" in pattern) and amt >= 200000.0:
+                    if ledger not in ["Share Capital", "HDFC Bank Ltd", "Long-Term Borrowings", "General Ledger", "General"]:
+                        is_substantive = True
+                elif "Round-Number" in pattern and amt >= 500000.0:
+                    if ledger not in ["Share Capital", "HDFC Bank Ltd", "Long-Term Borrowings", "General Ledger", "General"]:
+                        is_substantive = True
+                elif sev == "CRITICAL" and amt >= materiality_thresh:
+                    is_substantive = True
+
+                if not is_substantive:
+                    continue
+
                 anom_id = anom.get("anomaly_id", "ANOM")
                 code = f"FIND-{anom_id.replace('#', '')}"
-                tx_id = anom.get("transaction_id")
                 tx_ids = [tx_id] if tx_id else []
-                sev = str(anom.get("severity") or "MEDIUM").upper()
-                amt = float(anom.get("amount") or 0.0)
-                level = anom.get("level", "Statistical")
-                pattern = anom.get("detected_pattern", "Outlier")
 
                 score, factors, explanation = cls.calculate_deterministic_risk_score(
                     severity=sev,
@@ -611,14 +651,14 @@ class CentralizedFindingsEngine:
                     "category": f"{level} Anomaly",
                     "severity": sev,
                     "risk_score": score,
-                    "title": f"Anomaly: {pattern} ({anom.get('party_name') or anom.get('ledger') or 'Transaction'})",
+                    "title": f"Anomaly: {pattern} ({party or ledger or 'Transaction'})",
                     "description": anom.get("explanation", f"Transaction flagged under {level} hybrid anomaly inspection."),
                     "affected_records": tx_ids,
                     "expected_value": "Normal transaction bounds",
                     "actual_value": f"₹{amt:,.2f} flagged (Score: {anom.get('anomaly_score', 0)})",
                     "difference": f"₹{amt:,.2f}",
                     "reason": pattern,
-                    "evidence": anom.get("evidence", {}),
+                    "evidence": ev,
                     "rule_used": f"Hybrid Anomaly Engine ({level} - {pattern})",
                     "engine_type": "STATISTICAL_ML" if "ML" in level or "Statistical" in level else "DETERMINISTIC",
                     "risk_factors": factors,

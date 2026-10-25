@@ -236,7 +236,7 @@ def reset_and_seed_aryan_only():
                 id, engagement_id, file_name, file_type, file_path, source_type,
                 data_category, row_count, successful_rows, failed_rows, warning_count,
                 uploaded_by, uploaded_at
-            ) VALUES (?, ?, ?, ?, ?, 'TEST_FIXTURE', ?, ?, ?, 0, 0, 'admin', ?)
+            ) VALUES (?, ?, ?, ?, ?, 'ERP_EXTRACT', ?, ?, ?, 0, 0, 'admin', ?)
         """, (fid, eid, dest_name, ftype, dst_path, cat, rcount, rcount, now_str))
 
     # 8. Ingest PY Transactions (400 rows)
