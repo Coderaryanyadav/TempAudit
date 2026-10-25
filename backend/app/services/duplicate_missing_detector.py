@@ -20,6 +20,18 @@ def normalize_code(code: Optional[str]) -> str:
         return ""
     return re.sub(r'[^a-zA-Z0-9]', '', str(code)).upper()
 
+def parse_tx_date(d_str: Optional[str]) -> Optional[datetime]:
+    if not d_str:
+        return None
+    cleaned = str(d_str).split("T")[0].strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(cleaned, fmt)
+        except Exception:
+            pass
+    return None
+
+
 def string_similarity(s1: str, s2: str) -> float:
     if not s1 and not s2:
         return 1.0
@@ -75,41 +87,62 @@ def extract_sequence_parts(val: Optional[str]) -> Optional[Tuple[str, int, str, 
     num = int(num_str)
     return (prefix, num, suffix, len(num_str))
 
-def detect_duplicates_and_gaps(engagement_id: int) -> Dict[str, Any]:
+def detect_duplicates_and_gaps(engagement_id: Any) -> Dict[str, Any]:
     """
     Executes full duplicate detection (exact, invoice, voucher, date+amount+party, reference, fuzzy)
-    and sequence gap detection (invoices, vouchers, cheques) for an engagement.
+    and sequence gap detection (invoices, vouchers, cheques) for an engagement or transaction list.
     """
-    conn = get_db_connection()
-    
-    # 1. Fetch transactions
-    tx_rows = conn.execute("""
-        SELECT id, date, ledger, party_name, debit, credit, amount, voucher_no, invoice_no, description, reference_no, account_group
-        FROM transactions
-        WHERE engagement_id = ?
-        ORDER BY date ASC, id ASC
-    """, (engagement_id,)).fetchall()
+    if isinstance(engagement_id, list):
+        txs = []
+        for idx, t in enumerate(engagement_id, start=1):
+            item = dict(t)
+            item.setdefault("id", idx)
+            item.setdefault("date", "")
+            item.setdefault("ledger", "")
+            item.setdefault("party_name", "")
+            item.setdefault("debit", 0.0)
+            item.setdefault("credit", 0.0)
+            item.setdefault("amount", 0.0)
+            item.setdefault("voucher_no", "")
+            item.setdefault("invoice_no", "")
+            item.setdefault("description", "")
+            item.setdefault("reference_no", "")
+            item.setdefault("account_group", "")
+            txs.append(item)
+        total_tx = len(txs)
+        dup_reviews_map = {}
+        gap_reviews_map = {}
+    else:
+        conn = get_db_connection()
+        
+        # 1. Fetch transactions
+        tx_rows = conn.execute("""
+            SELECT id, date, ledger, party_name, debit, credit, amount, voucher_no, invoice_no, description, reference_no, account_group
+            FROM transactions
+            WHERE engagement_id = ?
+            ORDER BY date ASC, id ASC
+        """, (engagement_id,)).fetchall()
 
-    txs = [dict(r) for r in tx_rows]
-    total_tx = len(txs)
+        txs = [dict(r) for r in tx_rows]
+        total_tx = len(txs)
 
-    # 2. Fetch existing reviews
-    dup_reviews_map = {}
-    dup_review_rows = conn.execute("""
-        SELECT * FROM duplicate_group_reviews WHERE engagement_id = ?
-    """, (engagement_id,)).fetchall()
-    for r in dup_review_rows:
-        dup_reviews_map[(r["group_code"], r["duplicate_transaction_id"])] = dict(r)
+        # 2. Fetch existing reviews
+        dup_reviews_map = {}
+        dup_review_rows = conn.execute("""
+            SELECT * FROM duplicate_group_reviews WHERE engagement_id = ?
+        """, (engagement_id,)).fetchall()
+        for r in dup_review_rows:
+            dup_reviews_map[(r["group_code"], r["duplicate_transaction_id"])] = dict(r)
 
-    gap_reviews_map = {}
-    gap_review_rows = conn.execute("""
-        SELECT * FROM missing_sequence_reviews WHERE engagement_id = ?
-    """, (engagement_id,)).fetchall()
-    for r in gap_review_rows:
-        k = (r["sequence_type"], r["series_prefix"] or "", r["expected_from"] or "", r["expected_to"] or "")
-        gap_reviews_map[k] = dict(r)
+        gap_reviews_map = {}
+        gap_review_rows = conn.execute("""
+            SELECT * FROM missing_sequence_reviews WHERE engagement_id = ?
+        """, (engagement_id,)).fetchall()
+        for r in gap_review_rows:
+            k = (r["sequence_type"], r["series_prefix"] or "", r["expected_from"] or "", r["expected_to"] or "")
+            gap_reviews_map[k] = dict(r)
 
-    conn.close()
+        conn.close()
 
     # -------------------------------------------------------------
     # PART A: DUPLICATE DETECTION
@@ -137,11 +170,14 @@ def detect_duplicates_and_gaps(engagement_id: int) -> Dict[str, Any]:
             "tx_b": t_second
         })
 
-    # A1. Exact duplicate (Same date, amount, debit, credit, ledger, party, voucher, invoice)
+    # A1. Exact duplicate (Same date, amount, debit, credit, direction, ledger, party, voucher, invoice)
     exact_map: Dict[str, List[Dict[str, Any]]] = {}
     for t in txs:
         amt = round(float(t["amount"] or t["debit"] or t["credit"] or 0.0), 2)
-        key = f"{t['date']}|{amt}|{t['ledger']}|{t['party_name']}|{t['voucher_no']}|{t['invoice_no']}"
+        dr = round(float(t.get("debit") or 0.0), 2)
+        cr = round(float(t.get("credit") or 0.0), 2)
+        direction = "DR" if dr > cr else ("CR" if cr > dr else "AMT")
+        key = f"{t['date']}|{amt}|{dr}|{cr}|{direction}|{t['ledger']}|{t['party_name']}|{t['voucher_no']}|{t['invoice_no']}"
         exact_map.setdefault(key, []).append(t)
 
     for k, group in exact_map.items():
@@ -194,13 +230,16 @@ def detect_duplicates_and_gaps(engagement_id: int) -> Dict[str, Any]:
                         f"Same voucher number '{t1['voucher_no']}' in ledger '{t1['ledger']}'"
                     )
 
-    # A4. Same Date + Amount + Party Name
+    # A4. Same Date + Amount + Direction + Party Name
     date_amt_party_map: Dict[str, List[Dict[str, Any]]] = {}
     for t in txs:
         party = normalize_text(t["party_name"])
         amt = round(float(t["amount"] or t["debit"] or t["credit"] or 0.0), 2)
+        dr = round(float(t.get("debit") or 0.0), 2)
+        cr = round(float(t.get("credit") or 0.0), 2)
+        direction = "DR" if dr > cr else ("CR" if cr > dr else "AMT")
         if party and amt > 0:
-            key = f"{t['date']}|{amt}|{party}"
+            key = f"{t['date']}|{amt}|{direction}|{party}"
             date_amt_party_map.setdefault(key, []).append(t)
 
     for k, group in date_amt_party_map.items():
@@ -263,6 +302,19 @@ def detect_duplicates_and_gaps(engagement_id: int) -> Dict[str, Any]:
                     if not is_near_amt:
                         continue
 
+                    dr1 = float(t1.get("debit") or 0.0)
+                    cr1 = float(t1.get("credit") or 0.0)
+                    dr2 = float(t2.get("debit") or 0.0)
+                    cr2 = float(t2.get("credit") or 0.0)
+                    # Opposing entries (pure debit vs pure credit) are accounting offsets/reversals, not duplicates
+                    if (dr1 > 0 and cr1 == 0 and cr2 > 0 and dr2 == 0) or (cr1 > 0 and dr1 == 0 and dr2 > 0 and cr2 == 0):
+                        continue
+
+                    # Calculate temporal distance if dates parseable
+                    d1 = parse_tx_date(t1.get("date"))
+                    d2 = parse_tx_date(t2.get("date"))
+                    date_diff_days = abs((d1 - d2).days) if (d1 and d2) else 0
+
                     # Check Party similarity
                     p_sim = string_similarity(t1["party_name"], t2["party_name"]) if (t1["party_name"] and t2["party_name"]) else 0.0
                     # Check Invoice similarity
@@ -271,7 +323,10 @@ def detect_duplicates_and_gaps(engagement_id: int) -> Dict[str, Any]:
                     desc_sim = string_similarity(t1["description"], t2["description"]) if (t1["description"] and t2["description"]) else 0.0
 
                     # Fuzzy match condition 1: Similar party (>= 85%) + exact/near amount
+                    # Periodic recurring entries (rent, salary, subscriptions > 21 days apart) without identical invoice are NOT duplicates
                     if p_sim >= 0.85 and amt1 > 0 and (amt_diff <= 1.0 or amt_diff / max_amt <= 0.01):
+                        if date_diff_days > 21 and (not t1.get("invoice_no") or t1.get("invoice_no") != t2.get("invoice_no")):
+                            continue
                         sim_score = round(p_sim * 95.0 + (5.0 if amt_diff == 0 else 0.0), 1)
                         add_dup_pair(
                             t1, t2,
@@ -288,6 +343,8 @@ def detect_duplicates_and_gaps(engagement_id: int) -> Dict[str, Any]:
                         )
                     # Fuzzy match condition 3: High description similarity (>= 85%) + exact amount
                     elif desc_sim >= 0.85 and amt_diff == 0.0 and len(t1["description"] or "") > 10:
+                        if date_diff_days > 21 and (not t1.get("invoice_no") or t1.get("invoice_no") != t2.get("invoice_no")):
+                            continue
                         sim_score = round(desc_sim * 92.0, 1)
                         add_dup_pair(
                             t1, t2,

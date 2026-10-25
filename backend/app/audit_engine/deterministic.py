@@ -1,11 +1,16 @@
 import re
+from decimal import Decimal
 from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
+
+from backend.app.utils.money import to_decimal, quantize_money, safe_sum_decimals
 
 GSTIN_REGEX = r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
 PAN_REGEX = r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$"
 
 DEFAULT_40A3_THRESHOLD = 10000.0
+DEFAULT_40A3_TRANSPORT_THRESHOLD = 35000.0
+TRANSPORT_40A3_KEYWORDS = ['transport', 'freight', 'truck', 'carriage', 'cartage', 'lorry', 'tempo', 'logistics', 'plying']
 DEFAULT_269ST_THRESHOLD = 200000.0
 
 
@@ -56,6 +61,7 @@ class DeterministicAuditEngine:
         self.financial_year = financial_year
         self.rule_config = rule_config if rule_config is not None else get_audit_rule_config()
         self.threshold_40a3 = float(self.rule_config.get("cash_threshold_40a3") or DEFAULT_40A3_THRESHOLD)
+        self.threshold_40a3_transport = float(self.rule_config.get("cash_threshold_40a3_transport") or self.threshold_40a3)
         self.threshold_269st = float(self.rule_config.get("cash_threshold_269st") or DEFAULT_269ST_THRESHOLD)
         self.findings = []
 
@@ -74,12 +80,15 @@ class DeterministicAuditEngine:
         return self.findings
 
     def check_debit_credit_balance(self):
-        """Rule: Trial Balance and Transaction Debit must equal Credit."""
-        total_debit = sum(float(t.get('debit') or 0.0) for t in self.transactions)
-        total_credit = sum(float(t.get('credit') or 0.0) for t in self.transactions)
-        diff = round(abs(total_debit - total_credit), 2)
+        """Rule: Trial Balance and Transaction Debit must equal Credit (exact Decimal precision)."""
+        dec_debit = safe_sum_decimals([t.get('debit') for t in self.transactions])
+        dec_credit = safe_sum_decimals([t.get('credit') for t in self.transactions])
+        dec_diff = quantize_money(abs(dec_debit - dec_credit))
+        total_debit = float(dec_debit)
+        total_credit = float(dec_credit)
+        diff = float(dec_diff)
 
-        if diff > 0.01:
+        if dec_diff > Decimal("0.01"):
             self.findings.append({
                 "finding_code": "DET-001",
                 "category": "Accounting Standard",
@@ -113,9 +122,12 @@ class DeterministicAuditEngine:
             date = str(t.get('date') or '').strip()
             party = str(t.get('party_name') or t.get('ledger') or '').strip().lower()
             inv = str(t.get('invoice_no') or t.get('voucher_no') or '').strip().lower()
+            dr = float(t.get('debit') or 0.0)
+            cr = float(t.get('credit') or 0.0)
+            direction = "DR" if dr > 0 else ("CR" if cr > 0 else "AMT")
 
             if amt > 0 and date and party:
-                key = (date, amt, party, inv)
+                key = (date, amt, party, inv, direction)
                 if key in seen_exact:
                     prev_t = seen_exact[key]
                     self.findings.append({
@@ -137,7 +149,7 @@ class DeterministicAuditEngine:
                             "voucher_duplicate": t.get('voucher_no'),
                             "amount": amt
                         },
-                        "rule_used": "Deterministic Duplicate Key Hash Check (Date + Amount + Party + Invoice)",
+                        "rule_used": "Deterministic Duplicate Key Hash Check (Date + Amount + Party + Invoice + Direction)",
                         "engine_type": "DETERMINISTIC",
                         "ai_explanation": "Identical entries recorded under the same voucher/invoice number create inflated expense or liability balances, leading to double payments or incorrect input tax credit claims.",
                         "recommended_action": "Inspect the original supporting invoice and bank statement to confirm whether this represents two genuine purchases or an unintentional double posting."
@@ -201,6 +213,10 @@ class DeterministicAuditEngine:
                 vch = str(t.get('voucher_no') or t.get('id') or '—')
                 rec_id = t.get('id')
 
+                transport_keywords = ['transport', 'freight', 'cartage', 'lorry', 'truck', 'goods carriage', 'carriage inward', 'carriage outward', 'loading']
+                is_transport = any(k in ledger_clean.lower() or k in desc for k in transport_keywords)
+                applicable_threshold = self.threshold_40a3_transport if is_transport else self.threshold_40a3
+
                 # Check if counterparty identity is established vs unresolved cash/expense ledger
                 is_unresolved = (
                     not raw_party 
@@ -212,82 +228,97 @@ class DeterministicAuditEngine:
                     party = raw_party
                     key = (date, party)
                     if key not in cash_by_party_day:
-                        cash_by_party_day[key] = {"total": 0.0, "records": [], "vouchers": []}
+                        cash_by_party_day[key] = {"total": 0.0, "records": [], "vouchers": [], "is_transport": is_transport}
                     cash_by_party_day[key]["total"] += amount
                     cash_by_party_day[key]["records"].append(rec_id)
                     cash_by_party_day[key]["vouchers"].append(vch)
+                    if not is_transport:
+                        cash_by_party_day[key]["is_transport"] = False
                 else:
                     # Unresolved payee
-                    if amount > self.threshold_40a3:
+                    if amount > applicable_threshold:
                         # Individual payment alone breaches statutory/configured threshold
+                        lim_label = f"₹{applicable_threshold:,.2f}"
                         self.findings.append({
                             "finding_code": "DET-TAX-40A3",
                             "category": "Statutory Compliance",
-                            "severity": "CRITICAL" if amount > 50000 else "HIGH",
+                            "severity": "CRITICAL" if amount > (applicable_threshold * 2) else "HIGH",
                             "risk_score": 8.8,
                             "title": f"Section 40A(3) Breach: Single Cash Payment of ₹{amount:,.2f} (Unresolved Payee, Ledger: {ledger_clean})",
-                            "description": f"Cash payment of ₹{amount:,.2f} under ledger '{ledger_clean}' on {date} (Voucher {vch}) exceeds the statutory limit of ₹{self.threshold_40a3:,.2f} under Section 40A(3) of the Income Tax Act, 1961.",
+                            "description": f"Cash payment of ₹{amount:,.2f} under ledger '{ledger_clean}' on {date} (Voucher {vch}) exceeds the statutory limit of {lim_label} under Section 40A(3) of the Income Tax Act, 1961.",
                             "affected_records": [rec_id],
-                            "expected_value": f"Payment via Account Payee Cheque / DD / ECS / prescribed electronic mode <= ₹{self.threshold_40a3:,.2f}",
+                            "expected_value": f"Payment via Account Payee Cheque / DD / ECS / prescribed electronic mode <= {lim_label}",
                             "actual_value": f"Cash Payment: ₹{amount:,.2f}",
-                            "difference": f"Excess over limit: ₹{amount - self.threshold_40a3:,.2f}",
+                            "difference": f"Excess over limit: ₹{amount - applicable_threshold:,.2f}",
                             "reason": "Direct cash expenditure exceeding statutory threshold must be disallowed under Section 40A(3) unless exempt under Rule 6DD.",
                             "evidence": {
                                 "date": date,
                                 "party": f"Unresolved Payee (Ledger: {ledger_clean})",
                                 "vouchers": [vch],
                                 "total_cash": amount,
-                                "records_count": 1
+                                "records_count": 1,
+                                "is_goods_carriage": is_transport,
+                                "statutory_limit": applicable_threshold
                             },
                             "rule_used": "Income Tax Act, 1961 - Section 40A(3) read with Rule 6DD",
                             "engine_type": "DETERMINISTIC",
-                            "ai_explanation": f"Under Section 40A(3), expenditure paid in cash exceeding ₹{self.threshold_40a3:,.2f} is disallowed and added back to taxable income in Form 3CD (Clause 21(d)).",
+                            "ai_explanation": f"Under Section 40A(3), expenditure paid in cash exceeding statutory threshold ({lim_label}) is disallowed and added back to taxable income in Form 3CD (Clause 21(d)).",
                             "recommended_action": "Identify the payee from physical voucher/receipt and verify if Rule 6DD exemptions apply."
                         })
                     else:
                         ukey = (date, ledger_clean)
                         if ukey not in unresolved_by_ledger_day:
-                            unresolved_by_ledger_day[ukey] = {"total": 0.0, "records": [], "vouchers": []}
+                            unresolved_by_ledger_day[ukey] = {"total": 0.0, "records": [], "vouchers": [], "is_transport": is_transport}
                         unresolved_by_ledger_day[ukey]["total"] += amount
                         unresolved_by_ledger_day[ukey]["records"].append(rec_id)
                         unresolved_by_ledger_day[ukey]["vouchers"].append(vch)
+                        if not is_transport:
+                            unresolved_by_ledger_day[ukey]["is_transport"] = False
 
         for (date, party), data in cash_by_party_day.items():
-            if data["total"] > self.threshold_40a3 and party.lower() not in ['cash', 'petty cash', 'bank', 'cash account', 'cash in hand']:
+            is_transport = data.get("is_transport", False)
+            applicable_threshold = self.threshold_40a3_transport if is_transport else self.threshold_40a3
+            if data["total"] > applicable_threshold and party.lower() not in ['cash', 'petty cash', 'bank', 'cash account', 'cash in hand']:
+                lim_label = f"₹{applicable_threshold:,.2f}"
                 self.findings.append({
                     "finding_code": "DET-TAX-40A3",
                     "category": "Statutory Compliance",
-                    "severity": "CRITICAL" if data["total"] > 50000 else "HIGH",
+                    "severity": "CRITICAL" if data["total"] > (applicable_threshold * 2) else "HIGH",
                     "risk_score": 8.8,
                     "title": f"Section 40A(3) Breach: Aggregate Cash Payment of ₹{data['total']:,.2f} to {party}",
-                    "description": f"Aggregate cash payments to '{party}' on {date} totaled ₹{data['total']:,.2f}, exceeding the threshold of ₹{self.threshold_40a3:,.2f} prescribed under Section 40A(3) of the Income Tax Act, 1961.",
+                    "description": f"Aggregate cash payments to '{party}' on {date} totaled ₹{data['total']:,.2f}, exceeding the statutory limit of {lim_label} prescribed under Section 40A(3) of the Income Tax Act, 1961.",
                     "affected_records": data["records"],
-                    "expected_value": f"Payment via Account Payee Cheque / DD / ECS / prescribed electronic mode <= ₹{self.threshold_40a3:,.2f}",
+                    "expected_value": f"Payment via Account Payee Cheque / DD / ECS / prescribed electronic mode <= {lim_label}",
                     "actual_value": f"Total Cash Paid: ₹{data['total']:,.2f}",
-                    "difference": f"Excess over limit: ₹{data['total'] - self.threshold_40a3:,.2f}",
+                    "difference": f"Excess over limit: ₹{data['total'] - applicable_threshold:,.2f}",
                     "reason": "Direct cash disallowance under Section 40A(3) will result in 100% add-back of this expenditure to taxable business income in Form 3CD (Clause 21(d)).",
                     "evidence": {
                         "date": date,
                         "party": party,
                         "vouchers": data["vouchers"],
                         "total_cash": data["total"],
-                        "records_count": len(data["records"])
+                        "records_count": len(data["records"]),
+                        "is_goods_carriage": is_transport,
+                        "statutory_limit": applicable_threshold
                     },
                     "rule_used": "Income Tax Act, 1961 - Section 40A(3) read with Rule 6DD",
                     "engine_type": "DETERMINISTIC",
-                    "ai_explanation": f"Under Section 40A(3), where an assessee incurs any expenditure in respect of which a payment or aggregate of payments made to a person in a day exceeds statutory threshold (₹{self.threshold_40a3:,.2f}) otherwise than by an account payee cheque or electronic clearing system, no deduction shall be allowed. This must be reported under Clause 21(d) of Tax Audit Report Form 3CD.",
+                    "ai_explanation": f"Under Section 40A(3), where an assessee incurs any expenditure in respect of which a payment or aggregate of payments made to a person in a day exceeds statutory threshold ({lim_label}) otherwise than by an account payee cheque or electronic clearing system, no deduction shall be allowed. This must be reported under Clause 21(d) of Tax Audit Report Form 3CD.",
                     "recommended_action": "Check whether the payment falls under any exemption listed under Rule 6DD (e.g. payments to cultivators, cottage industry, banking holidays). If not exempt, classify for 3CD tax audit disallowance."
                 })
 
         for (date, ledger), data in unresolved_by_ledger_day.items():
-            if data["total"] > self.threshold_40a3 and len(data["records"]) > 1 and ledger.lower() not in ['cash', 'petty cash', 'bank', 'cash account', 'cash in hand']:
+            is_transport = data.get("is_transport", False)
+            applicable_threshold = self.threshold_40a3_transport if is_transport else self.threshold_40a3
+            if data["total"] > applicable_threshold and len(data["records"]) > 1 and ledger.lower() not in ['cash', 'petty cash', 'bank', 'cash account', 'cash in hand']:
+                lim_label = f"₹{applicable_threshold:,.2f}"
                 self.findings.append({
                     "finding_code": "DET-TAX-40A3-UNRESOLVED",
                     "category": "Statutory Compliance",
                     "severity": "MEDIUM",
                     "risk_score": 6.5,
                     "title": f"Section 40A(3) Review Candidate: Aggregate Cash Vouchers of ₹{data['total']:,.2f} with Unresolved Payee on {date} (Ledger: {ledger})",
-                    "description": f"Multiple cash vouchers on {date} totaling ₹{data['total']:,.2f} were posted to ledger '{ledger}' without individual payee names. Manual verification of physical vouchers is required to confirm whether payments were made to the same person exceeding ₹{self.threshold_40a3:,.2f}.",
+                    "description": f"Multiple cash vouchers on {date} totaling ₹{data['total']:,.2f} were posted to ledger '{ledger}' without individual payee names. Manual verification of physical vouchers is required to confirm whether payments were made to the same person exceeding {lim_label}.",
                     "affected_records": data["records"],
                     "expected_value": "Payee identity documented on all cash expenditure vouchers",
                     "actual_value": f"Total Unresolved Cash: ₹{data['total']:,.2f} across {len(data['records'])} vouchers",
@@ -299,6 +330,8 @@ class DeterministicAuditEngine:
                         "vouchers": data["vouchers"],
                         "total_cash": data["total"],
                         "records_count": len(data["records"]),
+                        "is_goods_carriage": is_transport,
+                        "statutory_limit": applicable_threshold,
                         "is_review_candidate": True
                     },
                     "rule_used": "Income Tax Act, 1961 - Section 40A(3) Payee Verification Guidance",
