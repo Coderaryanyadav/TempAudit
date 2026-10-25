@@ -363,6 +363,18 @@ class FinAuditAPI {
     });
   }
 
+  static getFilePreview(fileId) {
+    return this.request(`/api/import/file/${fileId}/preview`);
+  }
+
+  static getFileDownloadUrl(fileId) {
+    return this.attachAuthToken(`/api/import/file/${fileId}/download`);
+  }
+
+  static getTemplateDownloadUrl(category) {
+    return `/api/import/templates/${encodeURIComponent(category)}/download`;
+  }
+
   static getErrorReportDownloadUrl(fileId) {
     return this.attachAuthToken(`/api/import/errors/${fileId}/download`);
   }

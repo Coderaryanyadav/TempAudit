@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Response
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from backend.app.schemas import ColumnMappingRequest, ValidateMappingRequest
 from backend.app.auth import get_current_user, require_role, normalize_role
 from backend.app.database import get_db_connection
@@ -413,4 +413,161 @@ def delete_uploaded_file(
         return {"message": f"File '{file_info['file_name']}' and its transactions deleted successfully."}
     finally:
         conn.close()
+
+@router.get("/file/{file_id}/preview")
+def preview_uploaded_file(
+    file_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Returns top 50 parsed preview records and schema details for an uploaded file."""
+    conn = get_db_connection()
+    try:
+        file_row = conn.execute("SELECT * FROM uploaded_files WHERE id = ?", (file_id,)).fetchone()
+        if not file_row:
+            raise HTTPException(status_code=404, detail="File record not found.")
+
+        file_info = dict(file_row)
+        check_engagement_access(conn, file_info["engagement_id"], current_user)
+        
+        # First try fetching from transactions if already imported
+        tx_rows = conn.execute(
+            "SELECT date, voucher_no, ledger, party_name, description, debit, credit, amount FROM transactions WHERE file_id = ? LIMIT 50",
+            (file_id,)
+        ).fetchall()
+        
+        if tx_rows:
+            rows = [dict(r) for r in tx_rows]
+            columns = ["date", "voucher_no", "ledger", "party_name", "description", "debit", "credit", "amount"]
+        else:
+            # Fall back to reading raw file preview
+            file_path = file_info.get("file_path")
+            if file_path and os.path.exists(file_path):
+                raw_preview = read_file_preview(file_path, file_info.get("file_type", ".csv"), file_info.get("data_category"))
+                columns = raw_preview.get("columns", [])
+                rows = raw_preview.get("preview_rows", [])
+            else:
+                columns = []
+                rows = []
+
+        return {
+            "file_id": file_id,
+            "file_name": file_info.get("file_name"),
+            "file_type": file_info.get("file_type"),
+            "data_category": file_info.get("data_category"),
+            "row_count": file_info.get("row_count", 0),
+            "successful_rows": file_info.get("successful_rows", 0),
+            "failed_rows": file_info.get("failed_rows", 0),
+            "warning_count": file_info.get("warning_count", 0),
+            "uploaded_by": file_info.get("uploaded_by"),
+            "uploaded_at": file_info.get("uploaded_at"),
+            "columns": columns,
+            "preview_rows": rows
+        }
+    finally:
+        conn.close()
+
+@router.get("/file/{file_id}/download")
+def download_uploaded_file(
+    file_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Downloads the physical uploaded financial data file."""
+    conn = get_db_connection()
+    try:
+        file_row = conn.execute("SELECT * FROM uploaded_files WHERE id = ?", (file_id,)).fetchone()
+        if not file_row:
+            raise HTTPException(status_code=404, detail="File record not found.")
+
+        file_info = dict(file_row)
+        check_engagement_access(conn, file_info["engagement_id"], current_user)
+        file_path = file_info.get("file_path")
+
+        if not file_path or not os.path.exists(file_path):
+            # If transactions exist, synthesize CSV on the fly
+            tx_rows = conn.execute(
+                "SELECT date, voucher_no, ledger, party_name, description, debit, credit, amount FROM transactions WHERE file_id = ?",
+                (file_id,)
+            ).fetchall()
+            if not tx_rows:
+                raise HTTPException(status_code=404, detail="Physical file not found on disk.")
+            import csv
+            import io
+            buf = io.StringIO()
+            writer = csv.DictWriter(buf, fieldnames=["date", "voucher_no", "ledger", "party_name", "description", "debit", "credit", "amount"])
+            writer.writeheader()
+            for r in tx_rows:
+                writer.writerow(dict(r))
+            safe_name = os.path.basename(file_info.get("file_name", f"file_{file_id}.csv"))
+            return Response(
+                content=buf.getvalue(),
+                media_type="text/csv",
+                headers={"Content-Disposition": f'attachment; filename="{safe_name}"'}
+            )
+
+        safe_name = os.path.basename(file_info.get("file_name", f"file_{file_id}"))
+        return FileResponse(
+            path=file_path,
+            filename=safe_name,
+            media_type="application/octet-stream"
+        )
+    finally:
+        conn.close()
+
+@router.get("/templates/{category}/download")
+def download_sample_template(category: str):
+    """Downloads a pre-formatted sample CSV template for the selected financial data category."""
+    import io
+    import csv
+
+    cat_norm = category.lower().replace("_", " ").strip()
+    buf = io.StringIO()
+
+    if "bank" in cat_norm:
+        fieldnames = ["Date", "Description / Narration", "Cheque / Ref No", "Withdrawal (Debit)", "Deposit (Credit)", "Balance"]
+        sample_rows = [
+            {"Date": "2025-04-05", "Description / Narration": "NEFT Inward - Client Settlement", "Cheque / Ref No": "NEFT123456", "Withdrawal (Debit)": "", "Deposit (Credit)": "250000.00", "Balance": "1250000.00"},
+            {"Date": "2025-04-10", "Description / Narration": "Vendor Payment - Server Infra", "Cheque / Ref No": "CHQ004521", "Withdrawal (Debit)": "45000.00", "Deposit (Credit)": "", "Balance": "1205000.00"},
+            {"Date": "2025-04-15", "Description / Narration": "Bank Charges & SMS Alert Fees", "Cheque / Ref No": "TXN987654", "Withdrawal (Debit)": "1500.00", "Deposit (Credit)": "", "Balance": "1203500.00"}
+        ]
+        filename = "Sample_Bank_Statement_Template.csv"
+    elif "sales" in cat_norm:
+        fieldnames = ["Invoice Date", "Invoice No", "Customer Name", "Customer GSTIN", "Taxable Value", "CGST", "SGST", "IGST", "Total Amount"]
+        sample_rows = [
+            {"Invoice Date": "2025-04-02", "Invoice No": "INV-2025-001", "Customer Name": "Enterprise Client Alpha", "Customer GSTIN": "27AAACB1234D1Z5", "Taxable Value": "100000.00", "CGST": "9000.00", "SGST": "9000.00", "IGST": "0.00", "Total Amount": "118000.00"},
+            {"Invoice Date": "2025-04-12", "Invoice No": "INV-2025-002", "Customer Name": "Overseas Partner Beta", "Customer GSTIN": "URP", "Taxable Value": "250000.00", "CGST": "0.00", "SGST": "0.00", "IGST": "45000.00", "Total Amount": "295000.00"}
+        ]
+        filename = "Sample_Sales_Register_Template.csv"
+    elif "purchase" in cat_norm or "gst" in cat_norm:
+        fieldnames = ["Bill Date", "Invoice No", "Vendor Name", "Supplier GSTIN", "Taxable Value", "CGST", "SGST", "IGST", "Total Amount"]
+        sample_rows = [
+            {"Bill Date": "2025-04-04", "Invoice No": "PUR-2025-010", "Vendor Name": "Cloud Services Provider", "Supplier GSTIN": "29AABCB5678E1Z2", "Taxable Value": "50000.00", "CGST": "4500.00", "SGST": "4500.00", "IGST": "0.00", "Total Amount": "59000.00"},
+            {"Bill Date": "2025-04-18", "Invoice No": "PUR-2025-011", "Vendor Name": "Office Supplies Corp", "Supplier GSTIN": "27AACCB9999F1Z1", "Taxable Value": "12000.00", "CGST": "1080.00", "SGST": "1080.00", "IGST": "0.00", "Total Amount": "14160.00"}
+        ]
+        filename = "Sample_Purchase_Register_Template.csv"
+    elif "trial" in cat_norm:
+        fieldnames = ["Account Code", "Ledger Name", "Group / Classification", "Opening Balance", "Debit Movement", "Credit Movement", "Closing Balance"]
+        sample_rows = [
+            {"Account Code": "1001", "Ledger Name": "Cash in Hand", "Group / Classification": "Current Assets", "Opening Balance": "50000.00", "Debit Movement": "120000.00", "Credit Movement": "90000.00", "Closing Balance": "80000.00"},
+            {"Account Code": "2001", "Ledger Name": "Sales Revenue", "Group / Classification": "Revenue", "Opening Balance": "0.00", "Debit Movement": "0.00", "Credit Movement": "1500000.00", "Closing Balance": "1500000.00"}
+        ]
+        filename = "Sample_Trial_Balance_Template.csv"
+    else:
+        # General Ledger
+        fieldnames = ["Date", "Voucher No", "Ledger", "Party Name", "Description", "Debit", "Credit", "Amount"]
+        sample_rows = [
+            {"Date": "2025-04-02", "Voucher No": "JV-001", "Ledger": "Consulting Fees", "Party Name": "Alpha Advisers", "Description": "Consulting charges for legal compliance", "Debit": "25000.00", "Credit": "0.00", "Amount": "25000.00"},
+            {"Date": "2025-04-05", "Voucher No": "BNK-001", "Ledger": "HDFC Bank Ltd", "Party Name": "Alpha Advisers", "Description": "Payment via NEFT for consulting", "Debit": "0.00", "Credit": "25000.00", "Amount": "25000.00"},
+            {"Date": "2025-04-12", "Voucher No": "SAL-001", "Ledger": "Sales Revenue", "Party Name": "Enterprise Client 1", "Description": "Software SaaS license billing", "Debit": "0.00", "Credit": "100000.00", "Amount": "100000.00"}
+        ]
+        filename = "Sample_General_Ledger_Template.csv"
+
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(sample_rows)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 

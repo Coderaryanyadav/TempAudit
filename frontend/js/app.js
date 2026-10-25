@@ -3090,33 +3090,84 @@ const STANDARD_TARGET_FIELDS = [
   { key: "gstin", label: "Party GSTIN", desc: "15-digit statutory GST identification number", required: false },
   { key: "description", label: "Narration / Description", desc: "Transaction narrative, line remarks, or notes", required: false },
   { key: "reference_no", label: "Reference / Cheque / UTR No", desc: "Bank UTR, cheque, or external transaction ref", required: false },
-  { key: "opening_balance", label: "Opening Balance (₹)", desc: "Starting balance for the ledger or statement", required: false },
-  { key: "closing_balance", label: "Closing Balance (₹)", desc: "Ending/Running balance after transaction", required: false },
   { key: "payment_date", label: "Payment / Value Date", desc: "Date of bank settlement or payment realization", required: false }
 ];
 
+let importCategoryFilter = "ALL";
+let importSearchQuery = "";
+
 async function renderImportData() {
   const container = document.getElementById("content-container");
+
+  // Robust engagement resolution: auto-select first valid engagement if needed
+  if (!state.currentEngagementId && state.engagements && state.engagements.length > 0) {
+    state.currentEngagementId = state.engagements[0].id;
+    const select = document.getElementById("engagement-select");
+    if (select) select.value = String(state.currentEngagementId);
+    await updateActiveEngagement();
+  }
+
+  if (!state.currentEngagementId) {
+    if (typeof renderEmptyEngagementGuide === "function") {
+      renderEmptyEngagementGuide(container, "import");
+    } else {
+      container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">Please select an active audit engagement first.</div>`;
+    }
+    return;
+  }
+
   if (!state.activeEngagement) await updateActiveEngagement();
   const eng = state.activeEngagement || {};
 
-  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading Financial Data Import...</div>`;
+  container.innerHTML = `
+    <div style="padding: 30px; text-align: center; color: var(--text-muted);">
+      <div style="display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 10px;"></div>
+      <div style="font-weight: 600; font-size: 13.5px; color: var(--text-main);">Loading Financial Data Workspace...</div>
+    </div>
+  `;
 
   try {
     const uploadedFiles = await FinAuditAPI.getUploadedFiles(state.currentEngagementId);
 
+    // Compute Executive Metrics
+    const totalFiles = uploadedFiles.length;
+    const totalRows = uploadedFiles.reduce((sum, f) => sum + (f.row_count || 0), 0);
+    const totalSuccess = uploadedFiles.reduce((sum, f) => sum + (f.successful_rows || f.row_count || 0), 0);
+    const totalFailed = uploadedFiles.reduce((sum, f) => sum + (f.failed_rows || 0), 0);
+    const totalWarnings = uploadedFiles.reduce((sum, f) => sum + (f.warning_count || 0), 0);
+    const uniqueCategories = Array.from(new Set(uploadedFiles.map(f => f.data_category || 'General Ledger')));
+
+    // Category filtering
+    let filteredFiles = uploadedFiles;
+    if (importCategoryFilter !== "ALL") {
+      filteredFiles = filteredFiles.filter(f => (f.data_category || 'General Ledger') === importCategoryFilter);
+    }
+    if (importSearchQuery.trim()) {
+      const q = importSearchQuery.trim().toLowerCase();
+      filteredFiles = filteredFiles.filter(f => 
+        (f.file_name || "").toLowerCase().includes(q) ||
+        (f.data_category || "").toLowerCase().includes(q) ||
+        (f.uploaded_by || "").toLowerCase().includes(q) ||
+        (f.file_type || "").toLowerCase().includes(q)
+      );
+    }
+
     container.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <!-- Workspace Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">Financial Data Import Workspace</h2>
-          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
-            Target Client: <b>${eng.client_name || 'Client'}</b> | Engagement: <b>${eng.title || 'Audit'}</b> (FY ${eng.financial_year || '2024-25'})
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main); margin: 0;">Financial Data Import Workspace</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 3px;">
+            Target Client: <b>${escapeHtml(eng.client_name || 'Client')}</b> | Engagement: <b>${escapeHtml(eng.title || 'Audit')}</b> (FY ${escapeHtml(eng.financial_year || '2024-25')})
           </div>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; align-items: center;">
           <button class="btn btn-secondary" onclick="navigateTo('trial_balance')">
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
             View Trial Balance
+          </button>
+          <button class="btn btn-secondary" onclick="navigateTo('general_ledger')">
+            ${ICONS.search || '🔍'} General Ledger Explorer
           </button>
           <button class="btn btn-primary" onclick="triggerRunHybridEngine()">
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
@@ -3125,48 +3176,116 @@ async function renderImportData() {
         </div>
       </div>
 
-      <!-- Step 1: Upload Card -->
-      <div class="card" style="margin-bottom: 20px;">
-        <div class="card-header">
-          <div>
-            <div class="card-title">1. Select Data Type & Upload File</div>
-            <div class="card-subtitle">Supported formats: Excel (.xlsx, .xls), CSV (.csv), JSON (.json), PDF (.pdf)</div>
+      <!-- Executive Metric Summary Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin-bottom: 20px;">
+        <div class="kpi-card" style="border-left: 4px solid var(--primary);">
+          <div class="kpi-label">ACTIVE DATASETS</div>
+          <div class="kpi-value font-mono">${totalFiles} Files</div>
+          <div class="kpi-subtext">${uniqueCategories.length} Categories active</div>
+        </div>
+        <div class="kpi-card" style="border-left: 4px solid #059669;">
+          <div class="kpi-label">TOTAL INGESTED RECORDS</div>
+          <div class="kpi-value font-mono" style="font-size: 15px; color: #059669;">${totalRows.toLocaleString('en-IN')} Rows</div>
+          <div class="kpi-subtext">${totalSuccess.toLocaleString('en-IN')} valid rows imported</div>
+        </div>
+        <div class="kpi-card" style="border-left: 4px solid #2563eb;">
+          <div class="kpi-label">INGESTION INTEGRITY</div>
+          <div class="kpi-value font-mono" style="font-size: 15px; color: #2563eb;">${totalRows > 0 ? (((totalRows - totalFailed) / totalRows) * 100).toFixed(1) : '100.0'}%</div>
+          <div class="kpi-subtext">${totalFailed === 0 ? 'Zero ingestion errors' : `${totalFailed} failed rows`}</div>
+        </div>
+        <div class="kpi-card" style="border-left: 4px solid ${totalWarnings > 0 ? '#d97706' : '#10b981'};">
+          <div class="kpi-label">DATA CLEANING LOGS</div>
+          <div class="kpi-value" style="color: ${totalWarnings > 0 ? '#d97706' : '#059669'};">
+            ${totalWarnings} Warnings
           </div>
-          <span class="offline-pill"><span class="offline-dot"></span> 100% Offline Local Parser</span>
+          <div class="kpi-subtext"><a href="#" onclick="navigateTo('cleaning_logs'); return false;" style="color: inherit; text-decoration: underline;">View cleaning records →</a></div>
+        </div>
+        <div class="kpi-card" style="border-left: 4px solid #7c3aed;">
+          <div class="kpi-label">SUBSTANTIVE TESTING</div>
+          <div class="kpi-value font-mono" style="font-size: 14px; color: #7c3aed;">${totalRows > 0 ? 'Engine Ready' : 'Pending Upload'}</div>
+          <div class="kpi-subtext">Deterministic 13-Point Rules</div>
+        </div>
+      </div>
+
+      <!-- Step 1: Upload Workspace Card -->
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 12px 16px;">
+          <div>
+            <div class="card-title" style="font-size: 14px; font-weight: 700;">1. Select Data Type & Upload File</div>
+            <div class="card-subtitle" style="font-size: 12px;">Supported formats: Excel (.xlsx, .xls), CSV (.csv), JSON (.json), PDF (.pdf) (Max 50MB)</div>
+          </div>
+          <span class="offline-pill" style="display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 4px 10px; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 20px;">
+            <span class="offline-dot" style="width: 6px; height: 6px; background: #10b981; border-radius: 50%;"></span>
+            100% Offline Local Parser
+          </span>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 16px; align-items: flex-start;">
-          <div>
-            <div class="form-group">
-              <label class="form-label">Financial Data Category *</label>
-              <select id="import-data-category" class="form-control" style="font-weight: 600;">
-                <option value="General Ledger" selected>General Ledger (GL Extract)</option>
-                <option value="Trial Balance">Trial Balance</option>
-                <option value="Sales Register">Sales Register (GSTR-1 / Invoices)</option>
-                <option value="Purchase Register">Purchase Register (GSTR-2B / Bills)</option>
-                <option value="Bank Statement">Bank Statement (Passbook / PDF)</option>
-                <option value="Expense Register">Expense & Voucher Register</option>
-                <option value="Customer Ledger">Debtors / Customer Ledger</option>
-                <option value="Vendor Ledger">Creditors / Vendor Ledger</option>
-                <option value="Journal Entries">Journal Entries (Day Book)</option>
-                <option value="GST-related data">GST Returns / 2B Reconciliation</option>
-                <option value="Other transaction data">Other Financial Transactions</option>
-              </select>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-                FinAuditPro applies specific statutory audit checks tailored to the selected data category.
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 18px; padding: 16px; align-items: stretch;">
+          <div style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Financial Data Category *</label>
+                <select id="import-data-category" class="form-control" style="font-weight: 600;">
+                  <option value="General Ledger" selected>General Ledger (GL Extract)</option>
+                  <option value="Trial Balance">Trial Balance</option>
+                  <option value="Sales Register">Sales Register (GSTR-1 / Invoices)</option>
+                  <option value="Purchase Register">Purchase Register (GSTR-2B / Bills)</option>
+                  <option value="Bank Statement">Bank Statement (Passbook / PDF)</option>
+                  <option value="Expense Register">Expense & Voucher Register</option>
+                  <option value="Customer Ledger">Debtors / Customer Ledger</option>
+                  <option value="Vendor Ledger">Creditors / Vendor Ledger</option>
+                  <option value="Journal Entries">Journal Entries (Day Book)</option>
+                  <option value="GST-related data">GST Returns / 2B Reconciliation</option>
+                  <option value="Other transaction data">Other Financial Transactions</option>
+                </select>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  FinAuditPro applies specific statutory audit checks tailored to the selected data category.
+                </div>
+              </div>
+
+              <!-- Sample Template Download -->
+              <div style="padding: 10px 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 11.5px; font-weight: 600; color: var(--text-main);">Sample CSV Template</div>
+                  <div style="font-size: 10.5px; color: var(--text-muted);">Standard ICAI columns & formatting</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="downloadSelectedTemplate()">
+                  ${ICONS.download || '📥'} Download Template
+                </button>
               </div>
             </div>
 
-            <div style="padding: 10px; background: #ecfdf5; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 11.5px; color: #065f46;">
-              <b>Security & Integrity:</b> Files are processed purely on your machine using Python & SQLite. No data is ever transmitted to external cloud APIs.
+            <div style="padding: 10px 12px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: var(--radius-md); font-size: 11.5px; color: #065f46;">
+              <b>Security & Privacy Guarantee:</b> Files are processed purely in-memory on your local machine using Python and SQLite. Zero telemetry, zero cloud uploads.
             </div>
           </div>
 
+          <!-- Dropzone -->
           <div>
-            <div class="upload-zone" id="file-drop-zone" onclick="document.getElementById('file-upload-input').click()" style="border: 2px dashed #93c5fd; background: var(--bg-app); border-radius: var(--radius-lg); padding: 30px; text-align: center; cursor: pointer; transition: all 0.2s;">
-              <svg width="40" height="40" fill="none" stroke="#2563eb" viewBox="0 0 24 24" style="margin: 0 auto 10px auto;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-              <div style="font-size: 14px; font-weight: 700; color: var(--text-main);">Click to browse or Drag & Drop financial file here</div>
-              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">CSV, XLSX, XLS, PDF, JSON (Max 100MB)</div>
+            <div class="upload-zone" id="file-drop-zone" 
+                 onclick="document.getElementById('file-upload-input').click()" 
+                 ondragover="handleDragOver(event)" 
+                 ondragleave="handleDragLeave(event)" 
+                 ondrop="handleFileDrop(event)"
+                 style="border: 2px dashed #93c5fd; background: var(--bg-app); border-radius: var(--radius-lg); padding: 36px 20px; text-align: center; cursor: pointer; transition: all 0.2s ease; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              
+              <div style="width: 52px; height: 52px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+                <svg width="28" height="28" fill="none" stroke="#2563eb" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+              </div>
+
+              <div style="font-size: 15px; font-weight: 700; color: var(--text-main);">Click to browse or Drag & Drop financial file here</div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 5px; margin-bottom: 12px;">
+                Drag your client's accounting extract or click to open file explorer
+              </div>
+
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+                <span class="badge" style="background: white; border: 1px solid var(--border); font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono);">.CSV</span>
+                <span class="badge" style="background: white; border: 1px solid var(--border); font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono);">.XLSX</span>
+                <span class="badge" style="background: white; border: 1px solid var(--border); font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono);">.XLS</span>
+                <span class="badge" style="background: white; border: 1px solid var(--border); font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono);">.JSON</span>
+                <span class="badge" style="background: white; border: 1px solid var(--border); font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono);">.PDF</span>
+              </div>
+
               <input type="file" id="file-upload-input" style="display: none;" accept=".csv,.xlsx,.xls,.json,.pdf" onchange="handleFileInputChange(event)">
             </div>
           </div>
@@ -3178,60 +3297,111 @@ async function renderImportData() {
 
       <!-- Uploaded Files Repository & Import Log -->
       <div class="card">
-        <div class="card-header">
-          <div class="card-title">Imported Financial Datasets & Audit Logs (${uploadedFiles.length})</div>
+        <div class="card-header" style="background: var(--bg-card); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div class="card-title" style="font-size: 14px; font-weight: 700;">Imported Financial Datasets & Audit Logs (${uploadedFiles.length})</div>
+            <div class="card-subtitle" style="font-size: 12px;">Active repository of ingested audit evidence files for this engagement</div>
+          </div>
+
+          <!-- Quick Search in Datasets -->
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" class="form-control" style="font-size: 12px; padding: 5px 10px; width: 200px;" placeholder="Search imported files..." value="${escapeHtml(importSearchQuery)}" oninput="searchImportFiles(this.value)">
+          </div>
         </div>
-        ${uploadedFiles.length === 0 ? `
-          <div style="padding: 30px; text-align: center; color: var(--text-muted);">
-            No financial datasets have been imported for this audit engagement yet.
+
+        <!-- Category Filter Chips -->
+        <div style="padding: 10px 16px; background: var(--bg-app); border-bottom: 1px solid var(--border); display: flex; gap: 6px; flex-wrap: wrap;">
+          <button class="demo-chip ${importCategoryFilter === 'ALL' ? 'active' : ''}" 
+                  style="${importCategoryFilter === 'ALL' ? 'background: #0f172a; color: white;' : ''}" 
+                  onclick="filterImportByCategory('ALL')">
+            All Files (${uploadedFiles.length})
+          </button>
+          ${uniqueCategories.map(cat => {
+            const count = uploadedFiles.filter(f => (f.data_category || 'General Ledger') === cat).length;
+            const isSel = importCategoryFilter === cat;
+            return `
+              <button class="demo-chip ${isSel ? 'active' : ''}" 
+                      style="${isSel ? 'background: var(--primary); color: white;' : ''}" 
+                      onclick="filterImportByCategory('${escapeHtml(cat)}')">
+                ${escapeHtml(cat)} (${count})
+              </button>
+            `;
+          }).join('')}
+        </div>
+
+        ${filteredFiles.length === 0 ? `
+          <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+            <div style="font-size: 32px; margin-bottom: 8px;">📂</div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-main);">No datasets match the filter</div>
+            <p style="font-size: 12px; margin-top: 4px;">Upload financial data files or adjust category filter above.</p>
           </div>
         ` : `
-          <div class="table-container">
+          <div class="table-container" style="overflow-x: auto;">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>File Name & Type</th>
                   <th>Category</th>
                   <th>Import Date & Auditor</th>
-                  <th>Total Rows</th>
-                  <th>Valid Rows</th>
-                  <th>Failed Rows</th>
-                  <th>Warnings</th>
-                  <th class="text-center">Actions</th>
+                  <th class="text-right">Total Rows</th>
+                  <th class="text-right">Valid Rows</th>
+                  <th class="text-right">Failed</th>
+                  <th class="text-right">Warnings</th>
+                  <th class="text-center" style="width: 220px;">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                ${uploadedFiles.map(f => `
-                  <tr>
-                    <td>
-                      <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">${f.file_name}</div>
-                      <div style="font-size: 11px; color: var(--text-muted);" class="font-mono">Format: ${f.file_type.toUpperCase()}</div>
-                    </td>
-                    <td>
-                      <span class="badge badge-entity">${f.data_category || 'General Ledger'}</span>
-                    </td>
-                    <td>
-                      <div style="font-size: 12px;">${f.uploaded_at ? f.uploaded_at.replace('T', ' ').split('.')[0] : '—'}</div>
-                      <div style="font-size: 11px; color: var(--text-muted);">By: <b>${f.uploaded_by || 'Auditor'}</b></div>
-                    </td>
-                    <td class="font-mono font-bold">${f.row_count || 0}</td>
-                    <td class="font-mono" style="color: #059669; font-weight: 600;">${f.successful_rows || f.row_count || 0}</td>
-                    <td class="font-mono" style="color: ${f.failed_rows > 0 ? '#dc2626' : '#64748b'}; font-weight: 600;">${f.failed_rows || 0}</td>
-                    <td class="font-mono" style="color: ${f.warning_count > 0 ? '#d97706' : '#64748b'}; font-weight: 600;">${f.warning_count || 0}</td>
-                    <td class="text-center">
-                      <div style="display: flex; gap: 6px; justify-content: center;">
-                        ${(f.failed_rows > 0 || f.warning_count > 0) ? `
-                          <a href="${FinAuditAPI.getErrorReportDownloadUrl(f.id)}" target="_blank" class="btn btn-sm btn-secondary" title="Download CSV Error Log">
-                            ${ICONS.download} Error Log
+                ${filteredFiles.map(f => {
+                  const cat = f.data_category || 'General Ledger';
+                  let moduleLink = '';
+                  if (cat.includes('General Ledger')) moduleLink = `<a href="#" onclick="navigateTo('general_ledger'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in GL Explorer →</a>`;
+                  else if (cat.includes('Bank')) moduleLink = `<a href="#" onclick="navigateTo('reconciliation'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in BRS →</a>`;
+                  else if (cat.includes('GST') || cat.includes('Purchase')) moduleLink = `<a href="#" onclick="navigateTo('reconciliation'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in GST Recon →</a>`;
+                  else if (cat.includes('Trial Balance')) moduleLink = `<a href="#" onclick="navigateTo('trial_balance'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in Trial Balance →</a>`;
+
+                  return `
+                    <tr>
+                      <td>
+                        <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">${escapeHtml(f.file_name || f.filename)}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; align-items: center; margin-top: 2px;" class="font-mono">
+                          <span>Format: <b>${(f.file_type || 'CSV').toUpperCase().replace('.', '')}</b></span>
+                          <span>•</span>
+                          <span>Source: ${escapeHtml(f.source_type || 'UPLOAD')}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="badge ${getCategoryBadgeClass(cat)}">${escapeHtml(cat)}</span>
+                        ${moduleLink}
+                      </td>
+                      <td>
+                        <div style="font-size: 12px; font-weight: 500;">${f.uploaded_at ? f.uploaded_at.replace('T', ' ').split('.')[0] : '—'}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">By: <b>${escapeHtml(f.uploaded_by || 'Auditor')}</b></div>
+                      </td>
+                      <td class="text-right font-mono font-bold">${(f.row_count || 0).toLocaleString('en-IN')}</td>
+                      <td class="text-right font-mono font-bold" style="color: #059669;">${(f.successful_rows || f.row_count || 0).toLocaleString('en-IN')}</td>
+                      <td class="text-right font-mono font-bold" style="color: ${(f.failed_rows || 0) > 0 ? '#dc2626' : '#94a3b8'};">${f.failed_rows || 0}</td>
+                      <td class="text-right font-mono font-bold" style="color: ${(f.warning_count || 0) > 0 ? '#d97706' : '#94a3b8'};">${f.warning_count || 0}</td>
+                      <td class="text-center">
+                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                          <button class="btn btn-sm btn-primary" style="font-size: 11px; padding: 4px 8px;" onclick="openFilePreviewDrawer(${f.id})" title="Inspect data rows">
+                            👁️ View Data
+                          </button>
+                          <a href="${FinAuditAPI.getFileDownloadUrl(f.id)}" class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 4px 8px;" title="Download original file">
+                            ${ICONS.download || '📥'} File
                           </a>
-                        ` : ''}
-                        <button class="btn btn-sm btn-secondary" style="color: #dc2626;" onclick="deleteImportedFile(${f.id}, '${f.file_name}')" title="Delete Dataset & Transactions">
-                          ${ICONS.trash} Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                `).join("")}
+                          ${(f.failed_rows > 0 || f.warning_count > 0) ? `
+                            <a href="${FinAuditAPI.getErrorReportDownloadUrl(f.id)}" target="_blank" class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 4px 8px; color: #dc2626;" title="Download CSV Error Log">
+                              Error Log
+                            </a>
+                          ` : ''}
+                          <button class="btn btn-sm btn-secondary" style="color: #dc2626; font-size: 11px; padding: 4px 8px;" onclick="deleteImportedFile(${f.id}, '${escapeHtml(f.file_name || f.filename)}')" title="Delete Dataset & Transactions">
+                            ${ICONS.trash || '🗑️'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join("")}
               </tbody>
             </table>
           </div>
@@ -3240,6 +3410,157 @@ async function renderImportData() {
     `;
   } catch (err) {
     container.innerHTML = renderErrorBanner(err, "Unable to Load Data Import View");
+  }
+}
+
+function getCategoryBadgeClass(cat) {
+  if (!cat) return "badge-entity";
+  const c = cat.toLowerCase();
+  if (c.includes("general ledger")) return "badge-primary";
+  if (c.includes("sales")) return "badge-resolved";
+  if (c.includes("purchase")) return "badge-warning";
+  if (c.includes("bank")) return "badge-critical";
+  if (c.includes("trial")) return "badge-entity";
+  return "badge-entity";
+}
+
+async function openFilePreviewDrawer(fileId) {
+  const drawerHeader = document.getElementById("drawer-title");
+  const drawerBody = document.getElementById("drawer-content");
+
+  drawerHeader.innerText = `Dataset Inspection: #${fileId}`;
+  drawerBody.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Loading parsed dataset records...</div>`;
+
+  document.getElementById("drawer-overlay").style.display = "block";
+  document.getElementById("evidence-drawer").classList.add("open");
+
+  try {
+    const data = await FinAuditAPI.getFilePreview(fileId);
+    const rows = data.preview_rows || [];
+    const columns = data.columns || [];
+
+    drawerHeader.innerText = `${escapeHtml(data.file_name || 'Dataset')} (${escapeHtml(data.data_category || 'General Ledger')})`;
+
+    drawerBody.innerHTML = `
+      <!-- Metadata summary card -->
+      <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--text-main);">${escapeHtml(data.file_name)}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Uploaded by <b>${escapeHtml(data.uploaded_by || 'Auditor')}</b> on ${data.uploaded_at ? data.uploaded_at.replace('T', ' ').split('.')[0] : '—'}</div>
+          </div>
+          <span class="badge ${getCategoryBadgeClass(data.data_category)}">${escapeHtml(data.data_category)}</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 12px;">
+          <div style="background: var(--bg-card); padding: 8px; border-radius: 4px; text-align: center; border: 1px solid var(--border);">
+            <div style="font-size: 10.5px; color: var(--text-muted);">TOTAL ROWS</div>
+            <div class="font-mono font-bold" style="font-size: 14px; color: var(--text-main);">${(data.row_count || 0).toLocaleString('en-IN')}</div>
+          </div>
+          <div style="background: var(--bg-card); padding: 8px; border-radius: 4px; text-align: center; border: 1px solid var(--border);">
+            <div style="font-size: 10.5px; color: var(--text-muted);">VALID ROWS</div>
+            <div class="font-mono font-bold" style="font-size: 14px; color: #059669;">${(data.successful_rows || data.row_count || 0).toLocaleString('en-IN')}</div>
+          </div>
+          <div style="background: var(--bg-card); padding: 8px; border-radius: 4px; text-align: center; border: 1px solid var(--border);">
+            <div style="font-size: 10.5px; color: var(--text-muted);">ERRORS</div>
+            <div class="font-mono font-bold" style="font-size: 14px; color: ${(data.failed_rows || 0) > 0 ? '#dc2626' : '#64748b'};">${data.failed_rows || 0}</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <a href="${FinAuditAPI.getFileDownloadUrl(fileId)}" class="btn btn-sm btn-secondary" style="flex: 1; text-align: center;">
+            ${ICONS.download || '📥'} Download File
+          </a>
+          <button class="btn btn-sm btn-primary" style="flex: 1;" onclick="navigateToModuleForCategory('${escapeHtml(data.data_category)}')">
+            Open Audit Module →
+          </button>
+        </div>
+      </div>
+
+      <!-- Preview Table -->
+      <div style="font-weight: 700; font-size: 12.5px; color: var(--text-main); margin-bottom: 8px;">
+        Dataset Sample Records (Showing up to ${rows.length} rows):
+      </div>
+
+      ${rows.length === 0 ? `
+        <div style="padding: 30px; text-align: center; color: var(--text-muted);">No parsed records available for preview.</div>
+      ` : `
+        <div class="table-container" style="max-height: 480px; overflow-y: auto;">
+          <table class="data-table" style="font-size: 11.5px;">
+            <thead>
+              <tr>
+                ${columns.map(c => `<th class="font-mono" style="padding: 6px 10px; font-size: 10.5px;">${escapeHtml(c)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  ${columns.map(c => {
+                    const val = r[c];
+                    const isAmt = (c === 'debit' || c === 'credit' || c === 'amount');
+                    return `<td style="padding: 6px 10px; ${isAmt ? 'text-align: right; font-family: var(--font-mono); font-weight: 600;' : ''}">${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) : '<span style="color:#cbd5e1;">—</span>'}</td>`;
+                  }).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `}
+    `;
+  } catch (err) {
+    drawerBody.innerHTML = renderErrorBanner(err, "Unable to Load File Preview");
+  }
+}
+
+function navigateToModuleForCategory(cat) {
+  document.getElementById("drawer-overlay").style.display = "none";
+  document.getElementById("evidence-drawer").classList.remove("open");
+  const c = (cat || "").toLowerCase();
+  if (c.includes("bank")) navigateTo("reconciliation");
+  else if (c.includes("gst") || c.includes("purchase") || c.includes("sales")) navigateTo("reconciliation");
+  else if (c.includes("trial")) navigateTo("trial_balance");
+  else navigateTo("general_ledger");
+}
+
+function downloadSelectedTemplate() {
+  const cat = document.getElementById("import-data-category")?.value || "General Ledger";
+  window.open(FinAuditAPI.getTemplateDownloadUrl(cat), "_blank");
+}
+
+function filterImportByCategory(cat) {
+  importCategoryFilter = cat;
+  renderImportData();
+}
+
+function searchImportFiles(q) {
+  importSearchQuery = q;
+  renderImportData();
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  const dropZone = document.getElementById("file-drop-zone");
+  if (dropZone) {
+    dropZone.style.borderColor = "#2563eb";
+    dropZone.style.background = "#eff6ff";
+  }
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  const dropZone = document.getElementById("file-drop-zone");
+  if (dropZone) {
+    dropZone.style.borderColor = "#93c5fd";
+    dropZone.style.background = "var(--bg-app)";
+  }
+}
+
+function handleFileDrop(e) {
+  e.preventDefault();
+  handleDragLeave(e);
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    const fakeEvent = { target: { files: e.dataTransfer.files } };
+    handleFileInputChange(fakeEvent);
   }
 }
 
