@@ -55,3 +55,7 @@ backend/logs/*
 uploaded_files/
 .github/
 
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+screenshots/
+screenshots_root_backup/
