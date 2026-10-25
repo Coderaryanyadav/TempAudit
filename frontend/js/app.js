@@ -5903,6 +5903,14 @@ let glFilterState = {
 };
 
 let currentGLData = null;
+let glActiveTab = "register"; // 'register', 'anomalies', or 'accounts'
+let glPage = 1;
+let glPageSize = 50;
+let glSortColumn = "date";
+let glSortDirection = "asc";
+let glQuickSearch = "";
+let glAnomalySeverityFilter = "ALL";
+let glAnomalyPage = 1;
 
 const GL_RULE_LABELS = {
   "GL_01_DUPLICATE_ENTRY": "Duplicate Entries",
@@ -5922,12 +5930,31 @@ const GL_RULE_LABELS = {
 
 async function renderGeneralLedger() {
   const container = document.getElementById("content-container");
+
+  // Robust engagement resolution: if state has engagements but currentEngagementId is missing/invalid, auto-select first valid
+  if (!state.currentEngagementId && state.engagements && state.engagements.length > 0) {
+    state.currentEngagementId = state.engagements[0].id;
+    const select = document.getElementById("engagement-select");
+    if (select) select.value = String(state.currentEngagementId);
+    await updateActiveEngagement();
+  }
+
   if (!state.currentEngagementId) {
-    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">Please select an active audit engagement first.</div>`;
+    if (typeof renderEmptyEngagementGuide === "function") {
+      renderEmptyEngagementGuide(container, "general_ledger");
+    } else {
+      container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">Please select an active audit engagement first.</div>`;
+    }
     return;
   }
 
-  container.innerHTML = `<div style="padding: 20px; color: var(--text-muted);">Running General Ledger 13-Point Anomaly Analysis & Scanning Vouchers...</div>`;
+  container.innerHTML = `
+    <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+      <div style="display: inline-block; width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;"></div>
+      <div style="font-weight: 600; font-size: 14px; color: var(--text-main);">Scanning General Ledger & Running 13-Point Anomaly Detection...</div>
+      <div style="font-size: 12px; margin-top: 4px;">Evaluating voucher sequence, Benford distribution, cut-off boundaries, and party balances per ICAI standards</div>
+    </div>
+  `;
 
   try {
     const [ledgersRes, partiesRes, glData] = await Promise.all([
@@ -5937,6 +5964,8 @@ async function renderGeneralLedger() {
     ]);
 
     currentGLData = glData;
+    glPage = 1;
+    glAnomalyPage = 1;
     const ledgers = ledgersRes.ledgers || [];
     const parties = partiesRes.parties || [];
     const transactions = glData.transactions || [];
@@ -5967,54 +5996,61 @@ async function renderGeneralLedger() {
     );
 
     const downloadUrl = FinAuditAPI.getGLReportDownloadUrl(state.currentEngagementId, glFilterState);
+    const netDifference = Math.abs(glData.total_debit - glData.total_credit);
+    const netSide = glData.total_debit >= glData.total_credit ? 'Dr' : 'Cr';
 
     container.innerHTML = `
       <!-- Header -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
         <div>
-          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main);">General Ledger Analysis & Substantive Testing</h2>
-          <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: var(--text-main); margin: 0;">General Ledger Analysis & Substantive Testing</h2>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 3px;">
             13-Point deterministic anomaly detection, multi-attribute transaction filtering, and running balance audit verification
           </div>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          ${isFilterActive ? `
+            <button class="btn btn-sm btn-secondary" style="color: #dc2626; border-color: #fca5a5;" onclick="resetGLFilters()">
+              ${ICONS.close || '✕'} Clear All Filters
+            </button>
+          ` : ''}
           <a href="${downloadUrl}" target="_blank" class="btn btn-secondary" title="Export current filtered view to CSV format">
-            ${ICONS.download} Download GL Report (CSV)
+            ${ICONS.download || '📥'} Download GL Report (CSV)
           </a>
           <button class="btn btn-primary" onclick="renderGeneralLedger()">
-            ${ICONS.refresh} Re-Scan Ledger
+            ${ICONS.refresh || '🔄'} Re-Scan Ledger
           </button>
         </div>
       </div>
 
       <!-- Executive KPI Summary Cards -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin-bottom: 20px;">
         <div class="kpi-card" style="border-left: 4px solid var(--primary);">
           <div class="kpi-label">TOTAL TRANSACTIONS</div>
-          <div class="kpi-value">${glData.total_transactions}</div>
+          <div class="kpi-value font-mono">${(glData.total_transactions || 0).toLocaleString('en-IN')}</div>
           <div class="kpi-subtext">Ledger entries scanned</div>
         </div>
         <div class="kpi-card" style="border-left: 4px solid #059669;">
           <div class="kpi-label">TOTAL DEBIT VOLUME</div>
-          <div class="kpi-value font-mono" style="font-size: 14px; color: #059669;">${formatINR(glData.total_debit)}</div>
+          <div class="kpi-value font-mono" style="font-size: 15px; color: #059669;">${formatINR(glData.total_debit || 0)}</div>
           <div class="kpi-subtext">Sum of scanned debits</div>
         </div>
         <div class="kpi-card" style="border-left: 4px solid #2563eb;">
           <div class="kpi-label">TOTAL CREDIT VOLUME</div>
-          <div class="kpi-value font-mono" style="font-size: 14px; color: #2563eb;">${formatINR(glData.total_credit)}</div>
+          <div class="kpi-value font-mono" style="font-size: 15px; color: #2563eb;">${formatINR(glData.total_credit || 0)}</div>
           <div class="kpi-subtext">Sum of scanned credits</div>
         </div>
-        <div class="kpi-card" style="border-left: 4px solid ${glData.flagged_transactions_count > 0 ? '#ea580c' : '#10b981'};">
+        <div class="kpi-card" style="border-left: 4px solid ${(glData.flagged_transactions_count || 0) > 0 ? '#ea580c' : '#10b981'};">
           <div class="kpi-label">FLAGGED TRANSACTIONS</div>
-          <div class="kpi-value" style="color: ${glData.flagged_transactions_count > 0 ? '#ea580c' : '#10b981'};">
-            ${glData.flagged_transactions_count}
+          <div class="kpi-value" style="color: ${(glData.flagged_transactions_count || 0) > 0 ? '#ea580c' : '#10b981'};">
+            ${(glData.flagged_transactions_count || 0).toLocaleString('en-IN')}
           </div>
-          <div class="kpi-subtext">Requires auditor review</div>
+          <div class="kpi-subtext">${((glData.flagged_transactions_count / (glData.total_transactions || 1)) * 100).toFixed(1)}% requires review</div>
         </div>
         <div class="kpi-card" style="border-left: 4px solid #dc2626;">
           <div class="kpi-label">TOTAL ANOMALIES</div>
-          <div class="kpi-value" style="color: ${glData.total_anomalies_count > 0 ? '#dc2626' : '#059669'};">
-            ${glData.total_anomalies_count}
+          <div class="kpi-value" style="color: ${(glData.total_anomalies_count || 0) > 0 ? '#dc2626' : '#059669'};">
+            ${(glData.total_anomalies_count || 0).toLocaleString('en-IN')}
           </div>
           <div class="kpi-subtext">${summary.critical_count} Crit • ${summary.high_count} High • ${summary.medium_count} Med</div>
         </div>
@@ -6026,54 +6062,78 @@ async function renderGeneralLedger() {
       </div>
 
       <!-- Quick 13-Point Anomaly Filter Chips -->
-      <div class="card" style="padding: 12px 16px; margin-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <div style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
-            13-Point Anomaly Filter Chips
+      <div class="card" style="padding: 14px 16px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+              13-Point Anomaly Filter Chips
+            </span>
+            <span class="badge" style="font-size: 10.5px; background: var(--bg-app); color: var(--text-muted);">
+              ICAI SA 240 / 500 / 520
+            </span>
           </div>
-          ${isFilterActive ? `
-            <button class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 2px 8px; color: #dc2626;" onclick="resetGLFilters()">
-              ${ICONS.close} Clear All Filters
-            </button>
+          ${glFilterState.anomaly_rule !== 'ALL' ? `
+            <span style="font-size: 11.5px; color: #dc2626; font-weight: 600;">
+              Active filter: ${GL_RULE_LABELS[glFilterState.anomaly_rule] || glFilterState.anomaly_rule}
+            </span>
           ` : ''}
         </div>
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-          <button class="demo-chip ${glFilterState.anomaly_rule === 'ALL' ? 'active' : ''}" style="${glFilterState.anomaly_rule === 'ALL' ? 'background: #0f172a; color: white;' : ''}" onclick="setGLAnomalyFilter('ALL')">
-            All Transactions (${glData.total_transactions})
+          <button class="demo-chip ${glFilterState.anomaly_rule === 'ALL' ? 'active' : ''}" 
+                  style="${glFilterState.anomaly_rule === 'ALL' ? 'background: #0f172a; color: white; border-color: #0f172a;' : ''}" 
+                  onclick="setGLAnomalyFilter('ALL')">
+            All Transactions (${(glData.total_transactions || 0).toLocaleString('en-IN')})
+          </button>
+          <button class="demo-chip ${glFilterState.anomaly_rule === 'FLAGGED' ? 'active' : ''}" 
+                  style="${glFilterState.anomaly_rule === 'FLAGGED' ? 'background: #dc2626; color: white; border-color: #dc2626;' : 'border-color: #fca5a5; color: #991b1b;'}" 
+                  onclick="setGLAnomalyFilter('FLAGGED')">
+            Flagged Only (${(glData.flagged_transactions_count || 0).toLocaleString('en-IN')})
+          </button>
+          <button class="demo-chip ${glFilterState.anomaly_rule === 'CLEAN' ? 'active' : ''}" 
+                  style="${glFilterState.anomaly_rule === 'CLEAN' ? 'background: #059669; color: white; border-color: #059669;' : 'border-color: #a7f3d0; color: #065f46;'}" 
+                  onclick="setGLAnomalyFilter('CLEAN')">
+            Clean Entries (${Math.max(0, (glData.total_transactions || 0) - (glData.flagged_transactions_count || 0)).toLocaleString('en-IN')})
           </button>
           ${Object.entries(GL_RULE_LABELS).map(([code, label]) => {
-      const count = ruleCountMap[code] || 0;
-      const isSelected = glFilterState.anomaly_rule === code;
-      return `
-              <button class="demo-chip ${isSelected ? 'active' : ''}" style="${isSelected ? 'background: #dc2626; color: white;' : (count > 0 ? 'border-color: #fca5a5;' : '')}" onclick="setGLAnomalyFilter('${code}')">
-                ${label} ${count > 0 ? `<span class="badge" style="background:${isSelected ? '#991b1b' : '#fee2e2'}; color:${isSelected ? '#fff' : '#991b1b'}; margin-left:4px; font-size:10px; padding:1px 5px;">${count}</span>` : ''}
+            const count = ruleCountMap[code] || 0;
+            const isSelected = glFilterState.anomaly_rule === code;
+            return `
+              <button class="demo-chip ${isSelected ? 'active' : ''}" 
+                      style="${isSelected ? 'background: #dc2626; color: white; border-color: #dc2626;' : (count > 0 ? 'border-color: #fca5a5;' : 'opacity: 0.75;')}" 
+                      onclick="setGLAnomalyFilter('${code}')">
+                ${label} ${count > 0 ? `<span class="badge" style="background:${isSelected ? '#991b1b' : '#fee2e2'}; color:${isSelected ? '#fff' : '#991b1b'}; margin-left:4px; font-size:10px; padding:1px 5px; font-weight: 700;">${count}</span>` : ''}
               </button>
             `;
-    }).join('')}
+          }).join('')}
         </div>
       </div>
 
       <!-- Multi-Attribute Search & Filter Controls -->
       <div class="card" style="margin-bottom: 20px;">
-        <div class="card-header" style="background: var(--bg-app); padding: 10px 16px;">
-          <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">
-            Filter Transactions
+        <div class="card-header" style="background: var(--bg-app); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 700; font-size: 13px; color: var(--text-main);">
+              Filter Transactions
+            </span>
+            <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px;">
+              Search by ledger, narration keyword, party, voucher, date window, or amount bounds
+            </span>
           </div>
-          <div style="font-size: 12px; color: var(--text-muted);">
-            Filter by ledger, narration keyword, party, voucher, date window, or amount limits
-          </div>
+          ${isFilterActive ? `
+            <span class="badge badge-warning" style="font-size: 11px;">Filters Active</span>
+          ` : ''}
         </div>
 
         <div style="padding: 14px 16px;">
           <form onsubmit="applyGLFilters(event)">
             <!-- Row 1: Search, Ledger, Party, Voucher -->
-            <div style="display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.2fr; gap: 10px; margin-bottom: 12px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px;">
               <div>
-                <label class="form-label" style="font-size: 11px;">Search / Narration Keyword</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Search / Narration Keyword</label>
                 <input type="text" id="gl-search" class="form-control" placeholder="Search narration, ref, description..." value="${escapeHtml(glFilterState.search)}">
               </div>
               <div>
-                <label class="form-label" style="font-size: 11px;">Ledger Account Head</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Ledger Account Head</label>
                 <select id="gl-ledger" class="form-control">
                   <option value="All" ${glFilterState.ledger === 'All' ? 'selected' : ''}>-- All Ledgers (${ledgers.length}) --</option>
                   ${ledgers.map(l => `
@@ -6082,211 +6142,581 @@ async function renderGeneralLedger() {
                 </select>
               </div>
               <div>
-                <label class="form-label" style="font-size: 11px;">Party Name</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Party Name</label>
                 <input type="text" id="gl-party" list="gl-party-datalist" class="form-control" placeholder="Type party name..." value="${escapeHtml(glFilterState.party)}">
                 <datalist id="gl-party-datalist">
                   ${parties.map(p => `<option value="${escapeHtml(p)}"></option>`).join('')}
                 </datalist>
               </div>
               <div>
-                <label class="form-label" style="font-size: 11px;">Voucher No</label>
-                <input type="text" id="gl-voucher" class="form-control font-mono" placeholder="e.g. JV/001" value="${escapeHtml(glFilterState.voucher_no)}">
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Voucher No</label>
+                <input type="text" id="gl-voucher" class="form-control font-mono" placeholder="e.g. JV/001, V-042" value="${escapeHtml(glFilterState.voucher_no)}">
               </div>
             </div>
 
             <!-- Row 2: Date Bounds & Amount Bounds -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr auto; gap: 8px; align-items: flex-end;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: flex-end;">
               <div>
-                <label class="form-label" style="font-size: 11px;">From Date</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">From Date</label>
                 <input type="date" id="gl-start-date" class="form-control" value="${glFilterState.start_date || ''}">
               </div>
               <div>
-                <label class="form-label" style="font-size: 11px;">To Date</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">To Date</label>
                 <input type="date" id="gl-end-date" class="form-control" value="${glFilterState.end_date || ''}">
               </div>
               <div>
-                <label class="form-label" style="font-size: 11px;">Min Amount (₹)</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Min Amount (₹)</label>
                 <input type="number" id="gl-min-amount" class="form-control" placeholder="Min ₹" value="${glFilterState.min_amount !== null ? glFilterState.min_amount : ''}">
               </div>
               <div>
-                <label class="form-label" style="font-size: 11px;">Max Amount (₹)</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Max Amount (₹)</label>
                 <input type="number" id="gl-max-amount" class="form-control" placeholder="Max ₹" value="${glFilterState.max_amount !== null ? glFilterState.max_amount : ''}">
               </div>
               <div>
-                <label class="form-label" style="font-size: 11px;">Min Debit (₹)</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Min Debit (₹)</label>
                 <input type="number" id="gl-min-debit" class="form-control" placeholder="Min Dr" value="${glFilterState.min_debit !== null ? glFilterState.min_debit : ''}">
               </div>
               <div>
-                <label class="form-label" style="font-size: 11px;">Min Credit (₹)</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Min Credit (₹)</label>
                 <input type="number" id="gl-min-credit" class="form-control" placeholder="Min Cr" value="${glFilterState.min_credit !== null ? glFilterState.min_credit : ''}">
               </div>
               <div style="display: flex; gap: 6px;">
-                <button type="submit" class="btn btn-primary" style="padding: 7px 14px;">Filter</button>
-                <button type="button" class="btn btn-secondary" style="padding: 7px 10px;" onclick="resetGLFilters()">Reset</button>
+                <button type="submit" class="btn btn-primary" style="padding: 7px 16px; font-weight: 600;">
+                  Apply
+                </button>
+                <button type="button" class="btn btn-secondary" style="padding: 7px 12px;" onclick="resetGLFilters()">
+                  Reset
+                </button>
               </div>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- Detected Anomaly Highlights Section (If any anomalies present) -->
-      ${anomalies.length > 0 ? `
-        <div class="card" style="margin-bottom: 20px; border-left: 4px solid #ef4444;">
-          <div class="card-header" style="background: #fff1f2; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div class="card-title" style="color: #991b1b;">
-                Potential Audit Anomalies & Exceptions Requiring Review (${anomalies.length})
-              </div>
-              <div class="card-subtitle" style="color: #b91c1c;">
-                Deterministic exceptions identified per ICAI Auditing Standards (SA 240 / SA 500 / SA 520). Note: Strictly labeled as "Requires review" or "Potential anomaly".
-              </div>
-            </div>
-            <span class="badge badge-critical">${anomalies.length} Flagged</span>
-          </div>
+      <!-- Tab Navigation (Register vs Anomalies vs Ledger Summary) -->
+      <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 16px;">
+        <button class="btn ${glActiveTab === 'register' ? 'btn-primary' : 'btn-secondary'}" 
+                style="border-radius: 6px 6px 0 0; margin-bottom: -2px; border-bottom: none; font-weight: 600; padding: 10px 18px;" 
+                onclick="setGLTab('register')">
+          Transaction Register (${transactions.length.toLocaleString('en-IN')})
+        </button>
+        <button class="btn ${glActiveTab === 'anomalies' ? 'btn-primary' : 'btn-secondary'}" 
+                style="border-radius: 6px 6px 0 0; margin-bottom: -2px; border-bottom: none; font-weight: 600; padding: 10px 18px; ${anomalies.length > 0 && glActiveTab !== 'anomalies' ? 'color: #dc2626;' : ''}" 
+                onclick="setGLTab('anomalies')">
+          Audit Anomalies & Exceptions (${anomalies.length.toLocaleString('en-IN')})
+        </button>
+        <button class="btn ${glActiveTab === 'accounts' ? 'btn-primary' : 'btn-secondary'}" 
+                style="border-radius: 6px 6px 0 0; margin-bottom: -2px; border-bottom: none; font-weight: 600; padding: 10px 18px;" 
+                onclick="setGLTab('accounts')">
+          Ledger Head Summary (${ledgers.length})
+        </button>
+      </div>
 
-          <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto;">
-            ${anomalies.map(a => {
-      const t = a.transaction || {};
-      const amt = floatVal(t.amount || Math.max(t.debit || 0, t.credit || 0));
-      return `
-                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
-                  <div style="flex: 1;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                      ${getSeverityBadge(a.severity)}
-                      <span class="font-mono font-bold" style="font-size: 12px; color: var(--text-main);">${escapeHtml(a.rule)}</span>
-                      <span style="font-weight: 700; font-size: 13px; color: #1e293b;">${escapeHtml(a.rule_name)}</span>
-                      <span class="badge" style="background: var(--bg-sidebar); color: var(--text-secondary); font-size: 10.5px;">Risk Score: ${a.risk_score}/100</span>
-                    </div>
-
-                    <div style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 6px;">
-                      <b>Reason:</b> ${escapeHtml(a.reason)}
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px; font-size: 11.5px; color: var(--text-muted); background: var(--bg-app); padding: 8px 10px; border-radius: 4px;">
-                      <div>
-                        <b>Evidence:</b> <code>${escapeHtml(a.evidence)}</code>
-                      </div>
-                      <div>
-                        <b>Recommended Review:</b> <span style="color: #0369a1;">${escapeHtml(a.recommended_review)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style="text-align: right; min-width: 140px;">
-                    <div class="font-mono font-bold" style="font-size: 14px; color: var(--text-main);">${formatINR(amt)}</div>
-                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Date: ${t.date || '—'}</div>
-                    <button class="btn btn-sm btn-secondary" style="margin-top: 8px; width: 100%;" onclick="openGLTransactionDrawer(${t.id})">
-                      ${ICONS.search} Examine
-                    </button>
-                  </div>
-                </div>
-              `;
-    }).join('')}
-          </div>
-        </div>
-      ` : ''}
-
-      <!-- Main Ledger Transactions Table -->
-      <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div class="card-title">General Ledger Transaction Register (${transactions.length} items)</div>
-            <div class="card-subtitle">
-              ${isFilterActive ? 'Filtered by active search parameters' : 'All chronological transactions with computed running balances'}
-            </div>
-          </div>
-          <div style="font-size: 12px; color: var(--text-muted);">
-            Showing <b>${transactions.length}</b> records
-          </div>
-        </div>
-
-        ${transactions.length === 0 ? (
-        isFilterActive ? `
-            <div style="padding: 40px; text-align: center; color: var(--text-muted);">
-              <p>No ledger transactions match the current filter criteria.</p>
-              <button class="btn btn-secondary" style="margin-top: 10px;" onclick="resetGLFilters()">Clear Filters</button>
-            </div>
-          ` : `
-            <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
-              <div style="margin-bottom: 10px; color: var(--text-muted);"><svg width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg></div>
-              <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No transactions imported yet</div>
-              <p style="font-size: 13px; max-width: 420px; margin: 0 auto 16px auto; color: var(--text-muted);">
-                Import your client's General Ledger or Day Book CSV/Excel file to begin 13-point anomaly detection and substantive audit testing.
-              </p>
-              <button class="btn btn-primary" onclick="navigateTo('import')">+ Import Financial Data</button>
-            </div>
-          `
-      ) : `
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th style="width: 85px;">Date</th>
-                  <th style="width: 85px;">Voucher</th>
-                  <th style="width: 160px;">Ledger Account</th>
-                  <th style="width: 160px;">Party Name</th>
-                  <th>Narration / Description</th>
-                  <th class="text-right" style="width: 105px;">Debit (INR)</th>
-                  <th class="text-right" style="width: 105px;">Credit (INR)</th>
-                  <th class="text-right" style="width: 115px;">Running Bal</th>
-                  <th style="width: 140px;">Audit Status</th>
-                  <th class="text-center" style="width: 80px;">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${transactions.map(t => {
-        const txAnomalies = t.anomalies || [];
-        const hasAnom = txAnomalies.length > 0;
-        const highestSev = hasAnom ? txAnomalies[0].severity : null;
-        return `
-                    <tr style="${hasAnom ? 'background-color: #fffbf5;' : ''}">
-                      <td class="font-mono" style="font-size: 11.5px;">${t.date || '—'}</td>
-                      <td class="font-mono font-bold" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(t.voucher_no || '—')}</td>
-                      <td>
-                        <b style="font-size: 12px; color: var(--text-main);">${escapeHtml(t.ledger || 'General')}</b>
-                      </td>
-                      <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(t.party_name || '—')}</td>
-                      <td style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.description || '')}">
-                        <span style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(t.description || '—')}</span>
-                      </td>
-                      <td class="text-right font-mono font-bold" style="font-size: 12px; color: ${t.debit > 0 ? 'var(--primary)' : '#94a3b8'};">
-                        ${t.debit > 0 ? formatINR(t.debit) : '—'}
-                      </td>
-                      <td class="text-right font-mono font-bold" style="font-size: 12px; color: ${t.credit > 0 ? '#059669' : '#94a3b8'};">
-                        ${t.credit > 0 ? formatINR(t.credit) : '—'}
-                      </td>
-                      <td class="text-right font-mono font-bold" style="font-size: 12px; color: var(--text-main);">
-                        ${formatINR(t.running_balance || 0)}
-                      </td>
-                      <td>
-                        ${hasAnom ? `
-                          <div style="display: flex; flex-direction: column; gap: 2px;">
-                            ${getSeverityBadge(highestSev)}
-                            <span style="font-size: 10px; color: #b45309; font-weight: 600;">
-                              ${txAnomalies.length} Flag${txAnomalies.length > 1 ? 's' : ''} (Requires review)
-                            </span>
-                          </div>
-                        ` : `
-                          <span class="badge badge-resolved" style="font-size: 10.5px;">Clear</span>
-                        `}
-                      </td>
-                      <td class="text-center">
-                        <button class="btn btn-sm ${hasAnom ? 'btn-primary' : 'btn-secondary'}" onclick="openGLTransactionDrawer(${t.id})">
-                          Examine
-                        </button>
-                      </td>
-                    </tr>
-                  `;
-      }).join('')}
-              </tbody>
-            </table>
-          </div>
-        `}
+      <!-- Tab Content Area -->
+      <div id="gl-tab-content">
+        <!-- Rendered dynamically by renderGLTabContent() -->
       </div>
     `;
+
+    renderGLTabContent();
   } catch (err) {
     container.innerHTML = renderErrorBanner(err, "Unable to Load General Ledger");
   }
+}
+
+function setGLTab(tabName) {
+  glActiveTab = tabName;
+  const container = document.getElementById("gl-tab-content");
+  if (!container) {
+    renderGeneralLedger();
+    return;
+  }
+  // Update tab button styles
+  const buttons = document.querySelectorAll("#content-container > div:nth-child(5) button");
+  renderGeneralLedger();
+}
+
+function renderGLTabContent() {
+  const container = document.getElementById("gl-tab-content");
+  if (!container || !currentGLData) return;
+
+  if (glActiveTab === "register") {
+    renderGLRegisterTab(container);
+  } else if (glActiveTab === "anomalies") {
+    renderGLAnomaliesTab(container);
+  } else if (glActiveTab === "accounts") {
+    renderGLAccountsTab(container);
+  }
+}
+
+// ----------------- TAB 1: TRANSACTION REGISTER -----------------
+function renderGLRegisterTab(container) {
+  let list = currentGLData.transactions || [];
+
+  // Client quick search filter
+  if (glQuickSearch.trim()) {
+    const q = glQuickSearch.trim().toLowerCase();
+    list = list.filter(t => 
+      (t.description || "").toLowerCase().includes(q) ||
+      (t.voucher_no || "").toLowerCase().includes(q) ||
+      (t.party_name || "").toLowerCase().includes(q) ||
+      (t.ledger || "").toLowerCase().includes(q) ||
+      String(t.amount || "").includes(q) ||
+      String(t.debit || "").includes(q) ||
+      String(t.credit || "").includes(q)
+    );
+  }
+
+  // Sorting
+  list = [...list].sort((a, b) => {
+    let valA = a[glSortColumn];
+    let valB = b[glSortColumn];
+    if (glSortColumn === "amount" || glSortColumn === "debit" || glSortColumn === "credit" || glSortColumn === "running_balance") {
+      valA = parseFloat(valA || 0);
+      valB = parseFloat(valB || 0);
+    } else {
+      valA = (valA || "").toString().toLowerCase();
+      valB = (valB || "").toString().toLowerCase();
+    }
+    if (valA < valB) return glSortDirection === "asc" ? -1 : 1;
+    if (valA > valB) return glSortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const totalItems = list.length;
+  const totalPages = glPageSize === "ALL" ? 1 : Math.max(1, Math.ceil(totalItems / glPageSize));
+  if (glPage > totalPages) glPage = totalPages;
+
+  const startIdx = glPageSize === "ALL" ? 0 : (glPage - 1) * glPageSize;
+  const endIdx = glPageSize === "ALL" ? totalItems : Math.min(startIdx + glPageSize, totalItems);
+  const pageItems = list.slice(startIdx, endIdx);
+
+  container.innerHTML = `
+    <div class="card">
+      <!-- Toolbar -->
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: var(--bg-card); padding: 12px 16px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary);">
+            <span>Show</span>
+            <select class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;" onchange="setGLPageSize(this.value)">
+              <option value="25" ${glPageSize === 25 ? 'selected' : ''}>25</option>
+              <option value="50" ${glPageSize === 50 ? 'selected' : ''}>50</option>
+              <option value="100" ${glPageSize === 100 ? 'selected' : ''}>100</option>
+              <option value="250" ${glPageSize === 250 ? 'selected' : ''}>250</option>
+              <option value="ALL" ${glPageSize === 'ALL' ? 'selected' : ''}>All</option>
+            </select>
+            <span>entries</span>
+          </div>
+
+          <div style="position: relative; width: 260px;">
+            <input type="text" 
+                   class="form-control" 
+                   style="font-size: 12px; padding: 6px 10px 6px 28px;" 
+                   placeholder="Quick filter on loaded items..." 
+                   value="${escapeHtml(glQuickSearch)}" 
+                   oninput="setGLQuickSearch(this.value)">
+            <span style="position: absolute; left: 8px; top: 7px; color: var(--text-muted); font-size: 12px;">🔍</span>
+            ${glQuickSearch ? `
+              <button type="button" style="position: absolute; right: 8px; top: 6px; background: none; border: none; cursor: pointer; color: var(--text-muted);" onclick="setGLQuickSearch('')">✕</button>
+            ` : ''}
+          </div>
+        </div>
+
+        <div style="font-size: 12.5px; color: var(--text-secondary);">
+          Showing <b>${totalItems === 0 ? 0 : startIdx + 1}</b> to <b>${endIdx}</b> of <b>${totalItems.toLocaleString('en-IN')}</b> entries
+          ${currentGLData.total_transactions && totalItems !== currentGLData.total_transactions ? ` (filtered from ${currentGLData.total_transactions.toLocaleString('en-IN')} total)` : ''}
+        </div>
+      </div>
+
+      <!-- Main Data Table -->
+      ${totalItems === 0 ? `
+        <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
+          <div style="font-size: 36px; margin-bottom: 10px;">📋</div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No transactions found</div>
+          <p style="font-size: 13px; max-width: 440px; margin: 0 auto 16px auto;">
+            ${glFilterState.anomaly_rule !== 'ALL' || glQuickSearch ? 'No vouchers match the selected anomaly rule or search criteria.' : 'Import your client\'s General Ledger or Day Book CSV/Excel file to begin 13-point anomaly detection.'}
+          </p>
+          ${glFilterState.anomaly_rule !== 'ALL' || glQuickSearch ? `
+            <button class="btn btn-secondary" onclick="resetGLFilters()">Reset Filters</button>
+          ` : `
+            <button class="btn btn-primary" onclick="navigateTo('import')">+ Import Financial Data</button>
+          `}
+        </div>
+      ` : `
+        <div class="table-container" style="overflow-x: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 95px; cursor: pointer;" onclick="setGLSort('date')">
+                  Date ${getSortIndicator('date')}
+                </th>
+                <th style="width: 105px; cursor: pointer;" onclick="setGLSort('voucher_no')">
+                  Voucher ${getSortIndicator('voucher_no')}
+                </th>
+                <th style="width: 170px; cursor: pointer;" onclick="setGLSort('ledger')">
+                  Ledger Account ${getSortIndicator('ledger')}
+                </th>
+                <th style="width: 170px; cursor: pointer;" onclick="setGLSort('party_name')">
+                  Party Name ${getSortIndicator('party_name')}
+                </th>
+                <th>Narration / Description</th>
+                <th class="text-right" style="width: 115px; cursor: pointer;" onclick="setGLSort('debit')">
+                  Debit (₹) ${getSortIndicator('debit')}
+                </th>
+                <th class="text-right" style="width: 115px; cursor: pointer;" onclick="setGLSort('credit')">
+                  Credit (₹) ${getSortIndicator('credit')}
+                </th>
+                <th class="text-right" style="width: 120px; cursor: pointer;" onclick="setGLSort('running_balance')">
+                  Running Bal (₹) ${getSortIndicator('running_balance')}
+                </th>
+                <th style="width: 150px;">Audit Status</th>
+                <th class="text-center" style="width: 80px;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pageItems.map(t => {
+                const txAnomalies = t.anomalies || [];
+                const hasAnom = txAnomalies.length > 0;
+                const highestSev = hasAnom ? txAnomalies[0].severity : null;
+                return `
+                  <tr style="${hasAnom ? 'background-color: #fffbf5;' : ''}">
+                    <td class="font-mono" style="font-size: 11.5px; white-space: nowrap;">${t.date || '—'}</td>
+                    <td class="font-mono font-bold" style="font-size: 11.5px; color: var(--text-main); white-space: nowrap;">
+                      ${escapeHtml(t.voucher_no || '—')}
+                    </td>
+                    <td>
+                      <b style="font-size: 12px; color: var(--text-main);">${escapeHtml(t.ledger || 'General')}</b>
+                    </td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(t.party_name || '—')}</td>
+                    <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.description || '')}">
+                      <span style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(t.description || '—')}</span>
+                    </td>
+                    <td class="text-right font-mono font-bold" style="font-size: 12px; color: ${t.debit > 0 ? '#2563eb' : '#94a3b8'}; white-space: nowrap;">
+                      ${t.debit > 0 ? formatINR(t.debit) : '—'}
+                    </td>
+                    <td class="text-right font-mono font-bold" style="font-size: 12px; color: ${t.credit > 0 ? '#059669' : '#94a3b8'}; white-space: nowrap;">
+                      ${t.credit > 0 ? formatINR(t.credit) : '—'}
+                    </td>
+                    <td class="text-right font-mono font-bold" style="font-size: 12px; color: var(--text-main); white-space: nowrap;">
+                      ${formatINR(t.running_balance || 0)}
+                    </td>
+                    <td>
+                      ${hasAnom ? `
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                          ${getSeverityBadge(highestSev)}
+                          <span style="font-size: 10px; color: #b45309; font-weight: 600;">
+                            ${txAnomalies.length} Flag${txAnomalies.length > 1 ? 's' : ''} (Requires review)
+                          </span>
+                        </div>
+                      ` : `
+                        <span class="badge badge-resolved" style="font-size: 10.5px;">Clear</span>
+                      `}
+                    </td>
+                    <td class="text-center">
+                      <button class="btn btn-sm ${hasAnom ? 'btn-primary' : 'btn-secondary'}" 
+                              style="font-size: 11px; padding: 3px 8px;" 
+                              onclick="openGLTransactionDrawer(${t.id})">
+                        Examine
+                      </button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination Footer -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-app); border-top: 1px solid var(--border); flex-wrap: wrap; gap: 10px;">
+          <div style="font-size: 12px; color: var(--text-muted);">
+            Page <b>${glPage}</b> of <b>${totalPages}</b> (${totalItems.toLocaleString('en-IN')} total entries)
+          </div>
+
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <button class="btn btn-sm btn-secondary" ${glPage <= 1 ? 'disabled' : ''} onclick="setGLPage(1)" title="First page">
+              « First
+            </button>
+            <button class="btn btn-sm btn-secondary" ${glPage <= 1 ? 'disabled' : ''} onclick="setGLPage(${glPage - 1})" title="Previous page">
+              ‹ Prev
+            </button>
+            
+            <span style="font-size: 12px; font-weight: 600; padding: 0 8px; color: var(--text-main);">
+              Page ${glPage}
+            </span>
+
+            <button class="btn btn-sm btn-secondary" ${glPage >= totalPages ? 'disabled' : ''} onclick="setGLPage(${glPage + 1})" title="Next page">
+              Next ›
+            </button>
+            <button class="btn btn-sm btn-secondary" ${glPage >= totalPages ? 'disabled' : ''} onclick="setGLPage(${totalPages})" title="Last page">
+              Last »
+            </button>
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function getSortIndicator(col) {
+  if (glSortColumn !== col) return '<span style="color: #cbd5e1; font-size: 10px;">↕</span>';
+  return glSortDirection === "asc" ? '<span style="color: var(--primary); font-size: 10px;">▲</span>' : '<span style="color: var(--primary); font-size: 10px;">▼</span>';
+}
+
+function setGLSort(col) {
+  if (glSortColumn === col) {
+    glSortDirection = glSortDirection === "asc" ? "desc" : "asc";
+  } else {
+    glSortColumn = col;
+    glSortDirection = "asc";
+  }
+  renderGLTabContent();
+}
+
+function setGLPage(p) {
+  glPage = p;
+  renderGLTabContent();
+}
+
+function setGLPageSize(sz) {
+  glPageSize = sz === "ALL" ? "ALL" : parseInt(sz);
+  glPage = 1;
+  renderGLTabContent();
+}
+
+function setGLQuickSearch(q) {
+  glQuickSearch = q;
+  glPage = 1;
+  renderGLTabContent();
+}
+
+// ----------------- TAB 2: AUDIT ANOMALIES & EXCEPTIONS -----------------
+function renderGLAnomaliesTab(container) {
+  let anomalies = currentGLData.anomalies || [];
+
+  if (glAnomalySeverityFilter !== "ALL") {
+    anomalies = anomalies.filter(a => a.severity === glAnomalySeverityFilter);
+  }
+
+  const pageSize = 25;
+  const totalPages = Math.max(1, Math.ceil(anomalies.length / pageSize));
+  if (glAnomalyPage > totalPages) glAnomalyPage = totalPages;
+
+  const startIdx = (glAnomalyPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, anomalies.length);
+  const pageAnomalies = anomalies.slice(startIdx, endIdx);
+
+  container.innerHTML = `
+    <!-- Top Filter Bar for Anomalies -->
+    <div class="card" style="margin-bottom: 16px; padding: 12px 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div style="font-size: 13px; font-weight: 700; color: #991b1b;">
+            Deterministic Audit Exceptions & Exceptions Register (${anomalies.length.toLocaleString('en-IN')})
+          </div>
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+            Identified pursuant to ICAI SA 240 (Auditor's Responsibilities Relating to Fraud) & SA 520 (Analytical Procedures).
+          </div>
+        </div>
+
+        <!-- Severity Filter Chips -->
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Severity:</span>
+          <button class="btn btn-sm ${glAnomalySeverityFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}" 
+                  style="font-size: 11px; padding: 2px 8px;" 
+                  onclick="setGLAnomalySeverity('ALL')">
+            All (${(currentGLData.anomalies || []).length})
+          </button>
+          <button class="btn btn-sm ${glAnomalySeverityFilter === 'CRITICAL' ? 'btn-primary' : 'btn-secondary'}" 
+                  style="font-size: 11px; padding: 2px 8px; color: #991b1b;" 
+                  onclick="setGLAnomalySeverity('CRITICAL')">
+            Critical (${(currentGLData.anomalies || []).filter(a => a.severity === 'CRITICAL').length})
+          </button>
+          <button class="btn btn-sm ${glAnomalySeverityFilter === 'HIGH' ? 'btn-primary' : 'btn-secondary'}" 
+                  style="font-size: 11px; padding: 2px 8px; color: #ea580c;" 
+                  onclick="setGLAnomalySeverity('HIGH')">
+            High (${(currentGLData.anomalies || []).filter(a => a.severity === 'HIGH').length})
+          </button>
+          <button class="btn btn-sm ${glAnomalySeverityFilter === 'MEDIUM' ? 'btn-primary' : 'btn-secondary'}" 
+                  style="font-size: 11px; padding: 2px 8px; color: #b45309;" 
+                  onclick="setGLAnomalySeverity('MEDIUM')">
+            Medium (${(currentGLData.anomalies || []).filter(a => a.severity === 'MEDIUM').length})
+          </button>
+        </div>
+      </div>
+    </div>
+
+    ${anomalies.length === 0 ? `
+      <div class="card" style="padding: 50px 20px; text-align: center; color: var(--text-muted);">
+        <div style="font-size: 32px; margin-bottom: 8px;">✅</div>
+        <div style="font-size: 15px; font-weight: 700; color: #065f46;">No Exceptions Found in Selected Filter</div>
+        <p style="font-size: 12.5px; margin-top: 4px;">All evaluated transactions conform to standard accounting and cutoff requirements.</p>
+      </div>
+    ` : `
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+        ${pageAnomalies.map(a => {
+          const t = a.transaction || {};
+          const amt = floatVal(t.amount || Math.max(t.debit || 0, t.credit || 0));
+          return `
+            <div class="card" style="padding: 14px 16px; border-left: 4px solid ${a.severity === 'CRITICAL' ? '#dc2626' : a.severity === 'HIGH' ? '#ea580c' : '#f59e0b'};">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 280px;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+                    ${getSeverityBadge(a.severity)}
+                    <span class="font-mono font-bold" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(a.rule)}</span>
+                    <span style="font-weight: 700; font-size: 13px; color: #0f172a;">${escapeHtml(a.rule_name)}</span>
+                    <span class="badge" style="background: var(--bg-app); color: var(--text-secondary); font-size: 10.5px; font-weight: 600;">
+                      Risk Score: ${a.risk_score}/100
+                    </span>
+                  </div>
+
+                  <div style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">
+                    <b style="color: var(--text-main);">Reason:</b> ${escapeHtml(a.reason)}
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px; font-size: 11.5px; background: var(--bg-app); padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border);">
+                    <div>
+                      <b style="color: var(--text-main);">Evidence:</b> <code style="font-size: 11px;">${escapeHtml(a.evidence)}</code>
+                    </div>
+                    <div>
+                      <b style="color: #0369a1;">Recommended Review:</b> <span style="color: #0369a1;">${escapeHtml(a.recommended_review)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="text-align: right; min-width: 140px;">
+                  <div class="font-mono font-bold" style="font-size: 15px; color: var(--text-main);">${formatINR(amt)}</div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">Date: <b>${t.date || '—'}</b></div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Voucher: <b class="font-mono">${escapeHtml(t.voucher_no || '—')}</b></div>
+                  <button class="btn btn-sm btn-primary" style="margin-top: 10px; width: 100%; font-size: 11px; padding: 4px 8px;" onclick="openGLTransactionDrawer(${t.id || a.transaction_id})">
+                    ${ICONS.search || '🔍'} Examine Voucher
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Pagination Footer -->
+      <div class="card" style="padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="font-size: 12px; color: var(--text-muted);">
+          Showing <b>${startIdx + 1}</b> to <b>${endIdx}</b> of <b>${anomalies.length.toLocaleString('en-IN')}</b> exceptions
+        </div>
+
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button class="btn btn-sm btn-secondary" ${glAnomalyPage <= 1 ? 'disabled' : ''} onclick="setGLAnomalyPage(${glAnomalyPage - 1})">
+            ‹ Prev
+          </button>
+          <span style="font-size: 12px; font-weight: 600; padding: 0 8px;">
+            Page ${glAnomalyPage} of ${totalPages}
+          </span>
+          <button class="btn btn-sm btn-secondary" ${glAnomalyPage >= totalPages ? 'disabled' : ''} onclick="setGLAnomalyPage(${glAnomalyPage + 1})">
+            Next ›
+          </button>
+        </div>
+      </div>
+    `}
+  `;
+}
+
+function setGLAnomalySeverity(sev) {
+  glAnomalySeverityFilter = sev;
+  glAnomalyPage = 1;
+  renderGLTabContent();
+}
+
+function setGLAnomalyPage(p) {
+  glAnomalyPage = p;
+  renderGLTabContent();
+}
+
+// ----------------- TAB 3: LEDGER HEAD SUMMARIES -----------------
+function renderGLAccountsTab(container) {
+  const transactions = currentGLData.transactions || [];
+  
+  // Aggregate ledger heads
+  const ledgerMap = {};
+  transactions.forEach(t => {
+    const led = t.ledger || "General Ledger";
+    if (!ledgerMap[led]) {
+      ledgerMap[led] = {
+        name: led,
+        count: 0,
+        debit: 0,
+        credit: 0,
+        flaggedCount: 0
+      };
+    }
+    ledgerMap[led].count += 1;
+    ledgerMap[led].debit += parseFloat(t.debit || 0);
+    ledgerMap[led].credit += parseFloat(t.credit || 0);
+    if (t.has_anomaly) ledgerMap[led].flaggedCount += 1;
+  });
+
+  const accounts = Object.values(ledgerMap).sort((a, b) => (b.debit + b.credit) - (a.debit + a.credit));
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-header" style="background: var(--bg-app); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">Ledger Head Summary Register</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Summary of active accounting heads with total movement and exception density</div>
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted);">
+          <b>${accounts.length}</b> distinct ledger accounts
+        </div>
+      </div>
+
+      <div class="table-container" style="overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ledger Account Head</th>
+              <th class="text-right" style="width: 120px;">Vouchers</th>
+              <th class="text-right" style="width: 150px;">Total Debit (₹)</th>
+              <th class="text-right" style="width: 150px;">Total Credit (₹)</th>
+              <th class="text-right" style="width: 160px;">Net Balance (₹)</th>
+              <th style="width: 140px;">Audit Status</th>
+              <th class="text-center" style="width: 120px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${accounts.map(a => {
+              const net = a.debit - a.credit;
+              const netStr = `${formatINR(Math.abs(net))} ${net >= 0 ? 'Dr' : 'Cr'}`;
+              return `
+                <tr>
+                  <td><b style="font-size: 12.5px; color: var(--text-main);">${escapeHtml(a.name)}</b></td>
+                  <td class="text-right font-mono" style="font-size: 12px;">${a.count.toLocaleString('en-IN')}</td>
+                  <td class="text-right font-mono font-bold" style="font-size: 12px; color: #2563eb;">${formatINR(a.debit)}</td>
+                  <td class="text-right font-mono font-bold" style="font-size: 12px; color: #059669;">${formatINR(a.credit)}</td>
+                  <td class="text-right font-mono font-bold" style="font-size: 12px; color: var(--text-main);">${netStr}</td>
+                  <td>
+                    ${a.flaggedCount > 0 ? `
+                      <span class="badge badge-warning" style="font-size: 10.5px;">${a.flaggedCount} Flagged</span>
+                    ` : `
+                      <span class="badge badge-resolved" style="font-size: 10.5px;">All Clean</span>
+                    `}
+                  </td>
+                  <td class="text-center">
+                    <button class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 3px 8px;" onclick="filterByLedger('${escapeHtml(a.name)}')">
+                      View Ledger →
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function filterByLedger(ledgerName) {
+  glFilterState.ledger = ledgerName;
+  glActiveTab = "register";
+  renderGeneralLedger();
 }
 
 function floatVal(v) {
@@ -6332,11 +6762,13 @@ function resetGLFilters() {
     max_credit: null,
     anomaly_rule: "ALL"
   };
+  glQuickSearch = "";
   renderGeneralLedger();
 }
 
 function setGLAnomalyFilter(ruleCode) {
   glFilterState.anomaly_rule = ruleCode;
+  glActiveTab = "register";
   renderGeneralLedger();
 }
 
@@ -6378,15 +6810,15 @@ async function openGLTransactionDrawer(txId) {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
           <div><b style="color: var(--text-secondary);">Ledger Head:</b> <span style="color: var(--text-main); font-weight: 600;">${escapeHtml(tx.ledger || '—')}</span></div>
           <div><b style="color: var(--text-secondary);">Party Name:</b> <span style="color: var(--text-main); font-weight: 600;">${escapeHtml(tx.party_name || '—')}</span></div>
-          <div><b style="color: var(--text-secondary);">Debit:</b> <span class="font-mono" style="color: var(--primary); font-weight: 700;">${tx.debit > 0 ? formatINR(tx.debit) : '—'}</span></div>
+          <div><b style="color: var(--text-secondary);">Debit:</b> <span class="font-mono" style="color: #2563eb; font-weight: 700;">${tx.debit > 0 ? formatINR(tx.debit) : '—'}</span></div>
           <div><b style="color: var(--text-secondary);">Credit:</b> <span class="font-mono" style="color: #059669; font-weight: 700;">${tx.credit > 0 ? formatINR(tx.credit) : '—'}</span></div>
           <div><b style="color: var(--text-secondary);">Invoice / Ref No:</b> <span class="font-mono">${escapeHtml(tx.invoice_no || tx.reference_no || '—')}</span></div>
           <div><b style="color: var(--text-secondary);">Running Bal:</b> <span class="font-mono font-bold">${formatINR(tx.running_balance || 0)}</span></div>
         </div>
 
-        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 12px;">
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px;">
           <b style="color: var(--text-secondary);">Narration:</b>
-          <div style="color: #1e293b; margin-top: 2px; background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border);">
+          <div style="color: var(--text-main); margin-top: 2px; background: var(--bg-card); padding: 8px 10px; border-radius: 4px; border: 1px solid var(--border); line-height: 1.4;">
             ${escapeHtml(tx.description || 'No narration recorded')}
           </div>
         </div>
@@ -6408,7 +6840,7 @@ async function openGLTransactionDrawer(txId) {
               <div style="background: #fff1f2; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                   <div style="font-weight: 700; font-size: 13px; color: #991b1b;">
-                    ${escapeHtml(a.rule_name)} (${escapeHtml(a.rule)})
+                    ${escapeHtml(a.rule_name || a.rule)} (${escapeHtml(a.rule)})
                   </div>
                   ${getSeverityBadge(a.severity)}
                 </div>
@@ -6437,11 +6869,11 @@ async function openGLTransactionDrawer(txId) {
 
       <!-- Working Paper Notes -->
       <div class="card" style="padding: 12px;">
-        <label class="form-label" style="font-size: 12px;">Auditor Working Paper Note / Verification Remark</label>
-        <textarea id="gl-wp-note" class="form-control" rows="3" placeholder="e.g. Inspected physical invoice #442 and delivery challan. Management confirmed non-routine weekend journal entry for emergency maintenance..."></textarea>
+        <label class="form-label" style="font-size: 12px; font-weight: 600;">Auditor Working Paper Note / Verification Remark</label>
+        <textarea id="gl-wp-note" class="form-control" rows="3" placeholder="e.g. Inspected physical invoice and delivery challan. Management confirmed non-routine journal entry for emergency repair..."></textarea>
         <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
           <button class="btn btn-sm btn-primary" onclick="saveGLWorkingPaperNote(${tx.id})">
-            ${ICONS.fileText} Save to Working Papers
+            ${ICONS.fileText || '📝'} Save to Working Papers
           </button>
         </div>
       </div>
@@ -6454,7 +6886,8 @@ async function openGLTransactionDrawer(txId) {
 async function saveGLWorkingPaperNote(txId) {
   const note = document.getElementById("gl-wp-note")?.value.trim();
   if (!note) {
-    notifyWarning("Please enter a working paper note before saving.");
+    if (typeof FinNotify !== "undefined") FinNotify.warning("Please enter a working paper note before saving.");
+    else alert("Please enter a working paper note before saving.");
     return;
   }
 
@@ -6465,9 +6898,9 @@ async function saveGLWorkingPaperNote(txId) {
       section_reference: "General Ledger Substantive Testing",
       sa_reference: "SA 500 / SA 520"
     });
-    notifySuccess("Working paper note saved successfully!");
+    if (typeof FinNotify !== "undefined") FinNotify.success("Working paper note saved successfully!");
   } catch (e) {
-    notifySuccess("Note saved to working paper repository.");
+    if (typeof FinNotify !== "undefined") FinNotify.success("Note saved to working paper repository.");
   }
 }
 

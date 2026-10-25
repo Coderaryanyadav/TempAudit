@@ -2741,6 +2741,9 @@ body {
   padding: 4px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+  max-width: 440px;
+  min-width: 180px;
+  flex-shrink: 1;
 }
 
 .engagement-label {
@@ -2749,6 +2752,7 @@ body {
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .engagement-select {
@@ -2760,6 +2764,10 @@ body {
   outline: none;
   cursor: pointer;
   appearance: none;
+  max-width: 320px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .global-search-trigger {
@@ -2773,8 +2781,18 @@ body {
   color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
-  margin-left: 20px;
+  margin-left: 8px;
   transition: all 0.1s ease;
+  max-width: 200px;
+  flex-shrink: 1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.global-search-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .global-search-trigger:hover {
@@ -3053,12 +3071,14 @@ body {
 }
 
 .kpi-value {
-  font-size: 18px !important;
+  font-size: 16px !important;
   font-weight: 800 !important;
   color: var(--text-main, #0f172a) !important;
   line-height: 1.3 !important;
   margin-bottom: 4px !important;
-  word-break: break-word !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .kpi-subtext {
@@ -3066,5 +3086,8 @@ body {
   color: var(--text-muted, #94a3b8) !important;
   line-height: 1.3 !important;
   margin-top: auto !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 

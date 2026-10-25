@@ -423,22 +423,18 @@ def analyze_general_ledger(
                         "recommended_review": "Review original journal entry to locate omitted debit leg or import mapping truncation."
                     })
 
-    # Filter anomalies by specific rule if requested
-    if anomaly_rule and anomaly_rule != "ALL":
-        anomalies = [a for a in anomalies if a["rule"] == anomaly_rule]
-
-    # Deduplicate anomalies per transaction and rule
+    # Deduplicate anomalies per transaction and rule across all rules
     seen_anom_keys = set()
-    unique_anomalies = []
+    all_unique_anomalies = []
     for a in anomalies:
         k = f"{a['transaction_id']}_{a['rule']}"
         if k not in seen_anom_keys:
             seen_anom_keys.add(k)
-            unique_anomalies.append(a)
+            all_unique_anomalies.append(a)
 
-    # Attach anomaly flags directly to transaction items (avoiding circular references)
+    # Attach all anomaly flags directly to transaction items
     anom_by_tx = {}
-    for a in unique_anomalies:
+    for a in all_unique_anomalies:
         anom_copy = {k: v for k, v in a.items() if k != "transaction"}
         anom_by_tx.setdefault(a["transaction_id"], []).append(anom_copy)
 
@@ -447,20 +443,19 @@ def analyze_general_ledger(
         t["has_anomaly"] = len(t["anomalies"]) > 0
 
     # Ensure transaction field in anomalies does not hold circular reference to anomalies list
-    for a in unique_anomalies:
+    for a in all_unique_anomalies:
         if isinstance(a.get("transaction"), dict):
             a["transaction"] = {k: v for k, v in a["transaction"].items() if k != "anomalies"}
 
+    # Overall risk metrics summary across full dataset
+    crit_count = sum(1 for a in all_unique_anomalies if a["severity"] == "CRITICAL")
+    high_count = sum(1 for a in all_unique_anomalies if a["severity"] == "HIGH")
+    med_count = sum(1 for a in all_unique_anomalies if a["severity"] == "MEDIUM")
+    low_count = sum(1 for a in all_unique_anomalies if a["severity"] == "LOW")
 
-    # Risk metrics summary
-    crit_count = sum(1 for a in unique_anomalies if a["severity"] == "CRITICAL")
-    high_count = sum(1 for a in unique_anomalies if a["severity"] == "HIGH")
-    med_count = sum(1 for a in unique_anomalies if a["severity"] == "MEDIUM")
-    low_count = sum(1 for a in unique_anomalies if a["severity"] == "LOW")
-
-    # Group anomalies by rule for summary breakdown
+    # Group anomalies by rule for summary breakdown (always across all detected anomalies)
     rule_breakdown = {}
-    for a in unique_anomalies:
+    for a in all_unique_anomalies:
         r = a["rule"]
         r_name = a["rule_name"]
         if r not in rule_breakdown:
@@ -472,15 +467,32 @@ def analyze_general_ledger(
             }
         rule_breakdown[r]["count"] += 1
 
+    # Filter transactions and anomalies by requested anomaly_rule if specified
+    filtered_transactions = transactions
+    filtered_anomalies = all_unique_anomalies
+
+    if anomaly_rule and anomaly_rule != "ALL":
+        if anomaly_rule == "FLAGGED":
+            filtered_transactions = [t for t in transactions if t.get("has_anomaly")]
+            filtered_anomalies = all_unique_anomalies
+        elif anomaly_rule == "CLEAN":
+            filtered_transactions = [t for t in transactions if not t.get("has_anomaly")]
+            filtered_anomalies = []
+        else:
+            filtered_anomalies = [a for a in all_unique_anomalies if a["rule"] == anomaly_rule]
+            matching_tx_ids = {a["transaction_id"] for a in filtered_anomalies}
+            filtered_transactions = [t for t in transactions if t["id"] in matching_tx_ids]
+
     conn.close()
 
     return {
         "engagement_id": engagement_id,
         "total_transactions": total_volume,
+        "filtered_transactions_count": len(filtered_transactions),
         "total_debit": total_debit,
         "total_credit": total_credit,
         "flagged_transactions_count": len(anom_by_tx),
-        "total_anomalies_count": len(unique_anomalies),
+        "total_anomalies_count": len(all_unique_anomalies),
         "large_transaction_threshold": large_threshold,
         "summary": {
             "critical_count": crit_count,
@@ -489,7 +501,7 @@ def analyze_general_ledger(
             "low_count": low_count,
             "rule_breakdown": list(rule_breakdown.values())
         },
-        "anomalies": unique_anomalies,
-        "transactions": transactions
+        "anomalies": filtered_anomalies,
+        "transactions": filtered_transactions
     }
 
