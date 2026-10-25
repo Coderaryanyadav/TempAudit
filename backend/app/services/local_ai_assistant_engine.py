@@ -23,71 +23,22 @@ from backend.app.services.trial_balance_analyzer import analyze_trial_balance
 
 MANDATORY_DISCLAIMER = "AI-generated assistance. Verify findings against source records before making audit decisions."
 
-def detect_intent(query: str) -> str:
-    """
-    Identifies the semantic audit intent from the user query using robust pattern matching.
-    """
-    q = (query or "").strip().lower()
-    
-    # 1. Why was transaction flagged / explain transaction
-    if re.search(r'\b(why|explain|reason)\b.*\b(flagged|flag|voucher|transaction|invoice|entry|item)\b', q) or \
-       re.search(r'\b(voucher|v-\d+|inv-\d+|tx-\d+)\b', q) or \
-       "why is" in q or "why was" in q:
-        return "EXPLAIN_FLAGGED_TRANSACTION"
-    
-    # 2. Unusual transactions / Anomalies / Outliers
-    if re.search(r'\b(unusual|anomal|anomalies|outlier|outliers|suspicious|flagged|irregular|abnormal)\b', q) or \
-       "high risk voucher" in q or "unusual transaction" in q or "anomaly detection" in q:
-        return "UNUSUAL_TRANSACTIONS"
-    
-    # 3. Summarize financial movement / Financial health
-    if re.search(r'\b(financial movement|financial health|performance|p&l|balance sheet|profitability|financial summary)\b', q) or \
-       "summarize this client" in q or "client's financial" in q:
-        return "FINANCIAL_MOVEMENT"
-    
-    # 4. Year-on-Year changes / Variances
-    if re.search(r'\b(year-on-year|year on year|yoy|annual change|varianc|growth|largest change|biggest change)\b', q) or \
-       "which ledgers have the largest" in q or "compare years" in q or "largest movements" in q or "yoy movement" in q:
-        return "YOY_CHANGES"
-    
-    # 5. Bank reconciliation / Unmatched bank transactions
-    if re.search(r'\b(bank|brs|unmatched bank|unpresented|cheque|deposit in transit|bank charge)\b', q) or \
-       "bank reconciliation" in q or "missing in bank" in q or "missing in books" in q:
-        return "UNMATCHED_BANK"
-    
-    # 6. Summarize audit exceptions / Major findings
-    if re.search(r'\b(summarize|summary|overview|breakdown)\b.*\b(exception|exceptions|finding|findings|risk|critical)\b', q) or \
-       "major audit exceptions" in q or "key findings" in q or "audit overview" in q:
-        return "SUMMARIZE_EXCEPTIONS"
-    
-    # 7. Accounts requiring review / High risk ledgers
-    if re.search(r'\b(which accounts|accounts require|ledgers require|accounts need|ledgers need|high risk account|suspense|abnormal balance)\b', q) or \
-       "require review" in q or "needs review" in q or "which accounts" in q:
-        return "ACCOUNTS_REQUIRE_REVIEW"
-    
-    # 8. Explain reconciliation difference / GST / Sales-Purchase
-    if re.search(r'\b(reconciliation difference|gst mismatch|sales purchase difference|2b mismatch|gstr|reconciliation exception)\b', q) or \
-       "explain this reconciliation" in q or "tax difference" in q:
-        return "EXPLAIN_RECONCILIATION"
-    
-    # 9. Create audit observation / Working paper note
-    if re.search(r'\b(create|draft|write|generate)\b.*\b(observation|working paper|note|memo|memorandum|finding)\b', q) or \
-       "audit observation" in q or "working paper note" in q:
-        return "CREATE_AUDIT_OBSERVATION"
-    
-    # 10. Cash limit / Section 40A(3) / 269ST
-    if "40a" in q or "269st" in q or "cash" in q:
-        return "CASH_STATUTORY_LIMITS"
-    
-    # 11. Top / Largest transactions
-    if re.search(r'\b(largest|highest|top|biggest)\b.*\b(transaction|voucher|payment|receipt|entry)\b', q):
-        return "LARGEST_TRANSACTIONS"
-
-    # 12. Help / Capabilities / Greeting
-    if re.search(r'\b(hi|hello|hey|help|guide|assist|capabilities|what can you do|who are you)\b', q):
-        return "GENERAL_AUDIT_QUERY"
-    
-    return "GENERAL_AUDIT_QUERY"
+from backend.app.services.assistant_intent import (
+    detect_intent,
+    INTENT_EXPLAIN_FLAGGED_TRANSACTION,
+    INTENT_UNUSUAL_TRANSACTIONS,
+    INTENT_FINANCIAL_MOVEMENT,
+    INTENT_YOY_CHANGES,
+    INTENT_UNMATCHED_BANK,
+    INTENT_SUMMARIZE_EXCEPTIONS,
+    INTENT_ACCOUNTS_REQUIRE_REVIEW,
+    INTENT_EXPLAIN_RECONCILIATION,
+    INTENT_CREATE_AUDIT_OBSERVATION,
+    INTENT_CASH_STATUTORY_LIMITS,
+    INTENT_LARGEST_TRANSACTIONS,
+    INTENT_GENERAL_AUDIT_QUERY,
+    ALL_INTENTS
+)
 
 class LocalAIAssistantEngine:
     """
@@ -142,37 +93,44 @@ class LocalAIAssistantEngine:
         intent = detect_intent(query)
         res = None
 
-        if finding_id or intent == "CREATE_AUDIT_OBSERVATION":
+        if finding_id or intent == INTENT_CREATE_AUDIT_OBSERVATION:
             res = self._handle_audit_observation(query, finding_id)
-        elif intent == "EXPLAIN_FLAGGED_TRANSACTION":
+        elif intent == INTENT_EXPLAIN_FLAGGED_TRANSACTION:
             res = self._handle_explain_flagged_transaction(query, transaction_id, voucher_no)
-        elif intent == "UNUSUAL_TRANSACTIONS":
+        elif intent == INTENT_UNUSUAL_TRANSACTIONS:
             res = self._handle_unusual_transactions(query)
-        elif intent == "YOY_CHANGES":
+        elif intent == INTENT_YOY_CHANGES:
             res = self._handle_yoy_changes(query)
-        elif intent == "UNMATCHED_BANK":
+        elif intent == INTENT_UNMATCHED_BANK:
             res = self._handle_unmatched_bank(query)
-        elif intent == "SUMMARIZE_EXCEPTIONS":
+        elif intent == INTENT_SUMMARIZE_EXCEPTIONS:
             res = self._handle_summarize_exceptions(query)
-        elif intent == "ACCOUNTS_REQUIRE_REVIEW":
+        elif intent == INTENT_ACCOUNTS_REQUIRE_REVIEW:
             res = self._handle_accounts_require_review(query)
-        elif intent == "EXPLAIN_RECONCILIATION":
+        elif intent == INTENT_EXPLAIN_RECONCILIATION:
             res = self._handle_explain_reconciliation(query)
-        elif intent == "FINANCIAL_MOVEMENT":
+        elif intent == INTENT_FINANCIAL_MOVEMENT:
             res = self._handle_financial_movement(query)
-        elif intent == "CASH_STATUTORY_LIMITS":
+        elif intent == INTENT_CASH_STATUTORY_LIMITS:
             res = self._handle_cash_limits(query)
-        elif intent == "LARGEST_TRANSACTIONS":
+        elif intent == INTENT_LARGEST_TRANSACTIONS:
             res = self._handle_largest_transactions(query)
         else:
             res = self._handle_general_query(query)
 
-        # Provenance attribution & Local LLM synthesis for audit explanations
+        return self._synthesize_llm_response(query, res)
+
+    def _synthesize_llm_response(self, query: str, res: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Synthesizes grounded local LLM explanations incorporating deterministic metrics
+        and complete relevant evidence with strict anti-hallucination guards.
+        """
         from backend.app.services.local_ai_provider import LocalAIModelManager, sanitize_audit_text
         from backend.app.ai.context_builder import AIContextBoundary
+
         config = LocalAIModelManager.get_config()
         provider = LocalAIModelManager.get_active_provider()
-        
+
         provenance = "DETERMINISTIC_RULE"
         model_name = config.get("model_name", "builtin-deterministic")
 
@@ -191,21 +149,20 @@ class LocalAIAssistantEngine:
             try:
                 is_avail, _, _ = provider.check_health()
                 if is_avail:
-                    # Grounded prompt incorporating deterministic metrics & complete relevant evidence
                     calc_metrics = res.get("calculated_metrics", {})
                     evidence_list = res.get("evidence", [])
                     source_txs = res.get("source_transactions", [])
-                    
+
                     # Build scoped, redacted context through dedicated AIContextBoundary
                     boundary_data = {
                         "transactions": source_txs if source_txs else self.transactions[:25],
                     }
-                    if res.get("intent") == "CREATE_AUDIT_OBSERVATION" and evidence_list:
+                    if res.get("intent") == INTENT_CREATE_AUDIT_OBSERVATION and evidence_list:
                         boundary_data["finding"] = evidence_list[0]
-                    elif res.get("intent") == "EXPLAIN_RECONCILIATION" and calc_metrics:
+                    elif res.get("intent") == INTENT_EXPLAIN_RECONCILIATION and calc_metrics:
                         boundary_data["reconciliation_summary"] = calc_metrics
 
-                    scoped_context, boundary_meta = AIContextBoundary.build_engagement_context(
+                    scoped_context, _ = AIContextBoundary.build_engagement_context(
                         engagement_id=self.engagement_id,
                         client_name=self.client_info.get("name", "Client"),
                         financial_year=self.engagement.get("financial_year", "2024-25"),
@@ -218,7 +175,7 @@ class LocalAIAssistantEngine:
                     metrics_str = json.dumps(calc_metrics, default=str) if calc_metrics else "None"
                     evidence_str = json.dumps(evidence_list[:10], default=str) if evidence_list else "None"
 
-                    if res.get("intent") == "CREATE_AUDIT_OBSERVATION":
+                    if res.get("intent") == INTENT_CREATE_AUDIT_OBSERVATION:
                         instructions = (
                             "INSTRUCTIONS FOR LOCAL AI AUDITOR ASSISTANT:\n"
                             "1. Synthesize an expert Chartered Accountant advisory review of this specific statutory audit observation.\n"
@@ -255,7 +212,7 @@ class LocalAIAssistantEngine:
                         # reject model output that contradicts them with false compliance claims.
                         viol_count = calc_metrics.get("violations_count", 0) or calc_metrics.get("critical_count", 0) or len(res.get("evidence", []))
                         is_contradiction = (
-                            viol_count > 0 and 
+                            viol_count > 0 and
                             any(phrase in gen_text.lower() for phrase in ["no issues found", "everything is compliant", "all transactions are compliant", "zero findings"])
                         )
 
@@ -263,7 +220,6 @@ class LocalAIAssistantEngine:
                             logging.getLogger(__name__).warning("Model output contradicted authoritative deterministic findings; suppressing model response.")
                             provenance = "FALLBACK"
                         else:
-                            # Preserve authoritative deterministic analysis and provide model explanation
                             res["response"] = (
                                 f"{deterministic_response}\n\n"
                                 f"---\n"
@@ -276,7 +232,6 @@ class LocalAIAssistantEngine:
                             model_name = gen_res.get("model", model_name)
             except Exception as e:
                 logging.getLogger(__name__).warning("Local LLM synthesis fallback triggered: %s", e)
-                # Retain deterministic response as fallback
                 provenance = "DETERMINISTIC_RULE"
 
         res["provenance"] = provenance
