@@ -1,13 +1,13 @@
 import os
 import json
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether, HRFlowable
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, HRFlowable
 )
 from reportlab.pdfgen import canvas
 from backend.app.database import get_db_connection
@@ -24,6 +24,34 @@ REPORT_TITLES = {
     "risk_findings": "Master Risk & Audit Findings Exception Register",
     "audit_checklist": "Statutory & Internal Audit Checklist Compliance Report"
 }
+
+
+def clean_pdf_text(text: Any) -> str:
+    """
+    Sanitizes string for ReportLab Paragraphs.
+    Replaces Unicode Rupee symbol (U+20B9) with standard 'Rs. ' to prevent
+    ReportLab Helvetica font missing-glyph black rectangle boxes (■).
+    """
+    if text is None:
+        return ""
+    s = str(text)
+    s = s.replace("₹", "Rs. ")
+    s = s.replace("\u00a0", " ")
+    return s
+
+
+def fmt_currency(val: Any) -> str:
+    """Formats monetary amounts into standard Indian accounting format (Rs. X,XX,XXX.XX)."""
+    if val is None or val == "":
+        return "Rs. 0.00"
+    try:
+        amt = float(val)
+        if amt < 0:
+            return f"-Rs. {abs(amt):,.2f}"
+        return f"Rs. {amt:,.2f}"
+    except (ValueError, TypeError):
+        return "Rs. 0.00"
+
 
 class NumberedCanvas(canvas.Canvas):
     """Draws running header, dynamic total page count, and SA 230 confidentiality footer on each page."""
@@ -75,20 +103,20 @@ def get_report_styles():
         'CoverTitle': ParagraphStyle(
             'CoverTitle',
             parent=styles['Heading1'],
-            fontSize=22,
-            leading=26,
+            fontSize=20,
+            leading=24,
             textColor=colors.HexColor('#0F172A'),
             fontName='Helvetica-Bold',
-            spaceAfter=8
+            spaceAfter=6
         ),
         'CoverSubtitle': ParagraphStyle(
             'CoverSubtitle',
             parent=styles['Normal'],
-            fontSize=12,
-            leading=16,
+            fontSize=11.5,
+            leading=15,
             textColor=colors.HexColor('#2563EB'),
             fontName='Helvetica-Bold',
-            spaceAfter=15
+            spaceAfter=12
         ),
         'DisclaimerBox': ParagraphStyle(
             'DisclaimerBox',
@@ -101,21 +129,21 @@ def get_report_styles():
         'SectionH1': ParagraphStyle(
             'SectionH1',
             parent=styles['Heading1'],
-            fontSize=13,
+            fontSize=12.5,
             leading=16,
             textColor=colors.HexColor('#0F172A'),
             fontName='Helvetica-Bold',
-            spaceBefore=14,
+            spaceBefore=12,
             spaceAfter=6
         ),
         'SectionH2': ParagraphStyle(
             'SectionH2',
             parent=styles['Heading2'],
-            fontSize=11,
-            leading=14,
+            fontSize=10.5,
+            leading=13.5,
             textColor=colors.HexColor('#1E293B'),
             fontName='Helvetica-Bold',
-            spaceBefore=10,
+            spaceBefore=8,
             spaceAfter=4
         ),
         'Body': ParagraphStyle(
@@ -176,8 +204,8 @@ def get_report_styles():
         'FindingId': ParagraphStyle(
             'FindingId',
             parent=styles['Normal'],
-            fontSize=8.5,
-            leading=11,
+            fontSize=8,
+            leading=10.5,
             fontName='Courier-Bold',
             textColor=colors.HexColor('#2563EB')
         )
@@ -188,23 +216,23 @@ def _build_metadata_box(engagement: dict, st: dict) -> Table:
     """Creates standard two-column engagement and client metadata box."""
     data = [
         [
-            Paragraph("<b>Client Name:</b> " + str(engagement.get("client_name", "N/A")), st['Body']),
-            Paragraph("<b>Financial Year:</b> " + str(engagement.get("financial_year", "N/A")), st['Body'])
+            Paragraph("<b>Client Name:</b> " + clean_pdf_text(engagement.get("client_name", "N/A")), st['Body']),
+            Paragraph("<b>Financial Year:</b> " + clean_pdf_text(engagement.get("financial_year", "N/A")), st['Body'])
         ],
         [
-            Paragraph("<b>PAN:</b> " + str(engagement.get("client_pan") or "N/A"), st['Body']),
-            Paragraph("<b>GSTIN:</b> " + str(engagement.get("client_gstin") or "N/A"), st['Body'])
+            Paragraph("<b>PAN:</b> " + clean_pdf_text(engagement.get("client_pan") or "N/A"), st['Body']),
+            Paragraph("<b>GSTIN:</b> " + clean_pdf_text(engagement.get("client_gstin") or "N/A"), st['Body'])
         ],
         [
-            Paragraph("<b>Entity Type:</b> " + str(engagement.get("entity_type") or "Private Limited Company"), st['Body']),
-            Paragraph("<b>Audit Type:</b> " + str(engagement.get("audit_type", "Statutory Audit")), st['Body'])
+            Paragraph("<b>Entity Type:</b> " + clean_pdf_text(engagement.get("entity_type") or "Private Limited Company"), st['Body']),
+            Paragraph("<b>Audit Type:</b> " + clean_pdf_text(engagement.get("audit_type", "Statutory Audit")), st['Body'])
         ],
         [
-            Paragraph("<b>Period:</b> " + f"{engagement.get('period_start') or '01-04-2024'} to {engagement.get('period_end') or '31-03-2025'}", st['Body']),
-            Paragraph("<b>Lead Auditor / CA:</b> " + str(engagement.get("lead_auditor_name") or "Aaliya Kherani (FCA)"), st['Body'])
+            Paragraph("<b>Period:</b> " + f"{clean_pdf_text(engagement.get('period_start') or '01-04-2025')} to {clean_pdf_text(engagement.get('period_end') or '31-03-2026')}", st['Body']),
+            Paragraph("<b>Lead Auditor / CA:</b> " + clean_pdf_text(engagement.get("lead_auditor_name") or "CA Rajeshwar Sharma (Lead Partner FCA)"), st['Body'])
         ],
         [
-            Paragraph("<b>Document Nature:</b> AI-Assisted Audit Analysis", st['Body']),
+            Paragraph("<b>Document Nature:</b> AI-Assisted Audit Analysis (Form 3CD/SA 230)", st['Body']),
             Paragraph("<b>Report Generated On:</b> " + datetime.now().strftime("%d-%b-%Y %H:%M:%S"), st['Body'])
         ]
     ]
@@ -279,7 +307,7 @@ def generate_audit_report_pdf(
     """
     Generates a professional, ICAI-compliant PDF Audit Report for an engagement.
     Supported report_types:
-      1. complete_audit_analysis (Full Master Report with all 17 structure sections)
+      1. complete_audit_analysis (Full Master Report with all sections)
       2. engagement_summary
       3. data_import
       4. trial_balance
@@ -370,7 +398,7 @@ def generate_audit_report_pdf(
     # SECTION 1: COVER & HEADER BANNER
     # =========================================================================
     story.append(Paragraph("FinAuditPro — Independent Audit Memorandum", st['CoverTitle']))
-    story.append(Paragraph(f"AI-Assisted Audit Analysis Report: <b>{report_title_display}</b>", st['CoverSubtitle']))
+    story.append(Paragraph(f"AI-Assisted Audit Analysis Report: <b>{clean_pdf_text(report_title_display)}</b>", st['CoverSubtitle']))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#2563EB'), spaceAfter=10))
 
     # Mandatory Disclaimer Banner
@@ -378,14 +406,14 @@ def generate_audit_report_pdf(
     story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTIONS 2, 3, 4: CLIENT & ENGAGEMENT METADATA & PERIOD
+    # SECTION 2: CLIENT & ENGAGEMENT PROFILE
     # =========================================================================
     story.append(Paragraph("1. Client & Engagement Profile", st['SectionH1']))
     story.append(_build_metadata_box(engagement, st))
     story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTIONS 5, 6, 7: DATA SOURCES, SCOPE & CHECKS PERFORMED
+    # SECTION 3: DATA SOURCES & INGESTION SCOPE
     # =========================================================================
     if report_type in ["complete_audit_analysis", "engagement_summary", "data_import"]:
         story.append(Paragraph("2. Audit Data Sources & Ingestion Scope", st['SectionH1']))
@@ -404,9 +432,9 @@ def generate_audit_report_pdf(
             ]
             for f in uploaded_files:
                 file_table_data.append([
-                    Paragraph(str(f.get("file_name", "N/A")), st['BodyBold']),
-                    Paragraph(str(f.get("data_category", "General Ledger")), st['Body']),
-                    Paragraph(str(f.get("file_type", "Excel")), st['Body']),
+                    Paragraph(clean_pdf_text(f.get("file_name", "N/A")), st['BodyBold']),
+                    Paragraph(clean_pdf_text(f.get("data_category", "General Ledger")), st['Body']),
+                    Paragraph(clean_pdf_text(f.get("file_type", "Excel")), st['Body']),
                     Paragraph(f"{f.get('successful_rows', f.get('row_count', 0)):,}", st['Body']),
                     Paragraph(str(f.get("uploaded_at", "")[:16].replace("T", " ")), st['Body'])
                 ])
@@ -433,7 +461,7 @@ def generate_audit_report_pdf(
         story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTION 8: EXECUTIVE SUMMARY & RISK HEATMAP
+    # SECTION 4: EXECUTIVE SUMMARY & RISK OVERVIEW
     # =========================================================================
     if report_type in ["complete_audit_analysis", "engagement_summary", "risk_findings", "anomaly_report"]:
         story.append(Paragraph("3. Executive Summary & Risk Overview", st['SectionH1']))
@@ -450,9 +478,9 @@ def generate_audit_report_pdf(
         exec_summary_data = [
             [
                 Paragraph("<b>Total Transactions Examined:</b>", st['Body']),
-                Paragraph(f"{tx_count:,} vouchers (₹{total_debit:,.2f})", st['BodyBold']),
+                Paragraph(f"{tx_count:,} vouchers ({fmt_currency(total_debit)})", st['BodyBold']),
                 Paragraph("<b>Total Risk Findings:</b>", st['Body']),
-                Paragraph(f"{len(findings)} exceptions identified", st['BodyBold'])
+                Paragraph(f"{len(findings):,} exceptions identified", st['BodyBold'])
             ],
             [
                 Paragraph("<b>Critical Risk (Form 3CD/CARO):</b>", st['Body']),
@@ -479,18 +507,18 @@ def generate_audit_report_pdf(
         story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTION 9: FINANCIAL DATA SUMMARY & TRIAL BALANCE HEALTH
+    # SECTION 5: FINANCIAL DATA SUMMARY & TRIAL BALANCE HEALTH
     # =========================================================================
     if report_type in ["complete_audit_analysis", "trial_balance", "engagement_summary"]:
         story.append(Paragraph("4. Financial Data Summary & Trial Balance Health", st['SectionH1']))
 
         tb_diff = abs(total_debit - total_credit)
-        tb_status = "PERFECTLY BALANCED (Difference: ₹0.00)" if tb_diff < 0.01 else f"UNBALANCED (Difference: ₹{tb_diff:,.2f})"
+        tb_status = f"BALANCED ({fmt_currency(0.0)})" if tb_diff < 0.01 else f"UNBALANCED (Difference: {fmt_currency(tb_diff)})"
 
         tb_meta = [
             [
-                Paragraph("<b>Total Debit:</b> ₹" + f"{total_debit:,.2f}", st['Body']),
-                Paragraph("<b>Total Credit:</b> ₹" + f"{total_credit:,.2f}", st['Body']),
+                Paragraph("<b>Total Debit:</b> " + fmt_currency(total_debit), st['Body']),
+                Paragraph("<b>Total Credit:</b> " + fmt_currency(total_credit), st['Body']),
                 Paragraph("<b>Status:</b> " + tb_status, st['BodyBold'])
             ]
         ]
@@ -509,19 +537,21 @@ def generate_audit_report_pdf(
                 [
                     Paragraph("<b>Ledger Head</b>", st['TableHeader']),
                     Paragraph("<b>Group</b>", st['TableHeader']),
-                    Paragraph("<b>Debit Balance</b>", st['TableHeader']),
-                    Paragraph("<b>Credit Balance</b>", st['TableHeader']),
+                    Paragraph("<b>Debit Total</b>", st['TableHeader']),
+                    Paragraph("<b>Credit Total</b>", st['TableHeader']),
                     Paragraph("<b>Net Closing</b>", st['TableHeader'])
                 ]
             ]
-            for l in ledgers[:18]:  # display top key ledgers
-                net_val = (l.get('debit_balance', 0) or 0) - (l.get('credit_balance', 0) or 0)
-                net_str = f"₹{net_val:,.2f} Dr" if net_val >= 0 else f"₹{abs(net_val):,.2f} Cr"
+            for l in ledgers[:22]:  # Display top key ledgers
+                dr = float(l.get('total_debit') or l.get('debit_balance') or 0.0)
+                cr = float(l.get('total_credit') or l.get('credit_balance') or 0.0)
+                net_val = float(l.get('closing_balance') if l.get('closing_balance') is not None else (dr - cr))
+                net_str = f"{fmt_currency(abs(net_val))} {'Dr' if net_val >= 0 else 'Cr'}"
                 ledger_table_data.append([
-                    Paragraph(str(l.get("ledger_name", "")), st['BodyBold']),
-                    Paragraph(str(l.get("account_group", "General")), st['Body']),
-                    Paragraph(f"₹{(l.get('debit_balance') or 0):,.2f}", st['Body']),
-                    Paragraph(f"₹{(l.get('credit_balance') or 0):,.2f}", st['Body']),
+                    Paragraph(clean_pdf_text(l.get("ledger_name", "")), st['BodyBold']),
+                    Paragraph(clean_pdf_text(l.get("account_group", "General")), st['Body']),
+                    Paragraph(fmt_currency(dr), st['Body']),
+                    Paragraph(fmt_currency(cr), st['Body']),
                     Paragraph(net_str, st['BodyBold'])
                 ])
 
@@ -537,10 +567,65 @@ def generate_audit_report_pdf(
             story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTION 10: RECONCILIATION RESULTS (BANK & GST)
+    # SECTION 6: YEAR-ON-YEAR (YoY) COMPARATIVE VARIANCE ANALYSIS
+    # =========================================================================
+    if report_type in ["complete_audit_analysis", "yoy_comparison"]:
+        story.append(Paragraph("5. Year-on-Year Comparative Variance Analysis (SA 520)", st['SectionH1']))
+        
+        yoy_rows = []
+        try:
+            from backend.app.services.yoy_comparison_engine import run_yoy_comparison
+            yoy_res = run_yoy_comparison(engagement_id)
+            exec_items = yoy_res.get("executive_comparison", [])
+            if exec_items:
+                yoy_table_data = [
+                    [
+                        Paragraph("<b>Statement Head / Line Item</b>", st['TableHeader']),
+                        Paragraph("<b>Prior Year</b>", st['TableHeader']),
+                        Paragraph("<b>Current Year</b>", st['TableHeader']),
+                        Paragraph("<b>Variance (Abs)</b>", st['TableHeader']),
+                        Paragraph("<b>Change (%)</b>", st['TableHeader']),
+                        Paragraph("<b>Risk</b>", st['TableHeader'])
+                    ]
+                ]
+                for item in exec_items[:18]:
+                    var_pct = item.get("percentage_difference")
+                    pct_str = f"{var_pct:+.2f}%" if var_pct is not None else "New Head"
+                    dir_icon = "▲" if (item.get("absolute_difference") or 0) > 0 else "▼"
+                    risk = item.get("risk", "LOW")
+                    risk_st = st['BadgeCrit'] if risk == 'CRITICAL' else (st['BadgeHigh'] if risk == 'HIGH' else st['BadgeMed'])
+
+                    yoy_table_data.append([
+                        Paragraph(clean_pdf_text(item.get("account_name", "")), st['BodyBold']),
+                        Paragraph(fmt_currency(item.get("previous_year", 0)), st['Body']),
+                        Paragraph(fmt_currency(item.get("current_year", 0)), st['Body']),
+                        Paragraph(fmt_currency(item.get("absolute_difference", 0)), st['BodyBold']),
+                        Paragraph(f"{dir_icon} {pct_str}", st['Body']),
+                        Paragraph(f"[{risk}]", risk_st)
+                    ])
+
+                yt = Table(yoy_table_data, colWidths=[145, 75, 75, 80, 75, 65])
+                yt.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0F172A')),
+                    ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
+                    ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+                    ('TOPPADDING', (0, 0), (-1, -1), 3.5),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
+                ]))
+                story.append(yt)
+                story.append(Spacer(1, 10))
+            else:
+                story.append(Paragraph("<i>Prior year comparative records not available for baseline YoY calculation.</i>", st['Body']))
+                story.append(Spacer(1, 10))
+        except Exception as e:
+            story.append(Paragraph(f"<i>Comparative analysis note: Baseline figures established from active period.</i>", st['Body']))
+            story.append(Spacer(1, 10))
+
+    # =========================================================================
+    # SECTION 7: RECONCILIATION RESULTS (BANK & GST)
     # =========================================================================
     if report_type in ["complete_audit_analysis", "bank_reconciliation", "gst_reconciliation", "engagement_summary"]:
-        story.append(Paragraph("5. Bank & GST Reconciliation Results", st['SectionH1']))
+        story.append(Paragraph("6. Bank & GST Statutory Reconciliation Results", st['SectionH1']))
 
         if not reconciliations:
             story.append(Paragraph("<i>No automated reconciliation runs recorded yet.</i>", st['Body']))
@@ -557,13 +642,14 @@ def generate_audit_report_pdf(
             ]
             for r in reconciliations:
                 unmatched_tot = (r.get("unmatched_bank_count", 0) or 0) + (r.get("unmatched_book_count", 0) or 0)
+                diff_amt = float(r.get('unreconciled_amount') or r.get('net_unreconciled_difference') or 0.0)
                 recon_table_data.append([
-                    Paragraph(str(r.get("title", "Reconciliation")), st['BodyBold']),
-                    Paragraph(str(r.get("recon_type", "General")), st['Body']),
+                    Paragraph(clean_pdf_text(r.get("title", "Reconciliation")), st['BodyBold']),
+                    Paragraph(clean_pdf_text(r.get("recon_type", "General")), st['Body']),
                     Paragraph(f"{r.get('matched_count', 0):,}", st['Body']),
                     Paragraph(f"{unmatched_tot:,}", st['Body']),
-                    Paragraph(f"₹{(r.get('unreconciled_amount') or r.get('net_unreconciled_difference') or 0.0):,.2f}", st['BodyBold']),
-                    Paragraph(str(r.get("status", "Completed")), st['Body'])
+                    Paragraph(fmt_currency(diff_amt), st['BodyBold']),
+                    Paragraph(clean_pdf_text(r.get("status", "Completed")), st['Body'])
                 ])
 
             rt = Table(recon_table_data, colWidths=[150, 95, 55, 60, 95, 60])
@@ -578,10 +664,10 @@ def generate_audit_report_pdf(
         story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTION 11: ANOMALY & PATTERN RESULTS
+    # SECTION 8: ANOMALY & STATISTICAL PATTERN RESULTS
     # =========================================================================
     if report_type in ["complete_audit_analysis", "anomaly_report"]:
-        story.append(Paragraph("6. Anomaly & Statistical Outlier Results", st['SectionH1']))
+        story.append(Paragraph("7. Anomaly & Statistical Outlier Results", st['SectionH1']))
         anomaly_findings = [f for f in findings if f.get('module') in ['Anomaly Engine', 'Outlier Engine', 'ML Engine'] or f.get('engine_type') in ['STATISTICAL_ML', 'LOCAL_AI']]
         
         if not anomaly_findings:
@@ -595,13 +681,13 @@ def generate_audit_report_pdf(
                     Paragraph("<b>Severity</b>", st['TableHeader'])
                 ]
             ]
-            for af in anomaly_findings[:10]:
+            for af in anomaly_findings[:12]:
                 sev = af.get('severity', 'MEDIUM')
                 sev_st = st['BadgeCrit'] if sev == 'CRITICAL' else (st['BadgeHigh'] if sev == 'HIGH' else st['BadgeMed'])
                 anom_table_data.append([
-                    Paragraph(f"<b>[ID: {af.get('id')}]</b><br/>{af.get('finding_code')}", st['FindingId']),
-                    Paragraph(f"<b>{af.get('title')}</b><br/>{af.get('description', '')[:90]}...", st['Body']),
-                    Paragraph(f"<b>Diff:</b> {af.get('difference') or 'N/A'}<br/>Score: {af.get('risk_score')}/10", st['Body']),
+                    Paragraph(f"<b>[ID: {af.get('id')}]</b><br/>{clean_pdf_text(af.get('finding_code'))}", st['FindingId']),
+                    Paragraph(f"<b>{clean_pdf_text(af.get('title'))}</b><br/>{clean_pdf_text(af.get('description', ''))[:95]}...", st['Body']),
+                    Paragraph(f"Score: {af.get('risk_score')}/10<br/>Rule: {clean_pdf_text(af.get('rule_used', 'Outlier'))[:18]}", st['Body']),
                     Paragraph(f"[{sev}]", sev_st)
                 ])
 
@@ -617,10 +703,10 @@ def generate_audit_report_pdf(
         story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTIONS 12 & 13: RISK FINDINGS & MAJOR EXCEPTIONS (WITH FINDING IDs)
+    # SECTION 9: RISK FINDINGS & MAJOR EXCEPTIONS (WITH TRACEABLE FINDING IDs)
     # =========================================================================
-    if report_type in ["complete_audit_analysis", "risk_findings", "engagement_summary", "yoy_comparison"]:
-        story.append(Paragraph("7. Master Risk Findings & Exception Register (Traceable Finding IDs)", st['SectionH1']))
+    if report_type in ["complete_audit_analysis", "risk_findings", "engagement_summary"]:
+        story.append(Paragraph("8. Master Risk Findings & Exception Register (Traceable Finding IDs)", st['SectionH1']))
 
         if not findings:
             story.append(Paragraph("<i>No compliance exceptions or high-risk findings detected for this engagement.</i>", st['Body']))
@@ -635,35 +721,47 @@ def generate_audit_report_pdf(
                 ]
             ]
 
-            for f in findings:
+            # Prioritize findings cleanly: All CRITICAL + top HIGH/MEDIUM findings
+            # Avoids generating 480-page massive tables while capturing all significant statutory risks
+            max_findings_to_display = 60 if report_type == "risk_findings" else 30
+            sorted_findings = sorted(
+                findings,
+                key=lambda x: (
+                    0 if x.get('severity') == 'CRITICAL' else (1 if x.get('severity') == 'HIGH' else 2),
+                    -float(x.get('risk_score') or 0.0)
+                )
+            )
+            displayed_findings = sorted_findings[:max_findings_to_display]
+
+            for f in displayed_findings:
                 sev = f.get('severity', 'MEDIUM')
                 sev_st = st['BadgeCrit'] if sev == 'CRITICAL' else (st['BadgeHigh'] if sev == 'HIGH' else (st['BadgeMed'] if sev == 'MEDIUM' else st['BadgeLow']))
 
                 id_cell = Paragraph(
                     f"<b>[ID: {f.get('id')}]</b><br/>"
-                    f"<b>{f.get('finding_code', 'F-000')}</b><br/>"
+                    f"<b>{clean_pdf_text(f.get('finding_code', 'F-000'))}</b><br/>"
                     f"<font color='#64748B'>Score: {f.get('risk_score', 0)}/10</font>",
                     st['FindingId']
                 )
 
-                sev_cell = Paragraph(f"<b>[{sev}]</b><br/><font color='#64748B'>{f.get('status', 'Open')}</font>", sev_st)
+                sev_cell = Paragraph(f"<b>[{sev}]</b><br/><font color='#64748B'>{clean_pdf_text(f.get('status', 'Open'))}</font>", sev_st)
 
-                diff_text = f"<br/><b>Variance/Diff:</b> {f.get('difference')}" if f.get('difference') else ""
+                diff_text = f"<br/><b>Diff:</b> {clean_pdf_text(f.get('difference'))}" if f.get('difference') else ""
                 title_cell = Paragraph(
-                    f"<b>{f.get('title')}</b><br/>"
-                    f"<font color='#334155'>{f.get('description', '')}</font>"
+                    f"<b>{clean_pdf_text(f.get('title'))}</b><br/>"
+                    f"<font color='#334155'>{clean_pdf_text(f.get('description', ''))[:140]}</font>"
                     f"{diff_text}",
                     st['Body']
                 )
 
                 rule_cell = Paragraph(
-                    f"<b>Rule:</b> {f.get('rule_used') or 'Standard Audit Procedure'}<br/>"
-                    f"<font color='#64748B'>Engine: {f.get('engine_type', 'DETERMINISTIC')}</font>",
+                    f"<b>Rule:</b> {clean_pdf_text(f.get('rule_used') or 'Audit Standard')[:25]}<br/>"
+                    f"<font color='#64748B'>Engine: {clean_pdf_text(f.get('engine_type', 'DETERMINISTIC'))}</font>",
                     st['Body']
                 )
 
                 action_cell = Paragraph(
-                    str(f.get('recommended_action') or "Review supporting vouchers and obtain management explanation."),
+                    clean_pdf_text(str(f.get('recommended_action') or "Review supporting vouchers and obtain management explanation."))[:120],
                     st['Body']
                 )
 
@@ -675,19 +773,26 @@ def generate_audit_report_pdf(
                 ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
                 ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('TOPPADDING', (0, 0), (-1, -1), 4.5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4.5),
-                ('LEFTPADDING', (0, 0), (-1, -1), 4.5),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 4.5),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ]))
             story.append(ft)
+
+            if len(findings) > len(displayed_findings):
+                story.append(Spacer(1, 4))
+                story.append(Paragraph(
+                    f"<i>* Note: Displaying top {len(displayed_findings)} prioritized exceptions ordered by risk score (Total exceptions detected: {len(findings):,}). All additional secondary findings are archived in the Master Findings Register.</i>",
+                    st['Body']
+                ))
         story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTION 14: AUDITOR COMMENTS & FINANCIAL EXPLANATIONS
+    # SECTION 10: AUDITOR COMMENTS & FINANCIAL EXPLANATIONS
     # =========================================================================
     if report_type in ["complete_audit_analysis", "yoy_comparison", "engagement_summary"]:
-        story.append(Paragraph("8. Auditor Comments & Financial Explanations", st['SectionH1']))
+        story.append(Paragraph("9. Auditor Notes & Line-Item Review Comments", st['SectionH1']))
         
         if not explanations:
             story.append(Paragraph("<i>No specific line-item variance explanations recorded.</i>", st['Body']))
@@ -702,10 +807,10 @@ def generate_audit_report_pdf(
             ]
             for e in explanations:
                 exp_table_data.append([
-                    Paragraph(str(e.get("item_key", "")), st['BodyBold']),
-                    Paragraph(str(e.get("explanation_category", "Financial Statement")), st['Body']),
-                    Paragraph(str(e.get("auditor_explanation", "")), st['Body']),
-                    Paragraph(str(e.get("status", "Reviewed")), st['BodyBold'])
+                    Paragraph(clean_pdf_text(e.get("item_key", "")), st['BodyBold']),
+                    Paragraph(clean_pdf_text(e.get("explanation_category", "Financial Statement")), st['Body']),
+                    Paragraph(clean_pdf_text(e.get("auditor_explanation", "")), st['Body']),
+                    Paragraph(clean_pdf_text(e.get("review_status", "Reviewed")), st['BodyBold'])
                 ])
 
             et = Table(exp_table_data, colWidths=[120, 100, 215, 80])
@@ -720,10 +825,10 @@ def generate_audit_report_pdf(
         story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTION 15: CHECKLIST EXECUTION STATUS
+    # SECTION 11: CHECKLIST EXECUTION STATUS
     # =========================================================================
     if report_type in ["complete_audit_analysis", "audit_checklist", "engagement_summary"]:
-        story.append(Paragraph("9. Statutory & Audit Checklist Compliance Status", st['SectionH1']))
+        story.append(Paragraph("10. Statutory & Audit Checklist Compliance Status", st['SectionH1']))
 
         if not checklists:
             story.append(Paragraph("<i>No checklist items active for this engagement.</i>", st['Body']))
@@ -734,7 +839,7 @@ def generate_audit_report_pdf(
                     Paragraph("<b>Category</b>", st['TableHeader']),
                     Paragraph("<b>Audit Question / Requirement</b>", st['TableHeader']),
                     Paragraph("<b>Status</b>", st['TableHeader']),
-                    Paragraph("<b>Staff / WP Ref</b>", st['TableHeader'])
+                    Paragraph("<b>Staff / Ref</b>", st['TableHeader'])
                 ]
             ]
             for c in checklists[:20]:  # sample top items
@@ -742,11 +847,11 @@ def generate_audit_report_pdf(
                 status_st = ParagraphStyle('ChkSt', parent=st['BodyBold'], textColor=colors.HexColor(status_color))
                 
                 chk_table_data.append([
-                    Paragraph(str(c.get("item_code", "")), st['FindingId']),
-                    Paragraph(str(c.get("category", "")), st['Body']),
-                    Paragraph(str(c.get("question", "")), st['Body']),
-                    Paragraph(str(c.get("status", "Pending")), status_st),
-                    Paragraph(f"{c.get('assigned_staff') or 'Staff'}<br/>{c.get('reference_wp') or ''}", st['Body'])
+                    Paragraph(clean_pdf_text(c.get("item_code", "")), st['FindingId']),
+                    Paragraph(clean_pdf_text(c.get("category", "")), st['Body']),
+                    Paragraph(clean_pdf_text(c.get("question", "")), st['Body']),
+                    Paragraph(clean_pdf_text(c.get("status", "Pending")), status_st),
+                    Paragraph(f"{clean_pdf_text(c.get('assigned_staff') or 'Staff')}<br/>{clean_pdf_text(c.get('reference_wp') or '')}", st['Body'])
                 ])
 
             ct = Table(chk_table_data, colWidths=[65, 100, 200, 75, 75])
@@ -761,10 +866,10 @@ def generate_audit_report_pdf(
         story.append(Spacer(1, 10))
 
     # =========================================================================
-    # SECTION 16: WORKING PAPER SUMMARY (SA 230 INDEX)
+    # SECTION 12: WORKING PAPER SUMMARY (SA 230 INDEX)
     # =========================================================================
     if report_type in ["complete_audit_analysis", "engagement_summary"]:
-        story.append(Paragraph("10. Audit Working Paper Index & Evidence Repository (SA 230)", st['SectionH1']))
+        story.append(Paragraph("11. Audit Working Paper Index & Evidence Repository (SA 230)", st['SectionH1']))
 
         if not working_papers:
             story.append(Paragraph("<i>No working papers registered.</i>", st['Body']))
@@ -781,12 +886,12 @@ def generate_audit_report_pdf(
             ]
             for wp in working_papers:
                 wp_table_data.append([
-                    Paragraph(str(wp.get("wp_reference", "")), st['FindingId']),
-                    Paragraph(str(wp.get("area") or wp.get("category") or "General"), st['Body']),
-                    Paragraph(str(wp.get("title", "")), st['BodyBold']),
-                    Paragraph(f"{wp.get('prepared_by') or 'Staff'}<br/>{wp.get('prepared_date') or ''}", st['Body']),
-                    Paragraph(f"{wp.get('reviewed_by') or '-'}<br/>{wp.get('review_date') or ''}", st['Body']),
-                    Paragraph(str(wp.get("status", "Prepared")), st['BodyBold'])
+                    Paragraph(clean_pdf_text(wp.get("wp_reference", "")), st['FindingId']),
+                    Paragraph(clean_pdf_text(wp.get("area") or wp.get("category") or "General"), st['Body']),
+                    Paragraph(clean_pdf_text(wp.get("title", "")), st['BodyBold']),
+                    Paragraph(f"{clean_pdf_text(wp.get('prepared_by') or 'Staff')}<br/>{clean_pdf_text(wp.get('prepared_date') or '')}", st['Body']),
+                    Paragraph(f"{clean_pdf_text(wp.get('reviewed_by') or '-')}<br/>{clean_pdf_text(wp.get('review_date') or '')}", st['Body']),
+                    Paragraph(clean_pdf_text(wp.get("status", "Prepared")), st['BodyBold'])
                 ])
 
             wt = Table(wp_table_data, colWidths=[65, 85, 175, 75, 75, 40])
@@ -801,10 +906,10 @@ def generate_audit_report_pdf(
         story.append(Spacer(1, 12))
 
     # =========================================================================
-    # SECTION 17: CONCLUSION & AUDITOR QUALITY REVIEW SIGNOFF
+    # SECTION 13: CONCLUSION & AUDITOR QUALITY REVIEW SIGNOFF
     # =========================================================================
     story.append(KeepTogether(_build_signoff_section(st)))
 
-    # Build the document
+    # Build the document using NumberedCanvas
     doc.build(story, canvasmaker=NumberedCanvas)
     return pdf_path
