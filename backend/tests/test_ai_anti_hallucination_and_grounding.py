@@ -266,5 +266,5 @@ def test_live_model_trial_balance_inquiry(adversarial_engagement_setup):
 
     assert "conversation_id" in res
     response_lower = res["response"].lower()
-    assert any(w in response_lower for w in ["out of balance", "discrepancy", "difference", "unbalanced", "imbalance", "50,000", "75,000"])
+    assert any(w in response_lower for w in ["out of balance", "discrepancy", "difference", "unbalanced", "imbalance", "50,000", "75,000"]), f"Got: {res['response']}"
 
