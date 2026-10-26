@@ -79,6 +79,8 @@ def perform_clean_room_reset(confirm: bool = False):
     for target_dir in [uploads_dir, reports_dir]:
         if os.path.exists(target_dir):
             for fname in os.listdir(target_dir):
+                if fname == ".gitkeep":
+                    continue
                 fpath = os.path.join(target_dir, fname)
                 try:
                     if os.path.isfile(fpath) or os.path.islink(fpath):

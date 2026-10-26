@@ -66,8 +66,12 @@ def take_ultra_hd_screenshots(base_url="http://127.0.0.1:8000", output_dir="scre
         print("[+] Logging in with admin credentials...")
         page.wait_for_selector("#login-username", state="visible")
         page.fill("#login-username", "admin")
-        page.fill("#login-password", "SecureAdmin2026!")
-        page.click("#login-submit-btn")
+        for pwd in ["admin123", "SecureAdmin2026!"]:
+            page.fill("#login-password", pwd)
+            page.click("#login-submit-btn")
+            time.sleep(1.0)
+            if not page.locator("#login-screen-overlay").is_visible():
+                break
 
         page.wait_for_selector("#login-screen-overlay", state="hidden", timeout=10000)
         page.wait_for_selector("#app-container", state="visible")
