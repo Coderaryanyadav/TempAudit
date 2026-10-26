@@ -979,13 +979,16 @@ TempAudit/
 │   ├── development/            # Environment setup & test guides
 │   ├── maintenance/            # Repository audit, structure, and cleanup logs
 │   └── production/             # Comprehensive 18-volume production specifications
-├── scripts/                    # Safe maintenance & operational scripts
+├── scripts/                    # Operational scripts, test runners, & platform launchers
+│   ├── setup_mac.sh            # macOS / Linux environment installer
+│   ├── start_mac.sh            # macOS / Linux daily launcher
+│   ├── setup_windows.bat       # Windows environment installer
+│   ├── start_windows.bat       # Windows daily launcher
+│   ├── run_tests.sh            # Universal test runner
+│   ├── test_browser_suite.py   # Consolidated Playwright real-browser suite
 │   ├── cleanup_generated.sh    # Safe dry-run cleanup automation
 │   └── README.md               # Script usage & safety constraints
 ├── test_data/                  # Synthetic test fixtures & client trial balances
-├── initialize/                 # Platform launcher scripts
-│   ├── start_mac.sh            # macOS launcher (starts LM Studio & FastAPI)
-│   └── start_windows.bat       # Windows launcher
 ├── .env.example                # Configuration template
 ├── .gitignore                  # Git exclusion rules
 ├── package.json                # Frontend test dependencies
@@ -1008,15 +1011,15 @@ TempAudit/
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/Coderaryadav/TempAudit.git
+git clone https://github.com/Coderaryanyadav/TempAudit.git
 cd TempAudit
 
-# 2. Setup Virtual Environment
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+# 2. Setup Virtual Environment & Install Dependencies
+./scripts/setup_mac.sh
+# (or on Windows: scripts\setup_windows.bat)
 
 # 3. Launch Platform
-./initialize/start_mac.sh
+./scripts/start_mac.sh
+# (or on Windows: scripts\start_windows.bat / python run.py)
 # Accessible at http://127.0.0.1:8000
 ```

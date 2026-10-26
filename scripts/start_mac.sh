@@ -21,8 +21,8 @@ fi
 # 1. Activate venv if present
 if [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
-elif [ -f "../0 - BACKUP/FinAuditPro/.venv/bin/activate" ]; then
-    source "../0 - BACKUP/FinAuditPro/.venv/bin/activate"
+elif [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
 fi
 
 # 2. Ensure database exists and schema is initialized

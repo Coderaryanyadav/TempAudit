@@ -50,8 +50,7 @@ TempAudit-main/
 │   │   ├── api.js                 # API client, token interceptor, download URL signing
 │   │   └── app.js                 # State machine, navigation router, view renderers
 │   └── tests/                     # Node.js session, token, and download regression suites
-├── initialize/                    # Platform launch packages (setup_mac.sh, start_mac.sh, windows .bat)
-├── scripts/                       # E2E workflow runners, admin creator, Playwright browser tests
+├── scripts/                       # Platform launch packages (setup/start scripts), test runners, seeders
 ├── DevOps/                        # CI workflow definitions (DevOps/ci/ci.yml)
 ├── requirements.txt               # Root Python production dependencies
 └── README.md                      # Architecture documentation & quickstart guide

@@ -8,8 +8,11 @@ echo   Standalone Offline-First CA Auditing Suite
 echo ==============================================================================
 echo.
 
+:: Move to project root directory
+cd /d "%~dp0\.."
+
 :: 1. Verify Windows Environment
-echo [1/7] Verifying Windows OS Environment...
+echo [1/8] Verifying Windows OS Environment...
 if not "%OS%"=="Windows_NT" (
     echo [ERROR] This installer is designed for Windows operating systems.
     exit /b 1
@@ -18,7 +21,7 @@ echo [OK] Windows OS detected.
 
 :: 2. Check Python Runtime
 echo.
-echo [2/7] Checking Python 3.10+ installation...
+echo [2/8] Checking Python 3.10+ installation...
 python --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Python is not installed or not found in PATH.
@@ -30,7 +33,7 @@ echo [OK] Found Python version %PY_VER%
 
 :: 3. Create Virtual Environment
 echo.
-echo [3/7] Setting up Python virtual environment (venv)...
+echo [3/8] Setting up Python virtual environment (venv)...
 if not exist "venv" (
     python -m venv venv
     if %ERRORLEVEL% NEQ 0 (
@@ -44,24 +47,19 @@ if not exist "venv" (
 
 :: 4. Install Dependencies
 echo.
+echo [4/8] Installing production dependencies from requirements.txt...
 call venv\Scripts\activate.bat
 python -m pip install --upgrade pip --quiet
-if exist requirements.lock (
-    echo [4/7] Installing pinned dependencies from requirements.lock...
-    python -m pip install -r requirements.lock --quiet
-) else (
-    echo [4/7] Installing dependencies from requirements.txt...
-    python -m pip install -r requirements.txt --quiet
-)
+python -m pip install -r requirements.txt --quiet
 if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Dependency installation failed. Check internet connection or requirements file.
+    echo [ERROR] Dependency installation failed. Check internet connection or requirements.txt.
     exit /b 1
 )
 echo [OK] All dependencies successfully verified and installed.
 
 :: 5. Create Application Runtime Directories
 echo.
-echo [5/7] Creating required application data directories...
+echo [5/8] Creating required application data directories...
 if not exist "backend\backups" mkdir "backend\backups"
 if not exist "backend\uploaded_files" mkdir "backend\uploaded_files"
 if not exist "backend\reports_generated" mkdir "backend\reports_generated"
@@ -70,7 +68,7 @@ echo [OK] Data directories created: backups, uploaded_files, reports_generated, 
 
 :: 6. Initialize Clean Production Database
 echo.
-echo [6/8] Initializing clean production database and admin security...
+echo [6/8] Initializing production database and security schema...
 python -m backend.app.database
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Database initialization failed.
@@ -78,7 +76,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 echo [OK] Clean database initialized at backend\finauditpro.db.
 
-:: 7. Administrator Account Setup
+:: 7. Optional Admin Account Creation
 echo.
 echo [7/8] Administrator Account Setup
 echo Would you like to create an Administrator account now? (Y/N)
@@ -100,9 +98,7 @@ echo   SUCCESS: FinAuditPro Installation Completed Successfully!
 echo ==============================================================================
 echo.
 echo   To launch the application:
-echo     start.bat   OR   python run.py
-echo     (Cross-platform scripts available in the .\initialize\ folder)
-echo   First-Run Setup:
-echo     Open http://127.0.0.1:8000 in your browser.
+echo     Run: scripts\start_windows.bat   OR   python run.py
+echo     Web Interface: http://127.0.0.1:8000
 echo.
 pause

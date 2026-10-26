@@ -59,12 +59,12 @@ TempAudit/
 │   ├── maintenance/               # Repository audit, structure, and cleanup reports
 │   ├── production/                # Operational manuals, statutory formulas, release readiness
 │   └── production-review/         # Comprehensive release scorecards and defect verification
-├── initialize/                    # Platform-specific initializers and runners
+├── scripts/                       # Operational utilities, platform launchers, and test automation scripts
 │   ├── setup_mac.sh               # macOS environment setup and dependency installer
 │   ├── start_mac.sh               # macOS runner with LM Studio auto-start & model loading
 │   ├── setup_windows.bat          # Windows environment setup batch script
-│   └── start_windows.bat          # Windows runner batch script
-├── scripts/                       # Operational utilities and test automation scripts
+│   ├── start_windows.bat          # Windows runner batch script
+│   ├── run_tests.sh               # Universal test runner
 │   ├── activate_github_ci_workflow.sh
 │   ├── clean_room_reset.py        # Reset database to pristine state for verification
 │   ├── cleanup_generated.sh       # Safe cache & temporary artifact cleanup script
@@ -117,7 +117,7 @@ TempAudit/
 4. `backend/app/services/local_ai_provider.py`:
    - Increased inference timeout from 45.0s to 60.0s for 14B models.
    - Added automatic resolution of active loaded chat model if default `local-model` placeholder is configured.
-5. `initialize/start_mac.sh`:
+5. `scripts/start_mac.sh`:
    - Added automated discovery of `lms` CLI tool.
    - Auto-starts LM Studio server if not running.
    - Auto-loads `qwen2.5-coder-14b-instruct-mlx` model.
@@ -162,7 +162,7 @@ The following items were explicitly protected and preserved:
 ### Option A: Standard Native Startup (Recommended)
 ```bash
 # 1. Start application (automatically loads LM Studio local AI model and launches browser)
-./initialize/start_mac.sh
+./scripts/start_mac.sh
 
 # 2. Access Web Interface:
 # http://127.0.0.1:8000

@@ -57,6 +57,6 @@ uploaded_files/
 
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
-screenshots/
+/screenshots/
 fiverr_deliverables/
 screenshots_root_backup/

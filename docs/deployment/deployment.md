@@ -14,11 +14,11 @@ FinAuditPro is designed primarily as a **100% Offline-First Desktop / Local Work
    ```
 2. Run installation script:
    ```bash
-   ./initialize/setup_mac.sh
+   ./scripts/setup_mac.sh
    ```
 3. Launch daily audit operations:
    ```bash
-   ./initialize/start_mac.sh
+   ./scripts/start_mac.sh
    ```
 
 ### Windows Setup
@@ -29,11 +29,11 @@ FinAuditPro is designed primarily as a **100% Offline-First Desktop / Local Work
    ```
 2. Run installation script:
    ```cmd
-   initialize\setup_windows.bat
+   scripts\setup_windows.bat
    ```
 3. Launch daily audit operations:
    ```cmd
-   initialize\start_windows.bat
+   scripts\start_windows.bat
    ```
 
 ---

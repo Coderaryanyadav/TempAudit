@@ -15,11 +15,11 @@
    ```
 2. Execute the verified setup script (creates virtual environment and installs dependencies):
    ```bash
-   ./initialize/setup_mac.sh
+   ./scripts/setup_mac.sh
    ```
 3. Start the application server:
    ```bash
-   ./initialize/start_mac.sh
+   ./scripts/start_mac.sh
    ```
 4. Open your web browser and navigate to: `http://127.0.0.1:8000`.
 

@@ -41,18 +41,22 @@ TempAudit/
 │   ├── maintenance/               # Repository audit, structure, and cleanup reports
 │   ├── production/                # Operational manuals, statutory formulas, release readiness
 │   └── production-review/         # Comprehensive release scorecards and defect verification
-├── initialize/                    # Platform-specific initializers and runners
+├── scripts/                       # Operational utilities, platform launchers, and test automation scripts
 │   ├── setup_mac.sh               # macOS environment setup and dependency installer
 │   ├── start_mac.sh               # macOS runner with LM Studio auto-start & model loading
 │   ├── setup_windows.bat          # Windows environment setup batch script
-│   └── start_windows.bat          # Windows runner batch script
-├── scripts/                       # Operational utilities and test automation scripts
+│   ├── start_windows.bat          # Windows runner batch script
+│   ├── run_tests.sh               # Universal test runner
 │   ├── activate_github_ci_workflow.sh
 │   ├── clean_room_reset.py        # Reset database to pristine state for verification
 │   ├── cleanup_generated.sh       # Safe cache & temporary artifact cleanup script
 │   ├── create_admin.py            # Interactive CLI administrator account creation
 │   ├── e2e_full_audit_workflow.py # 24-step end-to-end statutory audit verification
-│   └── seed_test_data.py          # Synthetic corporate data seeder
+│   ├── generate_reports_and_docs.py # Master report compendium & doc PDF generator
+│   ├── reset_and_seed_aryan_fintech.py # Gold-standard corporate data seeder
+│   ├── seed_test_data.py          # Synthetic corporate data seeder
+│   ├── take_all_screenshots.py    # Ultra-HD 4K screenshot suite (docs/screenshots/)
+│   └── test_browser_suite.py      # Consolidated Playwright real-browser suite
 ├── test_data/                     # Synthetic test fixtures & mock business records
 │   ├── aryan_fintech/             # Complete statutory & tax audit test data suite
 │   ├── hitansh_fintech/           # Secondary isolated entity for multi-tenant tests

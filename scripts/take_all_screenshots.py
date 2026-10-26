@@ -4,7 +4,7 @@ import sys
 import time
 from playwright.sync_api import sync_playwright
 
-def take_ultra_hd_screenshots(base_url="http://127.0.0.1:8000", output_dir="screenshots"):
+def take_ultra_hd_screenshots(base_url="http://127.0.0.1:8000", output_dir="docs/screenshots"):
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     target_dir = os.path.join(project_root, output_dir)
     os.makedirs(target_dir, exist_ok=True)
