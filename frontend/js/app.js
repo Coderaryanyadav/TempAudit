@@ -3144,7 +3144,7 @@ async function renderImportData() {
     }
     if (importSearchQuery.trim()) {
       const q = importSearchQuery.trim().toLowerCase();
-      filteredFiles = filteredFiles.filter(f => 
+      filteredFiles = filteredFiles.filter(f =>
         (f.file_name || "").toLowerCase().includes(q) ||
         (f.data_category || "").toLowerCase().includes(q) ||
         (f.uploaded_by || "").toLowerCase().includes(q) ||
@@ -3317,16 +3317,16 @@ async function renderImportData() {
             All Files (${uploadedFiles.length})
           </button>
           ${uniqueCategories.map(cat => {
-            const count = uploadedFiles.filter(f => (f.data_category || 'General Ledger') === cat).length;
-            const isSel = importCategoryFilter === cat;
-            return `
+      const count = uploadedFiles.filter(f => (f.data_category || 'General Ledger') === cat).length;
+      const isSel = importCategoryFilter === cat;
+      return `
               <button class="demo-chip ${isSel ? 'active' : ''}" 
                       style="${isSel ? 'background: var(--primary); color: white;' : ''}" 
                       onclick="filterImportByCategory('${escapeHtml(cat)}')">
                 ${escapeHtml(cat)} (${count})
               </button>
             `;
-          }).join('')}
+    }).join('')}
         </div>
 
         ${filteredFiles.length === 0 ? `
@@ -3352,14 +3352,14 @@ async function renderImportData() {
               </thead>
               <tbody>
                 ${filteredFiles.map(f => {
-                  const cat = f.data_category || 'General Ledger';
-                  let moduleLink = '';
-                  if (cat.includes('General Ledger')) moduleLink = `<a href="#" onclick="navigateTo('general_ledger'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in GL Explorer →</a>`;
-                  else if (cat.includes('Bank')) moduleLink = `<a href="#" onclick="navigateTo('reconciliation'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in BRS →</a>`;
-                  else if (cat.includes('GST') || cat.includes('Purchase')) moduleLink = `<a href="#" onclick="navigateTo('reconciliation'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in GST Recon →</a>`;
-                  else if (cat.includes('Trial Balance')) moduleLink = `<a href="#" onclick="navigateTo('trial_balance'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in Trial Balance →</a>`;
+      const cat = f.data_category || 'General Ledger';
+      let moduleLink = '';
+      if (cat.includes('General Ledger')) moduleLink = `<a href="#" onclick="navigateTo('general_ledger'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in GL Explorer →</a>`;
+      else if (cat.includes('Bank')) moduleLink = `<a href="#" onclick="navigateTo('reconciliation'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in BRS →</a>`;
+      else if (cat.includes('GST') || cat.includes('Purchase')) moduleLink = `<a href="#" onclick="navigateTo('reconciliation'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in GST Recon →</a>`;
+      else if (cat.includes('Trial Balance')) moduleLink = `<a href="#" onclick="navigateTo('trial_balance'); return false;" style="font-size: 11px; color: #2563eb; display: block; margin-top: 2px;">View in Trial Balance →</a>`;
 
-                  return `
+      return `
                     <tr>
                       <td>
                         <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">${escapeHtml(f.file_name || f.filename)}</div>
@@ -3401,7 +3401,7 @@ async function renderImportData() {
                       </td>
                     </tr>
                   `;
-                }).join("")}
+    }).join("")}
               </tbody>
             </table>
           </div>
@@ -3496,10 +3496,10 @@ async function openFilePreviewDrawer(fileId) {
               ${rows.map(r => `
                 <tr>
                   ${columns.map(c => {
-                    const val = r[c];
-                    const isAmt = (c === 'debit' || c === 'credit' || c === 'amount');
-                    return `<td style="padding: 6px 10px; ${isAmt ? 'text-align: right; font-family: var(--font-mono); font-weight: 600;' : ''}">${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) : '<span style="color:#cbd5e1;">—</span>'}</td>`;
-                  }).join('')}
+      const val = r[c];
+      const isAmt = (c === 'debit' || c === 'credit' || c === 'amount');
+      return `<td style="padding: 6px 10px; ${isAmt ? 'text-align: right; font-family: var(--font-mono); font-weight: 600;' : ''}">${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) : '<span style="color:#cbd5e1;">—</span>'}</td>`;
+    }).join('')}
                 </tr>
               `).join('')}
             </tbody>
@@ -6416,16 +6416,16 @@ async function renderGeneralLedger() {
             Clean Entries (${Math.max(0, (glData.total_transactions || 0) - (glData.flagged_transactions_count || 0)).toLocaleString('en-IN')})
           </button>
           ${Object.entries(GL_RULE_LABELS).map(([code, label]) => {
-            const count = ruleCountMap[code] || 0;
-            const isSelected = glFilterState.anomaly_rule === code;
-            return `
+      const count = ruleCountMap[code] || 0;
+      const isSelected = glFilterState.anomaly_rule === code;
+      return `
               <button class="demo-chip ${isSelected ? 'active' : ''}" 
                       style="${isSelected ? 'background: #dc2626; color: white; border-color: #dc2626;' : (count > 0 ? 'border-color: #fca5a5;' : 'opacity: 0.75;')}" 
                       onclick="setGLAnomalyFilter('${code}')">
                 ${label} ${count > 0 ? `<span class="badge" style="background:${isSelected ? '#991b1b' : '#fee2e2'}; color:${isSelected ? '#fff' : '#991b1b'}; margin-left:4px; font-size:10px; padding:1px 5px; font-weight: 700;">${count}</span>` : ''}
               </button>
             `;
-          }).join('')}
+    }).join('')}
         </div>
       </div>
 
@@ -6577,7 +6577,7 @@ function renderGLRegisterTab(container) {
   // Client quick search filter
   if (glQuickSearch.trim()) {
     const q = glQuickSearch.trim().toLowerCase();
-    list = list.filter(t => 
+    list = list.filter(t =>
       (t.description || "").toLowerCase().includes(q) ||
       (t.voucher_no || "").toLowerCase().includes(q) ||
       (t.party_name || "").toLowerCase().includes(q) ||
@@ -6696,10 +6696,10 @@ function renderGLRegisterTab(container) {
             </thead>
             <tbody>
               ${pageItems.map(t => {
-                const txAnomalies = t.anomalies || [];
-                const hasAnom = txAnomalies.length > 0;
-                const highestSev = hasAnom ? txAnomalies[0].severity : null;
-                return `
+    const txAnomalies = t.anomalies || [];
+    const hasAnom = txAnomalies.length > 0;
+    const highestSev = hasAnom ? txAnomalies[0].severity : null;
+    return `
                   <tr style="${hasAnom ? 'background-color: #fffbf5;' : ''}">
                     <td class="font-mono" style="font-size: 11.5px; white-space: nowrap;">${t.date || '—'}</td>
                     <td class="font-mono font-bold" style="font-size: 11.5px; color: var(--text-main); white-space: nowrap;">
@@ -6742,7 +6742,7 @@ function renderGLRegisterTab(container) {
                     </td>
                   </tr>
                 `;
-              }).join('')}
+  }).join('')}
             </tbody>
           </table>
         </div>
@@ -6875,9 +6875,9 @@ function renderGLAnomaliesTab(container) {
     ` : `
       <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
         ${pageAnomalies.map(a => {
-          const t = a.transaction || {};
-          const amt = floatVal(t.amount || Math.max(t.debit || 0, t.credit || 0));
-          return `
+    const t = a.transaction || {};
+    const amt = floatVal(t.amount || Math.max(t.debit || 0, t.credit || 0));
+    return `
             <div class="card" style="padding: 14px 16px; border-left: 4px solid ${a.severity === 'CRITICAL' ? '#dc2626' : a.severity === 'HIGH' ? '#ea580c' : '#f59e0b'};">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap;">
                 <div style="flex: 1; min-width: 280px;">
@@ -6915,7 +6915,7 @@ function renderGLAnomaliesTab(container) {
               </div>
             </div>
           `;
-        }).join('')}
+  }).join('')}
       </div>
 
       <!-- Pagination Footer -->
@@ -6954,7 +6954,7 @@ function setGLAnomalyPage(p) {
 // ----------------- TAB 3: LEDGER HEAD SUMMARIES -----------------
 function renderGLAccountsTab(container) {
   const transactions = currentGLData.transactions || [];
-  
+
   // Aggregate ledger heads
   const ledgerMap = {};
   transactions.forEach(t => {
@@ -7003,9 +7003,9 @@ function renderGLAccountsTab(container) {
           </thead>
           <tbody>
             ${accounts.map(a => {
-              const net = a.debit - a.credit;
-              const netStr = `${formatINR(Math.abs(net))} ${net >= 0 ? 'Dr' : 'Cr'}`;
-              return `
+    const net = a.debit - a.credit;
+    const netStr = `${formatINR(Math.abs(net))} ${net >= 0 ? 'Dr' : 'Cr'}`;
+    return `
                 <tr>
                   <td><b style="font-size: 12.5px; color: var(--text-main);">${escapeHtml(a.name)}</b></td>
                   <td class="text-right font-mono" style="font-size: 12px;">${a.count.toLocaleString('en-IN')}</td>
@@ -7026,7 +7026,7 @@ function renderGLAccountsTab(container) {
                   </td>
                 </tr>
               `;
-            }).join('')}
+  }).join('')}
           </tbody>
         </table>
       </div>
